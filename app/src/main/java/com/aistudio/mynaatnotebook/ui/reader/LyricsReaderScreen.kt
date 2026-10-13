@@ -5,6 +5,9 @@ import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
@@ -628,78 +631,66 @@ private fun ReaderAudioControls(
             fontWeight = FontWeight.SemiBold,
             color = HighContrastGray
         )
+        // Line 1: seek — current time, full-width slider, total time
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // Skip backward 10s
-            IconButton(
-                onClick = { controller.skipBackward() },
-                modifier = Modifier.testTag("reader_skip_back")
-            ) {
-                Icon(
-                    Icons.Default.Replay10,
-                    contentDescription = stringResource(R.string.player_skip_back_cd),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            IconButton(
-                onClick = {
-                    if (playing) controller.pause()
-                    else if (ownsSelected) controller.resume()
-                    else viewModel.startEntryPlayback(naat, selectedPath)
-                },
-                modifier = Modifier.testTag("reader_play_pause")
-            ) {
-                Icon(
-                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (playing) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            // Skip forward 10s
-            IconButton(
-                onClick = { controller.skipForward() },
-                modifier = Modifier.testTag("reader_skip_forward")
-            ) {
-                Icon(
-                    Icons.Default.Forward10,
-                    contentDescription = stringResource(R.string.player_skip_forward_cd),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
+            Text(
+                formatTime(position),
+                style = MaterialTheme.typography.bodySmall,
+                color = HighContrastGray
+            )
             Slider(
                 value = position.toFloat(),
                 onValueChange = { controller.seekTo(it.toInt()) },
                 valueRange = 0f..(if (duration > 0) duration.toFloat() else 1000f),
-                modifier = Modifier.weight(1f).testTag("reader_audio_seekbar")
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp).testTag("reader_audio_seekbar")
             )
             Text(
-                "${formatTime(position)} / ${formatTime(duration)}",
+                formatTime(duration),
                 style = MaterialTheme.typography.bodySmall,
                 color = HighContrastGray
             )
         }
-        // Advanced controls: speed + sleep timer
-        PlayerAdvancedControls(controller = controller)
+        // Line 2: transport — speed chip, skip back, big play/pause, skip
+        // forward, sleep timer chip (same layout as the approved preview).
+        PlayerTransportControls(
+            controller = controller,
+            playing = playing,
+            onPlayPause = {
+                if (playing) controller.pause()
+                else if (ownsSelected) controller.resume()
+                else viewModel.startEntryPlayback(naat, selectedPath)
+            }
+        )
     }
 }
 
 /**
- * Speed selector and sleep timer row for the reader player.
+ * Transport row for the reader player: speed chip on the left, skip-back,
+ * a large filled play/pause button and skip-forward in the middle, and the
+ * sleep timer chip on the right.
  */
 @Composable
-private fun PlayerAdvancedControls(controller: com.aistudio.mynaatnotebook.audio.PlaybackController) {
+private fun PlayerTransportControls(
+    controller: com.aistudio.mynaatnotebook.audio.PlaybackController,
+    playing: Boolean,
+    onPlayPause: () -> Unit
+) {
     val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
     val sleepRemaining by controller.sleepTimerRemainingMs.collectAsStateWithLifecycle()
     var showSleepDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val chipBorder = MaterialTheme.colorScheme.outline
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Speed button: tap to cycle through speeds
+        // Speed chip: tap to cycle through speeds
         TextButton(
             onClick = { controller.cyclePlaybackSpeed() },
-            modifier = Modifier.testTag("reader_speed_btn")
+            modifier = Modifier
+                .border(1.dp, chipBorder, RoundedCornerShape(16.dp))
+                .testTag("reader_speed_btn")
         ) {
             Text(
                 text = "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x",
@@ -708,15 +699,54 @@ private fun PlayerAdvancedControls(controller: com.aistudio.mynaatnotebook.audio
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
-        // Sleep timer button
+        // Skip backward 10s
+        IconButton(
+            onClick = { controller.skipBackward() },
+            modifier = Modifier.testTag("reader_skip_back")
+        ) {
+            Icon(
+                Icons.Default.Replay10,
+                contentDescription = stringResource(R.string.player_skip_back_cd),
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        // Big filled play/pause
+        IconButton(
+            onClick = onPlayPause,
+            modifier = Modifier
+                .size(56.dp)
+                .background(MaterialTheme.colorScheme.onBackground, CircleShape)
+                .testTag("reader_play_pause")
+        ) {
+            Icon(
+                if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (playing) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
+                tint = MaterialTheme.colorScheme.background,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+        // Skip forward 10s
+        IconButton(
+            onClick = { controller.skipForward() },
+            modifier = Modifier.testTag("reader_skip_forward")
+        ) {
+            Icon(
+                Icons.Default.Forward10,
+                contentDescription = stringResource(R.string.player_skip_forward_cd),
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        // Sleep timer chip
         TextButton(
             onClick = { showSleepDialog = true },
-            modifier = Modifier.testTag("reader_sleep_timer_btn")
+            modifier = Modifier
+                .border(1.dp, chipBorder, RoundedCornerShape(16.dp))
+                .testTag("reader_sleep_timer_btn")
         ) {
             Icon(
                 Icons.Default.Bedtime,
                 contentDescription = stringResource(R.string.player_sleep_timer_cd),
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
                 tint = if (sleepRemaining != null) MaterialTheme.colorScheme.primary
                        else MaterialTheme.colorScheme.onBackground
             )

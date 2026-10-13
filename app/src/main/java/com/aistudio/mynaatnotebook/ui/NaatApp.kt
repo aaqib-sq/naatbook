@@ -231,7 +231,8 @@ fun NaatApp(
                                     else -> LibraryScreen(
                                         viewModel = viewModel,
                                         onOpenReader = ::openReader,
-                                        onEdit = ::openEditorById
+                                        onEdit = ::openEditorById,
+                                        onAddEntry = ::openAdd
                                     )
                                 }
                             }
