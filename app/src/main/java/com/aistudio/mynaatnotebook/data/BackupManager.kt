@@ -37,8 +37,11 @@ internal fun safeBackupDestination(baseDir: File, entryName: String): File? {
     return destination.takeIf { it.canonicalFile.path.startsWith(basePath) }
 }
 
-/** Result of an import: how many entries were added vs skipped as duplicates. */
-data class ImportResult(val imported: Int, val skipped: Int)
+/** Result of an import: entries added, duplicates skipped (merge), old entries removed (replace). */
+data class ImportResult(val imported: Int, val skipped: Int, val removedExisting: Int = 0)
+
+/** How an import treats the current library. */
+enum class ImportMode { MERGE, REPLACE }
 
 /** User-controlled ZIP import/export for the offline notebook. */
 @Singleton
@@ -228,6 +231,7 @@ class BackupManager @Inject constructor(
      */
     suspend fun importBackup(
         inputUri: Uri,
+        mode: ImportMode = ImportMode.MERGE,
         onProgress: (Float) -> Unit = {}
     ): Result<ImportResult> = withContext(Dispatchers.IO) {
         audioFiles.exclusive {
@@ -241,12 +245,24 @@ class BackupManager @Inject constructor(
             onProgress(0.45f)
             val plan = buildRestorePlan(staged)
             onProgress(0.55f)
-            // Smart import: skip entries that already exist (same content).
-            val existingSignatures = loadExistingSignatures { p ->
-                onProgress(0.55f + p * 0.1f)
+            // Snapshot of the current library: in MERGE it drives duplicate
+            // skipping; in REPLACE its rows are removed after a successful
+            // commit, so any pre-commit failure leaves the library untouched.
+            val existingEntries = repository.allNaats.first()
+            val newEntries: List<PlannedEntry>
+            val skipped: Int
+            if (mode == ImportMode.REPLACE) {
+                newEntries = plan.entries
+                skipped = 0
+                onProgress(0.65f)
+            } else {
+                // Smart import: skip entries that already exist (same content).
+                val existingSignatures = loadExistingSignatures(existingEntries) { p ->
+                    onProgress(0.55f + p * 0.1f)
+                }
+                newEntries = plan.entries.filter { it.signature !in existingSignatures }
+                skipped = plan.entries.size - newEntries.size
             }
-            val newEntries = plan.entries.filter { it.signature !in existingSignatures }
-            val skipped = plan.entries.size - newEntries.size
             onProgress(0.68f)
             val neededArchivePaths = newEntries.flatMap {
                 listOfNotNull(it.primaryArchivePath, it.secondaryArchivePath)
@@ -255,8 +271,22 @@ class BackupManager @Inject constructor(
             val committed = commitRestorePlan(newEntries.map { it.entity }, neededAudio.values) { p ->
                 onProgress(0.68f + p * 0.32f)
             }
+            var removedExisting = 0
+            if (mode == ImportMode.REPLACE && existingEntries.isNotEmpty()) {
+                // The backup is fully committed; only now remove the old rows
+                // and any of their audio files the new library doesn't use.
+                val keptPaths = newEntries.flatMap {
+                    listOfNotNull(it.entity.audioPath, it.entity.secondaryAudioPath)
+                }.toSet()
+                existingEntries.forEach { old -> repository.deleteById(old.id) }
+                removedExisting = existingEntries.size
+                existingEntries.flatMap { listOfNotNull(it.audioPath, it.secondaryAudioPath) }
+                    .distinct()
+                    .filter { it !in keptPaths }
+                    .forEach { path -> runCatching { File(path).delete() } }
+            }
             onProgress(1f)
-            ImportResult(committed, skipped)
+            ImportResult(committed, skipped, removedExisting)
             }.onFailure { Log.e("BackupManager", "Import failed", it) }
                 .also { stagingDir.deleteRecursively() }
         }
@@ -279,8 +309,10 @@ class BackupManager @Inject constructor(
         secondaryDigest.orEmpty()
     ).joinToString("|")
 
-    private suspend fun loadExistingSignatures(onProgress: (Float) -> Unit = {}): Set<String> {
-        val existing = repository.allNaats.first()
+    private suspend fun loadExistingSignatures(
+        existing: List<NaatEntity>,
+        onProgress: (Float) -> Unit = {}
+    ): Set<String> {
         return existing.mapIndexed { index, entry ->
             entrySignature(
                 entry.title,

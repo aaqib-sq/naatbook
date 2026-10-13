@@ -26,7 +26,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import javax.inject.Inject
 
-private const val DRAFT_PERSIST_DEBOUNCE_MS = 350L
+private const val DRAFT_PERSIST_DEBOUNCE_MS = 150L
 
 @HiltViewModel
 class NaatViewModel @Inject constructor(
