@@ -162,6 +162,17 @@
     <string name="settings_import_confirm_title">Import backup?</string>
     <string name="settings_import_confirm_message">This will add entries from the backup to your library. Continue?</string>
     <string name="settings_import_confirm_import">Import</string>
+    <string name="settings_import_mode_merge">Add to library</string>
+    <string name="settings_import_mode_merge_desc">New entries are added; entries that already exist are skipped.</string>
+    <string name="settings_import_mode_replace">Replace library</string>
+    <string name="settings_import_mode_replace_desc">Everything currently in the library is deleted and replaced by this backup.</string>
+    <string name="settings_import_replace_title">Replace the whole library?</string>
+    <string name="settings_import_replace_message">This will permanently delete all current entries and their audio, then load the backup. This cannot be undone. Continue?</string>
+    <string name="settings_import_replace_confirm">Delete and replace</string>
+    <string name="status_import_success_replaced">Library replaced: %1$d entries loaded, %2$d old entries removed.</string>
+    <string name="editor_replace_audio_title">Replace existing audio?</string>
+    <string name="editor_replace_audio_body">This entry already has an audio attached. The new audio will replace it, and the old audio will be removed when you save.</string>
+    <string name="action_replace">Replace</string>
     <string name="action_cancel">Cancel</string>
     <string name="editor_file_too_large">File is too large (max 100 MB)</string>
     <string name="editor_invalid_audio_file">This file is not valid audio and was not attached</string>

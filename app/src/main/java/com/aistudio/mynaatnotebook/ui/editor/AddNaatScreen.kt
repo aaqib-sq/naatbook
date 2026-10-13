@@ -2,6 +2,7 @@ package com.aistudio.mynaatnotebook.ui.editor
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -267,6 +269,32 @@ private fun EditorMetadataSection(viewModel: NaatViewModel) {
     }
 }
 
+/**
+ * Confirmation shown before an action that would replace an audio already
+ * attached to this entry (the old audio is removed when the entry is saved).
+ */
+@Composable
+private fun ReplaceAudioConfirmDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.editor_replace_audio_title)) },
+        text = { Text(stringResource(R.string.editor_replace_audio_body)) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag("replace_audio_confirm")
+            ) { Text(stringResource(R.string.action_replace)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+        modifier = Modifier.testTag("replace_audio_dialog")
+    )
+}
+
 @Composable
 private fun EditorAudioSection(viewModel: NaatViewModel) {
     val context = LocalContext.current
@@ -274,16 +302,36 @@ private fun EditorAudioSection(viewModel: NaatViewModel) {
     val activeRecordingFile by viewModel.activeRecordingFile.collectAsStateWithLifecycle()
     val isAttaching by viewModel.isAttachingFile.collectAsStateWithLifecycle()
 
+    fun doAttach(uri: Uri) {
+        viewModel.attachLocalFile(uri) { success ->
+            Toast.makeText(
+                context,
+                if (success) context.getString(R.string.editor_attach_success) else context.getString(R.string.editor_attach_failed),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    // Replacing an already-attached linked audio loses the old one on save,
+    // so that path asks first; a first-time attach never prompts.
+    val hasExistingLinked = (attachments.existingAudioType == "local_file" && !attachments.existingAudioRemoved) ||
+        (attachments.existingSecondaryAudioType == "local_file" && !attachments.existingSecondaryAudioRemoved)
+    var pendingReplaceUri by remember { mutableStateOf<Uri?>(null) }
+
     val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null && !isAttaching) {
-            viewModel.attachLocalFile(uri) { success ->
-                Toast.makeText(
-                    context,
-                    if (success) context.getString(R.string.editor_attach_success) else context.getString(R.string.editor_attach_failed),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+            if (hasExistingLinked) pendingReplaceUri = uri else doAttach(uri)
         }
+    }
+
+    pendingReplaceUri?.let { uri ->
+        ReplaceAudioConfirmDialog(
+            onConfirm = {
+                pendingReplaceUri = null
+                doAttach(uri)
+            },
+            onDismiss = { pendingReplaceUri = null }
+        )
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -391,9 +439,25 @@ private fun RecorderControls(viewModel: NaatViewModel) {
     val context = LocalContext.current
     val state by viewModel.recordingState.collectAsStateWithLifecycle()
     val activeFile by viewModel.activeRecordingFile.collectAsStateWithLifecycle()
+    val attachments by viewModel.editorAttachments.collectAsStateWithLifecycle()
+    // A new recording replaces an already-attached recorded audio on save —
+    // ask before starting when one exists (unless it was already removed).
+    val hasExistingRecorded = (attachments.existingAudioType == "recorded" && !attachments.existingAudioRemoved) ||
+        (attachments.existingSecondaryAudioType == "recorded" && !attachments.existingSecondaryAudioRemoved)
+    var confirmRecord by remember { mutableStateOf(false) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) viewModel.startRecording()
         else Toast.makeText(context, context.getString(R.string.editor_mic_permission), Toast.LENGTH_LONG).show()
+    }
+
+    if (confirmRecord) {
+        ReplaceAudioConfirmDialog(
+            onConfirm = {
+                confirmRecord = false
+                permission.launch(android.Manifest.permission.RECORD_AUDIO)
+            },
+            onDismiss = { confirmRecord = false }
+        )
     }
 
     when (state) {
@@ -432,7 +496,10 @@ private fun RecorderControls(viewModel: NaatViewModel) {
             val finishedFile = activeFile
             if (finishedFile == null) {
                 Button(
-                    onClick = { permission.launch(android.Manifest.permission.RECORD_AUDIO) },
+                    onClick = {
+                        if (hasExistingRecorded) confirmRecord = true
+                        else permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    },
                     modifier = Modifier.testTag("start_recording_btn")
                 ) {
                     Icon(Icons.Default.Mic, contentDescription = null)

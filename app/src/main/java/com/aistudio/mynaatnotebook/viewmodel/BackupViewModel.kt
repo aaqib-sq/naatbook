@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.data.BackupManager
+import com.aistudio.mynaatnotebook.data.ImportMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -53,18 +54,23 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    fun restoreNotebook(uri: Uri) {
+    fun restoreNotebook(uri: Uri, mode: ImportMode = ImportMode.MERGE) {
         if (_isWorking.value) return
         _isWorking.value = true
         _progress.value = 0f
         viewModelScope.launch {
             try {
                 statusReporter.show(R.string.status_importing)
-                val result = backupManager.importBackup(uri) { p ->
+                val result = backupManager.importBackup(uri, mode) { p ->
                     _progress.value = p.coerceIn(0f, 1f)
                 }
                 result.onSuccess { importResult ->
-                    if (importResult.skipped > 0) {
+                    if (importResult.removedExisting > 0) {
+                        statusReporter.show(
+                            R.string.status_import_success_replaced,
+                            importResult.imported, importResult.removedExisting
+                        )
+                    } else if (importResult.skipped > 0) {
                         statusReporter.show(
                             R.string.status_import_success_skipped,
                             importResult.imported, importResult.skipped
