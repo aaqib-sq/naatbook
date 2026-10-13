@@ -68,6 +68,7 @@ fun NaatApp(
     val showAddModal by viewModel.showAddModal.collectAsStateWithLifecycle()
     val selectedNaat by viewModel.selectedNaat.collectAsStateWithLifecycle()
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+    val foldersWithEntries by settingsViewModel.foldersWithEntries.collectAsStateWithLifecycle()
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val isAttaching by viewModel.isAttachingFile.collectAsStateWithLifecycle()
@@ -232,7 +233,9 @@ fun NaatApp(
                                         viewModel = viewModel,
                                         onOpenReader = ::openReader,
                                         onEdit = ::openEditorById,
-                                        onAddEntry = ::openAdd
+                                        onAddEntry = ::openAdd,
+                                        foldersWithEntries = foldersWithEntries,
+                                        onFoldersSeen = settingsViewModel::markFoldersWithEntries
                                     )
                                 }
                             }
