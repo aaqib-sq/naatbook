@@ -555,7 +555,6 @@ fun FolderSleekCard(
 }
 
 // --- Row Item representation inside a folder list ---
-@Composable
 /**
  * Guided empty state (approved preview): circular icon badge, a title, the
  * explanatory body text, and — where adding makes sense — a filled
@@ -627,6 +626,7 @@ private fun EmptyStateGuide(
     }
 }
 
+@Composable
 fun NaatRowItem(
     naat: NaatSummary,
     isPlaying: Boolean = false,
