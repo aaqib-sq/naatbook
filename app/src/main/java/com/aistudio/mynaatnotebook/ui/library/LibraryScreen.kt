@@ -385,7 +385,8 @@ fun LibraryScreen(
                             onItemClick = { onOpenReader(naat.id) },
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
-                            onEditClick = { onEdit(naat.id) }
+                            onEditClick = { onEdit(naat.id) },
+                            titleFontFamily = titleFontFamily
                         )
                         }
                     }
@@ -468,7 +469,8 @@ fun LibraryScreen(
                             onItemClick = { onOpenReader(naat.id) },
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
-                            onEditClick = { onEdit(naat.id) }
+                            onEditClick = { onEdit(naat.id) },
+                            titleFontFamily = titleFontFamily
                         )
                     }
                 }
@@ -776,7 +778,8 @@ fun NaatRowItem(
     onItemClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onFavoriteClick: () -> Unit,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    titleFontFamily: FontFamily = FontFamily.SansSerif
 ) {
     val cardBg = MaterialTheme.colorScheme.surfaceVariant
     // Playing entry: white (onBackground) border in the app's monochrome
