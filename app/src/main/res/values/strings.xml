@@ -11,6 +11,10 @@
     <string name="player_skip_forward_cd">Forward 10 seconds</string>
     <string name="player_sleep_timer_title">Sleep timer</string>
     <string name="player_sleep_timer_off">Off</string>
+    <string name="library_now_playing">Playing</string>
+    <string name="empty_guide_title">Nothing here yet</string>
+    <string name="empty_guide_add">Add first entry</string>
+    <string name="empty_guide_import_hint">or import a backup from Settings</string>
     <string name="common_delete">Delete</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_discard">Discard</string>

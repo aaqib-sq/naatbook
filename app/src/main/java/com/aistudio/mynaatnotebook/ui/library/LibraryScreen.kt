@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -66,7 +67,8 @@ import java.io.File
 fun LibraryScreen(
     viewModel: NaatViewModel,
     onOpenReader: (Int) -> Unit,
-    onEdit: (Int) -> Unit
+    onEdit: (Int) -> Unit,
+    onAddEntry: () -> Unit
 ) {
     val context = LocalContext.current
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -76,6 +78,9 @@ fun LibraryScreen(
     val categoryCounts by viewModel.categoryCounts.collectAsStateWithLifecycle()
     val favoritesOnly by viewModel.showFavoritesOnly.collectAsStateWithLifecycle()
     val isDeleting by viewModel.isDeleting.collectAsStateWithLifecycle()
+    // Now-playing highlight: the entry whose audio is currently loaded.
+    val nowPlaying by viewModel.playbackController.nowPlaying.collectAsStateWithLifecycle()
+    val hasPlaybackSession by viewModel.playbackController.hasActiveSession.collectAsStateWithLifecycle()
 
     // Entry pending deletion - deletions also remove attached audio, so confirm first
     var deleteCandidate by remember { mutableStateOf<NaatSummary?>(null) }
@@ -306,6 +311,7 @@ fun LibraryScreen(
                     recentNaats.forEach { naat ->
                         NaatRowItem(
                             naat = naat,
+                            isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
                             onItemClick = { onOpenReader(naat.id) },
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
@@ -339,15 +345,14 @@ fun LibraryScreen(
                             .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (favoritesOnly && searchQuery.isBlank()) {
+                        EmptyStateGuide(
+                            bodyText = if (favoritesOnly && searchQuery.isBlank()) {
                                 stringResource(R.string.library_empty_favorites)
                             } else {
                                 stringResource(R.string.library_empty_search)
                             },
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = HighContrastGray
+                            showAddButton = false,
+                            onAddEntry = onAddEntry
                         )
                     }
                 } else {
@@ -358,6 +363,7 @@ fun LibraryScreen(
                         items(filteredNaats, key = { it.id }) { naat ->
                         NaatRowItem(
                             naat = naat,
+                            isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
                             onItemClick = { onOpenReader(naat.id) },
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
@@ -411,11 +417,10 @@ fun LibraryScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = stringResource(R.string.library_empty_folder),
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = HighContrastGray
+                    EmptyStateGuide(
+                        bodyText = stringResource(R.string.library_empty_folder),
+                        showAddButton = true,
+                        onAddEntry = onAddEntry
                     )
                 }
             } else {
@@ -426,6 +431,7 @@ fun LibraryScreen(
                     items(filteredNaats, key = { it.id }) { naat ->
                         NaatRowItem(
                             naat = naat,
+                            isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
                             onItemClick = { onOpenReader(naat.id) },
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
@@ -549,21 +555,96 @@ fun FolderSleekCard(
 }
 
 // --- Row Item representation inside a folder list ---
+/**
+ * Guided empty state (approved preview): circular icon badge, a title, the
+ * explanatory body text, and — where adding makes sense — a filled
+ * "add first entry" button plus an import hint. Monochrome, matching the
+ * app's identity.
+ */
+@Composable
+private fun EmptyStateGuide(
+    bodyText: String,
+    showAddButton: Boolean,
+    onAddEntry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(66.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.LibraryMusic,
+                contentDescription = null,
+                tint = HighContrastGray,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = stringResource(R.string.empty_guide_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = bodyText,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium,
+            color = HighContrastGray
+        )
+        if (showAddButton) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onAddEntry,
+                shape = RoundedCornerShape(22.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.onBackground,
+                    contentColor = MaterialTheme.colorScheme.background
+                ),
+                modifier = Modifier.testTag("empty_add_first_btn")
+            ) {
+                Text(
+                    text = "+ " + stringResource(R.string.empty_guide_add),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.empty_guide_import_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = HighContrastGray
+            )
+        }
+    }
+}
+
 @Composable
 fun NaatRowItem(
     naat: NaatSummary,
+    isPlaying: Boolean = false,
     onItemClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     onEditClick: () -> Unit
 ) {
     val cardBg = MaterialTheme.colorScheme.surfaceVariant
-    val cardBorder = MaterialTheme.colorScheme.outline
+    // Playing entry: white (onBackground) border in the app's monochrome
+    // identity — no accent colors, per the approved preview.
+    val cardBorder = if (isPlaying) MaterialTheme.colorScheme.onBackground
+                     else MaterialTheme.colorScheme.outline
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, cardBorder, RoundedCornerShape(16.dp))
+            .border(if (isPlaying) 1.5.dp else 1.dp, cardBorder, RoundedCornerShape(16.dp))
             .clickable(onClick = onItemClick)
             .testTag("naat_row_item_${naat.id}"),
         colors = CardDefaults.cardColors(
@@ -578,14 +659,45 @@ fun NaatRowItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = naat.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = naat.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (isPlaying) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        // Equalizer bars (static trio) + "Playing" label
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.testTag("now_playing_indicator_${naat.id}")
+                        ) {
+                            listOf(6.dp, 10.dp, 5.dp).forEach { barHeight ->
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(barHeight)
+                                        .background(
+                                            MaterialTheme.colorScheme.onBackground,
+                                            RoundedCornerShape(1.dp)
+                                        )
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.library_now_playing),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                }
                 if (!naat.poet.isNullOrBlank()) {
                     Text(
                         text = stringResource(R.string.library_by_poet, naat.poet),
