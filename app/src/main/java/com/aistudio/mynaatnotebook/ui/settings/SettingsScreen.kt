@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.audio.RecordingState
+import com.aistudio.mynaatnotebook.data.ImportMode
 import com.aistudio.mynaatnotebook.data.NaatCategories
 import com.aistudio.mynaatnotebook.data.NaatEntity
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
@@ -99,24 +100,105 @@ fun SettingsScreen(
         }
     )
 
-    // Import confirmation dialog
+    // Import dialog: choose merge vs replace first. Replace is destructive,
+    // so it needs a second, explicit warning confirmation before anything runs.
     pendingImportUri?.let { uri ->
-        AlertDialog(
-            onDismissRequest = { pendingImportUri = null },
-            title = { Text(stringResource(R.string.settings_import_confirm_title)) },
-            text = { Text(stringResource(R.string.settings_import_confirm_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingImportUri = null
-                    backupViewModel.restoreNotebook(uri)
-                }) { Text(stringResource(R.string.settings_import_confirm_import)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingImportUri = null }) {
-                    Text(stringResource(R.string.action_cancel))
+        var importMode by remember(uri) { mutableStateOf(ImportMode.MERGE) }
+        var confirmReplace by remember(uri) { mutableStateOf(false) }
+        if (!confirmReplace) {
+            AlertDialog(
+                onDismissRequest = { pendingImportUri = null },
+                title = { Text(stringResource(R.string.settings_import_confirm_title)) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.settings_import_confirm_message))
+                        Spacer(modifier = Modifier.height(12.dp))
+                        listOf(
+                            ImportMode.MERGE to (R.string.settings_import_mode_merge to R.string.settings_import_mode_merge_desc),
+                            ImportMode.REPLACE to (R.string.settings_import_mode_replace to R.string.settings_import_mode_replace_desc)
+                        ).forEach { (mode, texts) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { importMode = mode }
+                                    .padding(vertical = 4.dp)
+                                    .testTag("import_mode_${mode.name.lowercase()}")
+                            ) {
+                                RadioButton(
+                                    selected = importMode == mode,
+                                    onClick = { importMode = mode }
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        stringResource(texts.first),
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (mode == ImportMode.REPLACE) HighContrastRed
+                                                else MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        stringResource(texts.second),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = HighContrastGray
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (importMode == ImportMode.REPLACE) {
+                                confirmReplace = true
+                            } else {
+                                pendingImportUri = null
+                                backupViewModel.restoreNotebook(uri, ImportMode.MERGE)
+                            }
+                        },
+                        modifier = Modifier.testTag("import_confirm_btn")
+                    ) {
+                        Text(
+                            stringResource(
+                                if (importMode == ImportMode.REPLACE) R.string.settings_import_mode_replace
+                                else R.string.settings_import_confirm_import
+                            )
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingImportUri = null }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
                 }
-            }
-        )
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { pendingImportUri = null },
+                title = { Text(stringResource(R.string.settings_import_replace_title)) },
+                text = { Text(stringResource(R.string.settings_import_replace_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            pendingImportUri = null
+                            backupViewModel.restoreNotebook(uri, ImportMode.REPLACE)
+                        },
+                        modifier = Modifier.testTag("import_replace_confirm_btn")
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_import_replace_confirm),
+                            color = HighContrastRed
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingImportUri = null }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                },
+                modifier = Modifier.testTag("import_replace_dialog")
+            )
+        }
     }
 
     Column(
