@@ -1,1 +1,187 @@
-PHJlc291cmNlcz4KICAgIDxzdHJpbmcgbmFtZT0iYXBwX25hbWUiIHRyYW5zbGF0YWJsZT0iZmFsc2UiPk5hYXRCb29rPC9zdHJpbmc+CgogICAgPCEtLSBDb21tb24gLS0+CiAgICA8c3RyaW5nIG5hbWU9ImNvbW1vbl9wYXVzZSI+UGF1c2U8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iY29tbW9uX3BsYXkiPlBsYXk8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icGxheWVyX3NsZWVwX3RpbWVyX2RvbmUiPlNsZWVwIHRpbWVyIGVuZGVkIOKAlCBwbGF5YmFjayBwYXVzZWQ8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icGxheWVyX3NwZWVkX2NkIj5QbGF5YmFjayBzcGVlZDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJwbGF5ZXJfc2xlZXBfdGltZXJfY2QiPlNsZWVwIHRpbWVyPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InBsYXllcl9za2lwX2JhY2tfY2QiPkJhY2sgMTAgc2Vjb25kczwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJwbGF5ZXJfc2tpcF9mb3J3YXJkX2NkIj5Gb3J3YXJkIDEwIHNlY29uZHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icGxheWVyX3NsZWVwX3RpbWVyX3RpdGxlIj5TbGVlcCB0aW1lcjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJwbGF5ZXJfc2xlZXBfdGltZXJfb2ZmIj5PZmY8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9ub3dfcGxheWluZyI+UGxheWluZzwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlbXB0eV9ndWlkZV90aXRsZSI+Tm90aGluZyBoZXJlIHlldDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlbXB0eV9ndWlkZV9hZGQiPkFkZCBmaXJzdCBlbnRyeTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlbXB0eV9ndWlkZV9hZGRfbmV3Ij5BZGQgbmV3IGVudHJ5PC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVtcHR5X2d1aWRlX2ltcG9ydF9oaW50Ij5vciBpbXBvcnQgYSBiYWNrdXAgZnJvbSBTZXR0aW5nczwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X2VtcHR5X2ZvbGRlcl9kZWxldGVkX3RpdGxlIj5UaGlzIGZvbGRlciBpcyBlbXB0eTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X2VtcHR5X2ZvbGRlcl9kZWxldGVkX2JvZHkiPkFsbCBlbnRyaWVzIGluIHRoaXMgZm9sZGVyIHdlcmUgZGVsZXRlZC48L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icGxheWVyX21lbnVfc3BlZWQiPlNwZWVkPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InBsYXllcl9tb3JlX2NkIj5Nb3JlIG9wdGlvbnM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iY29tbW9uX2RlbGV0ZSI+RGVsZXRlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImNvbW1vbl9jYW5jZWwiPkNhbmNlbDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJjb21tb25fZGlzY2FyZCI+RGlzY2FyZDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJjb21tb25fZWRpdF9lbnRyeSI+RWRpdCBlbnRyeTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJjb21tb25fZGF0YWJhc2VfZXJyb3IiPmRhdGFiYXNlIGVycm9yPC9zdHJpbmc+CgogICAgPCEtLSBTZXR0aW5ncyAtLT4KICAgIDxzdHJpbmcgbmFtZT0ic2V0dGluZ3NfdGl0bGUiPkFwcCBTZXR0aW5nczwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc190aGVtZV90aXRsZSI+QXBwIFRoZW1lPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX3RoZW1lX3N5c3RlbSI+TWF0Y2ggU3lzdGVtIFNldHRpbmdzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX3RoZW1lX3doaXRlIj5Ub3RhbCBXaGl0ZSBNb2RlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX3RoZW1lX2JsYWNrIj5Ub3RhbCBCbGFjayBNb2RlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX3RoZW1lX3N5c3RlbV9zdWIiPkZvbGxvd3MgeW91ciBwaG9uZVwncyB0aGVtZTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc190aGVtZV93aGl0ZV9zdWIiPkFsd2F5cyBsaWdodDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc190aGVtZV9ibGFja19zdWIiPkFsd2F5cyBkYXJrPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX3R5cG9ncmFwaHlfdGl0bGUiPlR5cG9ncmFwaHkgQWRqdXN0bWVudDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc19mb250X3NpemVfbGFiZWwiPkx5cmljcyBEZWZhdWx0IFRleHQgU2l6ZTogJTEkZCBzcDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc19iYWNrdXBfdGl0bGUiPlByaXZhY3kgJmFtcDsgTG9jYWwgRGF0YWJhc2UgQmFja3Vwczwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc19iYWNrdXBfZGVzY3JpcHRpb24iPkFsbCBkYXRhYmFzZSByZWNvcmRzIGFuZCBhdWRpbyBhc3NldHMgYXJlIHNhdmVkIHN0cmljdGx5IGxvY2FsbHkuIFNhZmVndWFyZCB5b3VyIHdvcmsgYmVsb3cuPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX2V4cG9ydF9jZCI+RXhwb3J0PC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX2V4cG9ydF96aXAiPkV4cG9ydCBaSVA8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic2V0dGluZ3NfZXhwb3J0X3N1YnRpdGxlIj5TYXZlIGEgY29weSBvZiB5b3VyIHdob2xlIGxpYnJhcnk8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic2V0dGluZ3NfaW1wb3J0X3N1YnRpdGxlIj5SZXN0b3JlIGVudHJpZXMgZnJvbSBhIGJhY2t1cCBmaWxlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX2ltcG9ydF9jZCI+SW1wb3J0PC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX2ltcG9ydF96aXAiPkltcG9ydCBaSVA8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic2V0dGluZ3NfYWJvdXQiPk5hYXRCb29rICUxJHNcbjEwMCUlIE9mZmxpbmUgfCBaZXJvIERhdGEgVHJhY2tpbmc8L3N0cmluZz4KCiAgICA8IS0tIFJlYWRlciAtLT4KICAgIDxzdHJpbmcgbmFtZT0icmVhZGVyX3RhcF9oaW50Ij5UYXAgb25jZSB0byBzaG93IGNvbnRyb2xzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InJlYWRlcl9jbG9zZV9jZCI+Q2xvc2UgUmVhZGVyPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InJlYWRlcl9wb2V0Ij5Qb2V0OiAlMSRzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InJlYWRlcl91bmtub3duX3BvZXQiPlVua25vd24gUG9ldDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJyZWFkZXJfZmF2b3JpdGVfY2QiPlRvZ2dsZSBmYXZvcml0ZTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJyZWFkZXJfaW1tZXJzaXZlX2VudGVyX2NkIj5FbnRlciBmdWxsIHNjcmVlbiByZWFkZXI8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icmVhZGVyX2ltbWVyc2l2ZV9leGl0X2NkIj5FeGl0IGZ1bGwgc2NyZWVuIHJlYWRlcjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJyZWFkZXJfZm9udF9zaXplX2NkIj5Gb250IHNpemU8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icmVhZGVyX2ZvbnRfbGFiZWwiPkZvbnQ6PC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InJlYWRlcl9hdXRvc2Nyb2xsX29uIj5TY3JvbGxpbmc8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icmVhZGVyX2F1dG9zY3JvbGxfb2ZmIj5BdXRvU2Nyb2xsPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InJlYWRlcl90YXBfbGFiZWwiPlNob3cgb3IgaGlkZSByZWFkZXIgY29udHJvbHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icmVhZGVyX25vX2x5cmljcyI+Tm8gd3JpdHRlbiBseXJpY3MgcHJvdmlkZWQuXG5SZWFkeSB0byByZWNpdGUgd2l0aCBhdHRhY2hlZCBtZWRpYSE8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icmVhZGVyX3ZvaWNlX25vdGUiPlZvaWNlIE5vdGU8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0icmVhZGVyX2xpbmtlZF9hdWRpbyI+TGlua2VkIEF1ZGlvPC9zdHJpbmc+CgogICAgPCEtLSBMaWJyYXJ5IC0tPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X3NlYXJjaF9jZCI+U2VhcmNoIGljb248L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9zZWFyY2hfaGludCI+U2VhcmNoIE5hYXRzLCBQb2V0cywgTHlyaWNzLi4uPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImxpYnJhcnlfdm9pY2VfcHJvbXB0Ij5TcGVhayBOYWF0IGtleXdvcmQuLi48L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9zdHRfdW5zdXBwb3J0ZWQiPlNwZWVjaC10by1UZXh0IG5vdCBzdXBwb3J0ZWQgb3Igb2ZmbGluZTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X3ZvaWNlX3NlYXJjaF9jZCI+Vm9pY2Ugc2VhcmNoPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImxpYnJhcnlfZm9sZGVyc190aXRsZSI+TElCUkFSWSBGT0xERVJTPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImxpYnJhcnlfZmF2b3JpdGVzX2xhYmVsIj5GYXZvcml0ZXM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9yZWNlbnRfdGl0bGUiPlJFQ0VOVCBOT1RFQk9PS1M8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9lbXB0eV9mb2xkZXJzIj5ObyBlbnRyaWVzIGluIGZvbGRlcnMgeWV0Ljwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X2Zhdm9yaXRlc19xdWVyeV90aXRsZSI+RkFWT1JJVEVTIMK3IFwiJTEkc1wiPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImxpYnJhcnlfZmF2b3JpdGVzX3RpdGxlIj5GQVZPUklURVM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9yZXN1bHRzX3RpdGxlIj5SRVNVTFRTIEZPUiBcIiUxJHNcIjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X3NlYXJjaF9pbl9mb2xkZXIiPlNlYXJjaGluZyBpbiAlMSRzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImxpYnJhcnlfZW1wdHlfZmF2b3JpdGVzIj5ObyBmYXZvcml0ZXMgeWV0LlxuU3RhciBhbnkgZW50cnkgd2l0aCB0aGUgaGVhcnQgaWNvbiB0byBzZWUgaXQgaGVyZS48L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9lbXB0eV9zZWFyY2giPk5vIG1hdGNoZXMgZm91bmQuXG5UcnkgYSBkaWZmZXJlbnQgdGl0bGUsIHBvZXQsIG9yIGx5cmljIHBocmFzZS48L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9iYWNrX2NkIj5CYWNrIHRvIGZvbGRlcnM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9lbXB0eV9mb2xkZXIiPk5vIGVudHJpZXMgaW4gdGhpcyBmb2xkZXIgeWV0LlxuVGFwICgrKSBiZWxvdyB0byBhZGQgeW91ciBmaXJzdCBlbnRyeSE8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9kZWxldGVfdGl0bGUiPkRlbGV0ZSB0aGlzIGVudHJ5Pzwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X2RlbGV0aW5nIj5EZWxldGluZ+KApjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X2J5X3BvZXQiPkJ5ICUxJHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9yZWNvcmRlZF9jZCI+UmVjb3JkZWQgQXVkaW8gTm90ZSBBdmFpbGFibGU8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9saW5rZWRfY2QiPkxpbmtlZCBNUDMgQXZhaWxhYmxlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImxpYnJhcnlfZmF2b3JpdGVfdG9nZ2xlX2NkIj5GYXZvcml0ZSB0b2dnbGU8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibGlicmFyeV9kZWxldGVfY2QiPkRlbGV0ZSBlbnRyeTwvc3RyaW5nPgoKICAgIDwhLS0gRWRpdG9yIC0tPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfdGl0bGVfZWRpdCI+RWRpdCBOYWF0Qm9vayBFbnRyeTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfdGl0bGVfYWRkIj5BZGQgTmV3IE5hYXRCb29rIEVudHJ5PC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9kZXRhaWxzX3RpdGxlIj5EZXRhaWxzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9jbG9zZV9jZCI+Q2xvc2UgbW9kYWw8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX3RpdGxlX2xhYmVsIj5UaXRsZSAoUmVxdWlyZWQpPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9wb2V0X2xhYmVsIj5Qb2V0IE5hbWUgKE9wdGlvbmFsKTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfZm9sZGVyX2xhYmVsIj5Gb2xkZXIgTG9jYXRpb248L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX2x5cmljc19sYWJlbCI+THlyaWNzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9seXJpY3NfaGludCI+QWRkIGx5cmljcyBoZXJlLi4uPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9kaWN0YXRlX3Byb21wdCI+RGljdGF0ZSB0aGUga2FsYW0uLi48L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX3N0dF91bnN1cHBvcnRlZCI+U3BlZWNoLXRvLVRleHQgbm90IHN1cHBvcnRlZDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfZGljdGF0ZV9jZCI+RGljdGF0ZSBseXJpY3M8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX2F0dGFjaF9zdWNjZXNzIj5BdWRpbyBmaWxlIGF0dGFjaGVkIHN1Y2Nlc3NmdWxseSE8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX2F0dGFjaF9mYWlsZWQiPkZhaWxlZCB0byBjb3B5IGF1ZGlvIGF0dGFjaG1lbnQ8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX2R1YWxfYXVkaW9fdGl0bGUiPkR1YWwtQXVkaW8gQXR0YWNobWVudHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX3JlY29yZGVyX3RpdGxlIj5Jbi1BcHAgVm9pY2UgUmVjb3JkZXI8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX2xpbmtfdGl0bGUiPkxpbmsgRXh0ZXJuYWwgTVAzIC8gTTRBIEZpbGU8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX2F0dGFjaGluZyI+QXR0YWNoaW5nLi4uPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9icm93c2UiPkJyb3dzZSBMb2NhbCBTdG9yYWdlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9icm93c2Vfc2hvcnQiPkJyb3dzZSBmaWxlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9yZWNvcmRfc2hvcnQiPlJlY29yZDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfcmVtb3ZlX2xpbmtlZF9jZCI+UmVtb3ZlIGxpbmtlZCBmaWxlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9jdXJyZW50X3ZvaWNlX25vdGUiPkN1cnJlbnQgdm9pY2Ugbm90ZTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfY3VycmVudF9saW5rZWRfYXVkaW8iPkN1cnJlbnQgbGlua2VkIGF1ZGlvPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9yZW1vdmVfYXR0YWNobWVudF9jZCI+UmVtb3ZlIGF0dGFjaG1lbnQ8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX21pY19wZXJtaXNzaW9uIj5NaWNyb3Bob25lIHBlcm1pc3Npb24gaXMgcmVxdWlyZWQ8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX3Jlc3VtZSI+UmVzdW1lPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9maW5pc2giPkZpbmlzaDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfdGFwX3RvX3JlY29yZCI+VGFwIHRvIFJlY29yZDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfcmVjb3JkaW5nX3JlYWR5Ij5SZWNvcmRpbmcgcmVhZHk6ICUxJHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX3JlcmVjb3JkX2NkIj5SZS1yZWNvcmQ8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX3RpdGxlX3JlcXVpcmVkIj5QbGVhc2UgZW50ZXIgYSB2YWxpZCBub3RlYm9vayB0aXRsZTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3Jfc2F2aW5nIj5TYXZpbmfigKY8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX3NhdmVfY2hhbmdlcyI+U2F2ZSBDaGFuZ2VzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImVkaXRvcl9zYXZlX2VudHJ5Ij5TYXZlIEVudHJ5PC9zdHJpbmc+CgogICAgPCEtLSBOYXZpZ2F0aW9uIC8gY29tcG9uZW50cyAtLT4KICAgIDxzdHJpbmcgbmFtZT0ibmF2X2xpYnJhcnkiPkxJQlJBUlk8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ibmF2X2FkZF9lbnRyeV9jZCI+QWRkIG5ldyBlbnRyeTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJuYXZfc2V0dGluZ3MiPlNFVFRJTkdTPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InBsYXllcl9wcmV2aWV3X3BhdXNlX2NkIj5QYXVzZSBwcmV2aWV3PC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InBsYXllcl9wcmV2aWV3X3BsYXlfY2QiPlBsYXkgcHJldmlldzwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJwbGF5ZXJfcHJldmlld19sYWJlbCI+UHJldmlldzwvc3RyaW5nPgoKICAgIDwhLS0gRGlzY2FyZCBkaWFsb2cgLS0+CiAgICA8c3RyaW5nIG5hbWU9ImRpc2NhcmRfdGl0bGUiPkRpc2NhcmQgdW5zYXZlZCBlbnRyeT88L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZGlzY2FyZF9tZXNzYWdlIj5Zb3VyIHVuc2F2ZWQgdGV4dCBhbmQgbmV3bHkgcmVjb3JkZWQgb3IgYXR0YWNoZWQgYXVkaW8gd2lsbCBiZSBkaXNjYXJkZWQuPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImRpc2NhcmRfa2VlcF9lZGl0aW5nIj5LZWVwIGVkaXRpbmc8L3N0cmluZz4KCiAgICA8IS0tIFN0YXR1cyAvIHRvYXN0IG1lc3NhZ2VzIC0tPgogICAgPHN0cmluZyBuYW1lPSJzdGF0dXNfcmVjb3JkaW5nX3N0YXJ0X2ZhaWxlZCI+VW5hYmxlIHRvIHN0YXJ0IHJlY29yZGluZzwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzdGF0dXNfcmVjb3JkaW5nX3N0YXJ0X2ZhaWxlZF9kZXRhaWwiPlVuYWJsZSB0byBzdGFydCByZWNvcmRpbmc6ICUxJHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX2VudHJ5X3NhdmVkIj5Ob3RlYm9vayBFbnRyeSBTYXZlZCE8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX2VudHJ5X3VwZGF0ZWQiPkVudHJ5IFVwZGF0ZWQhPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19zYXZlX2ZhaWxlZCI+U2F2ZSBmYWlsZWQ6ICUxJHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX2VudHJ5X2RlbGV0ZWQiPkVudHJ5IGRlbGV0ZWQ8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX2VudHJ5X21pc3NpbmciPkVudHJ5IG5vIGxvbmdlciBleGlzdHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX2RlbGV0ZV9mYWlsZWQiPkRlbGV0ZSBmYWlsZWQ6ICUxJHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX2Zhdm9yaXRlX2ZhaWxlZCI+Q291bGQgbm90IHVwZGF0ZSBmYXZvcml0ZTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzdGF0dXNfZW50cnlfbG9va3VwX2ZhaWxlZCI+VW5hYmxlIHRvIG9wZW4gZW50cnk8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX29wZW5fcGxheWluZ19mYWlsZWQiPlVuYWJsZSB0byBvcGVuIHRoZSBwbGF5aW5nIGVudHJ5OiAlMSRzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19leHBvcnRpbmciPkV4cG9ydGluZyBiYWNrdXAsIHBsZWFzZSB3YWl0Li4uPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19leHBvcnRfc3VjY2VzcyI+TGlicmFyeSBCYWNrdXAgRXhwb3J0ZWQgU3VjY2Vzc2Z1bGx5ISAlMSRkIGVudHJpZXMuPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19leHBvcnRfZmFpbGVkIj5FeHBvcnQgRmFpbGVkOiAlMSRzPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19pbXBvcnRpbmciPkltcG9ydGluZyBiYWNrdXAsIHBsZWFzZSB3YWl0Li4uPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19pbXBvcnRfc3VjY2VzcyI+TGlicmFyeSBSZXN0b3JlZCBTdWNjZXNzZnVsbHkhIExvYWRlZCAlMSRkIGVudHJpZXMuPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19pbXBvcnRfc3VjY2Vzc19za2lwcGVkIj5JbXBvcnQgY29tcGxldGU6ICUxJGQgbmV3IGVudHJpZXMgYWRkZWQsICUyJGQgYWxyZWFkeSBleGlzdGVkIChza2lwcGVkKS48L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX2ltcG9ydF9mYWlsZWQiPkltcG9ydCBGYWlsZWQ6ICUxJHM8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic3RhdHVzX2Vycm9yX2RhdGFiYXNlIj5kYXRhYmFzZSBlcnJvcjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzdGF0dXNfZXJyb3Jfc3RvcmFnZSI+c3RvcmFnZSBlcnJvcjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzdGF0dXNfZXJyb3JfdW5rbm93biI+dW5rbm93biBlcnJvcjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfYXR0YWNoZWRfZmlsZSI+QXR0YWNoZWQgZmlsZTogJTEkczwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X2RlbGV0ZV9tZXNzYWdlIj4iJTEkcyIgd2lsbCBiZSBwZXJtYW5lbnRseSBkZWxldGVkJTIkczwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJsaWJyYXJ5X2RlbGV0ZV93aXRoX2F1ZGlvIj4gYWxvbmcgd2l0aCBpdHMgYXR0YWNoZWQgYXVkaW8uPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9ImxpYnJhcnlfZW50cmllc19jb3VudCI+JTEkZCBFTlRSSUVTPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19wbGF5YmFja19mYWlsZWQiPlVuYWJsZSB0byBzdGFydCBwbGF5YmFjazwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc19pbXBvcnRfY29uZmlybV90aXRsZSI+SW1wb3J0IGJhY2t1cD88L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic2V0dGluZ3NfaW1wb3J0X2NvbmZpcm1fbWVzc2FnZSI+VGhpcyB3aWxsIGFkZCBlbnRyaWVzIGZyb20gdGhlIGJhY2t1cCB0byB5b3VyIGxpYnJhcnkuIENvbnRpbnVlPzwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc19pbXBvcnRfY29uZmlybV9pbXBvcnQiPkltcG9ydDwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc19pbXBvcnRfbW9kZV9tZXJnZSI+QWRkIHRvIGxpYnJhcnk8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic2V0dGluZ3NfaW1wb3J0X21vZGVfbWVyZ2VfZGVzYyI+TmV3IGVudHJpZXMgYXJlIGFkZGVkOyBlbnRyaWVzIHRoYXQgYWxyZWFkeSBleGlzdCBhcmUgc2tpcHBlZC48L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic2V0dGluZ3NfaW1wb3J0X21vZGVfcmVwbGFjZSI+UmVwbGFjZSBsaWJyYXJ5PC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX2ltcG9ydF9tb2RlX3JlcGxhY2VfZGVzYyI+RXZlcnl0aGluZyBjdXJyZW50bHkgaW4gdGhlIGxpYnJhcnkgaXMgZGVsZXRlZCBhbmQgcmVwbGFjZWQgYnkgdGhpcyBiYWNrdXAuPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InNldHRpbmdzX2ltcG9ydF9yZXBsYWNlX3RpdGxlIj5SZXBsYWNlIHRoZSB3aG9sZSBsaWJyYXJ5Pzwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJzZXR0aW5nc19pbXBvcnRfcmVwbGFjZV9tZXNzYWdlIj5UaGlzIHdpbGwgcGVybWFuZW50bHkgZGVsZXRlIGFsbCBjdXJyZW50IGVudHJpZXMgYW5kIHRoZWlyIGF1ZGlvLCB0aGVuIGxvYWQgdGhlIGJhY2t1cC4gVGhpcyBjYW5ub3QgYmUgdW5kb25lLiBDb250aW51ZT88L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0ic2V0dGluZ3NfaW1wb3J0X3JlcGxhY2VfY29uZmlybSI+RGVsZXRlIGFuZCByZXBsYWNlPC9zdHJpbmc+CiAgICA8c3RyaW5nIG5hbWU9InN0YXR1c19pbXBvcnRfc3VjY2Vzc19yZXBsYWNlZCI+TGlicmFyeSByZXBsYWNlZDogJTEkZCBlbnRyaWVzIGxvYWRlZCwgJTIkZCBvbGQgZW50cmllcyByZW1vdmVkLjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJlZGl0b3JfcmVwbGFjZV9hdWRpb190aXRsZSI+UmVwbGFjZSBleGlzdGluZyBhdWRpbz88L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX3JlcGxhY2VfYXVkaW9fYm9keSI+VGhpcyBlbnRyeSBhbHJlYWR5IGhhcyBhbiBhdWRpbyBhdHRhY2hlZC4gVGhlIG5ldyBhdWRpbyB3aWxsIHJlcGxhY2UgaXQsIGFuZCB0aGUgb2xkIGF1ZGlvIHdpbGwgYmUgcmVtb3ZlZCB3aGVuIHlvdSBzYXZlLjwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJhY3Rpb25fcmVwbGFjZSI+UmVwbGFjZTwvc3RyaW5nPgogICAgPHN0cmluZyBuYW1lPSJhY3Rpb25fY2FuY2VsIj5DYW5jZWw8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX2ZpbGVfdG9vX2xhcmdlIj5GaWxlIGlzIHRvbyBsYXJnZSAobWF4IDEwMCBNQik8L3N0cmluZz4KICAgIDxzdHJpbmcgbmFtZT0iZWRpdG9yX2ludmFsaWRfYXVkaW9fZmlsZSI+VGhpcyBmaWxlIGlzIG5vdCB2YWxpZCBhdWRpbyBhbmQgd2FzIG5vdCBhdHRhY2hlZDwvc3RyaW5nPgo8L3Jlc291cmNlcz4K
+<resources>
+    <string name="app_name" translatable="false">NaatBook</string>
+
+    <!-- Common -->
+    <string name="common_pause">Pause</string>
+    <string name="common_play">Play</string>
+    <string name="player_sleep_timer_done">Sleep timer ended — playback paused</string>
+    <string name="player_speed_cd">Playback speed</string>
+    <string name="player_sleep_timer_cd">Sleep timer</string>
+    <string name="player_skip_back_cd">Back 10 seconds</string>
+    <string name="player_skip_forward_cd">Forward 10 seconds</string>
+    <string name="player_sleep_timer_title">Sleep timer</string>
+    <string name="player_sleep_timer_off">Off</string>
+    <string name="library_now_playing">Playing</string>
+    <string name="empty_guide_title">Nothing here yet</string>
+    <string name="empty_guide_add">Add first entry</string>
+    <string name="empty_guide_add_new">Add new entry</string>
+    <string name="empty_guide_import_hint">or import a backup from Settings</string>
+    <string name="library_empty_folder_deleted_title">This folder is empty</string>
+    <string name="library_empty_folder_deleted_body">All entries in this folder were deleted.</string>
+    <string name="player_menu_speed">Speed</string>
+    <string name="player_more_cd">More options</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_discard">Discard</string>
+    <string name="common_edit_entry">Edit entry</string>
+    <string name="common_database_error">database error</string>
+
+    <!-- Settings -->
+    <string name="settings_title">App Settings</string>
+    <string name="settings_theme_title">App Theme</string>
+    <string name="settings_theme_system">Match System Settings</string>
+    <string name="settings_theme_white">Total White Mode</string>
+    <string name="settings_theme_black">Total Black Mode</string>
+    <string name="settings_theme_system_sub">Follows your phone\'s theme</string>
+    <string name="settings_theme_white_sub">Always light</string>
+    <string name="settings_theme_black_sub">Always dark</string>
+    <string name="settings_typography_title">Typography Adjustment</string>
+    <string name="settings_font_size_label">Lyrics Default Text Size: %1$d sp</string>
+    <string name="settings_backup_title">Privacy &amp; Local Database Backups</string>
+    <string name="settings_backup_description">All database records and audio assets are saved strictly locally. Safeguard your work below.</string>
+    <string name="settings_export_cd">Export</string>
+    <string name="settings_export_zip">Export ZIP</string>
+    <string name="settings_export_subtitle">Save a copy of your whole library</string>
+    <string name="settings_import_subtitle">Restore entries from a backup file</string>
+    <string name="settings_import_cd">Import</string>
+    <string name="settings_import_zip">Import ZIP</string>
+    <string name="settings_about">NaatBook %1$s\n100%% Offline | Zero Data Tracking</string>
+
+    <!-- Reader -->
+    <string name="reader_tap_hint">Tap once to show controls</string>
+    <string name="reader_close_cd">Close Reader</string>
+    <string name="reader_poet">Poet: %1$s</string>
+    <string name="reader_unknown_poet">Unknown Poet</string>
+    <string name="reader_favorite_cd">Toggle favorite</string>
+    <string name="reader_immersive_enter_cd">Enter full screen reader</string>
+    <string name="reader_immersive_exit_cd">Exit full screen reader</string>
+    <string name="reader_font_size_cd">Font size</string>
+    <string name="reader_font_label">Font:</string>
+    <string name="reader_autoscroll_on">Scrolling</string>
+    <string name="reader_autoscroll_off">AutoScroll</string>
+    <string name="reader_tap_label">Show or hide reader controls</string>
+    <string name="reader_no_lyrics">No written lyrics provided.\nReady to recite with attached media!</string>
+    <string name="reader_voice_note">Voice Note</string>
+    <string name="reader_linked_audio">Linked Audio</string>
+
+    <!-- Library -->
+    <string name="library_search_cd">Search icon</string>
+    <string name="library_search_hint">Search Naats, Poets, Lyrics...</string>
+    <string name="library_voice_prompt">Speak Naat keyword...</string>
+    <string name="library_stt_unsupported">Speech-to-Text not supported or offline</string>
+    <string name="library_voice_search_cd">Voice search</string>
+    <string name="library_folders_title">LIBRARY FOLDERS</string>
+    <string name="library_favorites_label">Favorites</string>
+    <string name="library_recent_title">RECENT NOTEBOOKS</string>
+    <string name="library_empty_folders">No entries in folders yet.</string>
+    <string name="library_favorites_query_title">FAVORITES · \"%1$s\"</string>
+    <string name="library_favorites_title">FAVORITES</string>
+    <string name="library_results_title">RESULTS FOR \"%1$s\"</string>
+    <string name="library_search_in_folder">Searching in %1$s</string>
+    <string name="library_empty_favorites">No favorites yet.\nStar any entry with the heart icon to see it here.</string>
+    <string name="library_empty_search">No matches found.\nTry a different title, poet, or lyric phrase.</string>
+    <string name="library_back_cd">Back to folders</string>
+    <string name="library_empty_folder">No entries in this folder yet.\nTap (+) below to add your first entry!</string>
+    <string name="library_delete_title">Delete this entry?</string>
+    <string name="library_deleting">Deleting…</string>
+    <string name="library_by_poet">By %1$s</string>
+    <string name="library_recorded_cd">Recorded Audio Note Available</string>
+    <string name="library_linked_cd">Linked MP3 Available</string>
+    <string name="library_favorite_toggle_cd">Favorite toggle</string>
+    <string name="library_delete_cd">Delete entry</string>
+
+    <!-- Editor -->
+    <string name="editor_title_edit">Edit NaatBook Entry</string>
+    <string name="editor_title_add">Add New NaatBook Entry</string>
+    <string name="editor_details_title">Details</string>
+    <string name="editor_close_cd">Close modal</string>
+    <string name="editor_title_label">Title (Required)</string>
+    <string name="editor_poet_label">Poet Name (Optional)</string>
+    <string name="editor_folder_label">Folder Location</string>
+    <string name="editor_lyrics_label">Lyrics</string>
+    <string name="editor_lyrics_hint">Add lyrics here...</string>
+    <string name="editor_dictate_prompt">Dictate the kalam...</string>
+    <string name="editor_stt_unsupported">Speech-to-Text not supported</string>
+    <string name="editor_dictate_cd">Dictate lyrics</string>
+    <string name="editor_attach_success">Audio file attached successfully!</string>
+    <string name="editor_attach_failed">Failed to copy audio attachment</string>
+    <string name="editor_dual_audio_title">Dual-Audio Attachments</string>
+    <string name="editor_recorder_title">In-App Voice Recorder</string>
+    <string name="editor_link_title">Link External MP3 / M4A File</string>
+    <string name="editor_attaching">Attaching...</string>
+    <string name="editor_browse">Browse Local Storage</string>
+    <string name="editor_browse_short">Browse file</string>
+    <string name="editor_record_short">Record</string>
+    <string name="editor_remove_linked_cd">Remove linked file</string>
+    <string name="editor_current_voice_note">Current voice note</string>
+    <string name="editor_current_linked_audio">Current linked audio</string>
+    <string name="editor_remove_attachment_cd">Remove attachment</string>
+    <string name="editor_mic_permission">Microphone permission is required</string>
+    <string name="editor_resume">Resume</string>
+    <string name="editor_finish">Finish</string>
+    <string name="editor_tap_to_record">Tap to Record</string>
+    <string name="editor_recording_ready">Recording ready: %1$s</string>
+    <string name="editor_rerecord_cd">Re-record</string>
+    <string name="editor_title_required">Please enter a valid notebook title</string>
+    <string name="editor_saving">Saving…</string>
+    <string name="editor_save_changes">Save Changes</string>
+    <string name="editor_save_entry">Save Entry</string>
+
+    <!-- Navigation / components -->
+    <string name="nav_library">LIBRARY</string>
+    <string name="nav_add_entry_cd">Add new entry</string>
+    <string name="nav_settings">SETTINGS</string>
+    <string name="player_preview_pause_cd">Pause preview</string>
+    <string name="player_preview_play_cd">Play preview</string>
+    <string name="player_preview_label">Preview</string>
+
+    <!-- Discard dialog -->
+    <string name="discard_title">Discard unsaved entry?</string>
+    <string name="discard_message">Your unsaved text and newly recorded or attached audio will be discarded.</string>
+    <string name="discard_keep_editing">Keep editing</string>
+
+    <!-- Status / toast messages -->
+    <string name="status_recording_start_failed">Unable to start recording</string>
+    <string name="status_recording_start_failed_detail">Unable to start recording: %1$s</string>
+    <string name="status_entry_saved">Notebook Entry Saved!</string>
+    <string name="status_entry_updated">Entry Updated!</string>
+    <string name="status_save_failed">Save failed: %1$s</string>
+    <string name="status_entry_deleted">Entry deleted</string>
+    <string name="status_entry_missing">Entry no longer exists</string>
+    <string name="status_delete_failed">Delete failed: %1$s</string>
+    <string name="status_favorite_failed">Could not update favorite</string>
+    <string name="status_entry_lookup_failed">Unable to open entry</string>
+    <string name="status_open_playing_failed">Unable to open the playing entry: %1$s</string>
+    <string name="status_exporting">Exporting backup, please wait...</string>
+    <string name="status_export_success">Library Backup Exported Successfully! %1$d entries.</string>
+    <string name="status_export_failed">Export Failed: %1$s</string>
+    <string name="status_importing">Importing backup, please wait...</string>
+    <string name="status_import_success">Library Restored Successfully! Loaded %1$d entries.</string>
+    <string name="status_import_success_skipped">Import complete: %1$d new entries added, %2$d already existed (skipped).</string>
+    <string name="status_import_failed">Import Failed: %1$s</string>
+    <string name="status_error_database">database error</string>
+    <string name="status_error_storage">storage error</string>
+    <string name="status_error_unknown">unknown error</string>
+    <string name="editor_attached_file">Attached file: %1$s</string>
+    <string name="library_delete_message">"%1$s" will be permanently deleted%2$s</string>
+    <string name="library_delete_with_audio"> along with its attached audio.</string>
+    <string name="library_entries_count">%1$d ENTRIES</string>
+    <string name="status_playback_failed">Unable to start playback</string>
+    <string name="settings_import_confirm_title">Import backup?</string>
+    <string name="settings_import_confirm_message">This will add entries from the backup to your library. Continue?</string>
+    <string name="settings_import_confirm_import">Import</string>
+    <string name="settings_import_mode_merge">Add to library</string>
+    <string name="settings_import_mode_merge_desc">New entries are added; entries that already exist are skipped.</string>
+    <string name="settings_import_mode_replace">Replace library</string>
+    <string name="settings_import_mode_replace_desc">Everything currently in the library is deleted and replaced by this backup.</string>
+    <string name="settings_import_replace_title">Replace the whole library?</string>
+    <string name="settings_import_replace_message">This will permanently delete all current entries and their audio, then load the backup. This cannot be undone. Continue?</string>
+    <string name="settings_import_replace_confirm">Delete and replace</string>
+    <string name="status_import_success_replaced">Library replaced: %1$d entries loaded, %2$d old entries removed.</string>
+    <string name="editor_replace_audio_title">Replace existing audio?</string>
+    <string name="editor_replace_audio_body">This entry already has an audio attached. The new audio will replace it, and the old audio will be removed when you save.</string>
+    <string name="action_replace">Replace</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="editor_file_too_large">File is too large (max 100 MB)</string>
+    <string name="editor_invalid_audio_file">This file is not valid audio and was not attached</string>
+</resources>
