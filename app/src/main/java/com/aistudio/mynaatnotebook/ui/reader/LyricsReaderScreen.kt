@@ -103,7 +103,7 @@ import com.aistudio.mynaatnotebook.ui.components.formatTime
 import com.aistudio.mynaatnotebook.ui.components.usesArabicScript
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
-import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
+import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
@@ -149,6 +149,11 @@ fun LyricsReaderScreen(
     val defaultFontSize by settingsViewModel.globalFontSize.collectAsStateWithLifecycle()
     var localFontSize by remember { mutableStateOf(defaultFontSize) }
     LaunchedEffect(defaultFontSize) { localFontSize = defaultFontSize }
+
+    // Font choices (Settings → Typography): reader lyrics + header title.
+    val readerFontChoice by settingsViewModel.readerFont.collectAsStateWithLifecycle()
+    val titleFontChoice by settingsViewModel.titleFont.collectAsStateWithLifecycle()
+    val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
 
     val readerChromeVisible = !immersive || immersiveChromeVisible
 
@@ -252,7 +257,9 @@ fun LyricsReaderScreen(
             topChromePaddingPx = topContentPaddingPx,
             bottomChromePaddingPx = bottomContentPaddingPx,
             immersive = immersive,
-            onIntentionalTap = ::toggleImmersiveChrome
+            onIntentionalTap = ::toggleImmersiveChrome,
+            readerFontChoice = readerFontChoice,
+            customFamilies = customFamilies
         )
 
         if (readerChromeVisible) {
@@ -271,7 +278,8 @@ fun LyricsReaderScreen(
                     onToggleFavorite = { viewModel.toggleFavorite(naat) },
                     onEdit = { onEdit(naat) },
                     onEnterImmersive = ::enterImmersive,
-                    onExitImmersive = ::exitImmersive
+                    onExitImmersive = ::exitImmersive,
+                    titleFontFamily = FontChoices.resolveTitle(titleFontChoice, customFamilies)
                 )
                 ReaderControls(
                     fontSize = localFontSize,
@@ -324,7 +332,8 @@ private fun ReaderTopBar(
     onToggleFavorite: () -> Unit,
     onEdit: () -> Unit,
     onEnterImmersive: () -> Unit,
-    onExitImmersive: () -> Unit
+    onExitImmersive: () -> Unit,
+    titleFontFamily: FontFamily
 ) {
     Row(
         modifier = Modifier
@@ -346,6 +355,7 @@ private fun ReaderTopBar(
                 text = naat.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
+                fontFamily = titleFontFamily,
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1
             )
@@ -556,7 +566,9 @@ private fun ReaderLyricsViewport(
     topChromePaddingPx: Int,
     bottomChromePaddingPx: Int,
     immersive: Boolean,
-    onIntentionalTap: () -> Unit
+    onIntentionalTap: () -> Unit,
+    readerFontChoice: String,
+    customFamilies: Map<String, FontFamily>
 ) {
     val density = LocalDensity.current
     val topPadding = with(density) { topChromePaddingPx.toDp() }
@@ -627,8 +639,15 @@ private fun ReaderLyricsViewport(
             Text(
                 text = naat.lyrics,
                 fontSize = fontSize.sp,
-                fontFamily = if (urduLyrics) NastaliqFamily else FontFamily.Serif,
-                lineHeight = (fontSize * if (urduLyrics) 2.0f else 1.6f).sp,
+                // User's reader-font choice (Settings → Typography); AUTO
+                // resolves to the original Nastaliq-for-Urdu / Serif rule.
+                fontFamily = FontChoices.resolveReader(readerFontChoice, urduLyrics, customFamilies),
+                // Tall scripts (Nastaliq, and imported fonts which are
+                // usually Nastaliq-style) need the roomier line height.
+                lineHeight = (fontSize * if (
+                    urduLyrics || readerFontChoice == FontChoices.NASTALIQ ||
+                    FontChoices.customId(readerFontChoice) != null
+                ) 2.0f else 1.6f).sp,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
