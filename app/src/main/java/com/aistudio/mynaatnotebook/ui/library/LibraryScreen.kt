@@ -31,6 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
@@ -588,8 +589,10 @@ fun FolderSleekCard(
 /**
  * Compact card for the Recents strip at the top of the home screen. A tap
  * opens the reader; favorite/edit/delete stay in the folder lists, where
- * the full rows live. Mirrors the folder cards' monochrome styling, with
- * the same white-border now-playing highlight as the list rows.
+ * the full rows live. Deliberately a different material from the matte
+ * folder cards (approved design): a glass look — a soft vertical sheen
+ * gradient and a brighter hairline border — so the strip reads as its own
+ * species at a glance. Playing state keeps the solid white border.
  */
 @Composable
 fun RecentNaatCard(
@@ -599,7 +602,15 @@ fun RecentNaatCard(
     modifier: Modifier = Modifier
 ) {
     val cardBorder = if (isPlaying) MaterialTheme.colorScheme.onBackground
-                     else MaterialTheme.colorScheme.outline
+                     else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
+    // Glass sheen: light catching the top of the card, fading downward.
+    // onBackground-based alphas keep it monochrome in both themes.
+    val glassBrush = Brush.verticalGradient(
+        listOf(
+            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.13f),
+            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.03f)
+        )
+    )
     Card(
         modifier = modifier
             .width(198.dp)
@@ -615,6 +626,7 @@ fun RecentNaatCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(glassBrush)
                 .padding(12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -32,6 +32,9 @@
     <string name="settings_theme_system">Match System Settings</string>
     <string name="settings_theme_white">Total White Mode</string>
     <string name="settings_theme_black">Total Black Mode</string>
+    <string name="settings_theme_system_sub">Follows your phone\'s theme</string>
+    <string name="settings_theme_white_sub">Always light</string>
+    <string name="settings_theme_black_sub">Always dark</string>
     <string name="settings_typography_title">Typography Adjustment</string>
     <string name="settings_font_size_label">Lyrics Default Text Size: %1$d sp</string>
     <string name="settings_backup_title">Privacy &amp; Local Database Backups</string>
@@ -107,6 +110,8 @@
     <string name="editor_link_title">Link External MP3 / M4A File</string>
     <string name="editor_attaching">Attaching...</string>
     <string name="editor_browse">Browse Local Storage</string>
+    <string name="editor_browse_short">Browse file</string>
+    <string name="editor_record_short">Record</string>
     <string name="editor_remove_linked_cd">Remove linked file</string>
     <string name="editor_current_voice_note">Current voice note</string>
     <string name="editor_current_linked_audio">Current linked audio</string>

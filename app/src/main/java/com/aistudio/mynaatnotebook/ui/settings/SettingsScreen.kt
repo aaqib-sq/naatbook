@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -229,67 +230,61 @@ fun SettingsScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
             shape = RoundedCornerShape(8.dp)
         ) {
-            // Theme choices as visual cards (approved design): each card
-            // shows its own colors, the selected one gets a bold border —
-            // no radio list. Order: system, white, black.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                listOf(
-                    "system" to stringResource(R.string.settings_theme_system),
-                    "white" to stringResource(R.string.settings_theme_white),
-                    "black" to stringResource(R.string.settings_theme_black)
-                ).forEach { (mode, title) ->
-                    val selected = themeMode == mode
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .border(
-                                if (selected) 2.dp else 1.dp,
-                                if (selected) MaterialTheme.colorScheme.onBackground
-                                else MaterialTheme.colorScheme.outline,
-                                RoundedCornerShape(12.dp)
-                            )
-                            .clickable { settingsViewModel.setThemeMode(mode) }
-                            .testTag("settings_theme_$mode"),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            // Miniature preview of the theme's own surface.
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp))
-                            ) {
-                                when (mode) {
-                                    "white" -> Box(
-                                        Modifier.fillMaxSize().background(Color(0xFFF7F7F7))
-                                    )
-                                    "black" -> Box(
-                                        Modifier.fillMaxSize().background(Color(0xFF0A0A0A))
-                                    )
-                                    else -> Row(Modifier.fillMaxSize()) {
-                                        Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFF0A0A0A)))
-                                        Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF7F7F7)))
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = title,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+            // Theme choices as three rows in one card (approved design):
+            // a color dot shows the theme, a subtitle says what it means,
+            // and the selected row carries a check. (The visual swatch
+            // cards were rejected as cheap-looking; rows match the
+            // settings page's own grouped-row language.)
+            val themeChoices = listOf(
+                Triple(
+                    "system",
+                    stringResource(R.string.settings_theme_system),
+                    stringResource(R.string.settings_theme_system_sub)
+                ),
+                Triple(
+                    "white",
+                    stringResource(R.string.settings_theme_white),
+                    stringResource(R.string.settings_theme_white_sub)
+                ),
+                Triple(
+                    "black",
+                    stringResource(R.string.settings_theme_black),
+                    stringResource(R.string.settings_theme_black_sub)
+                )
+            )
+            themeChoices.forEachIndexed { index, (mode, title, subtitle) ->
+                val selected = themeMode == mode
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { settingsViewModel.setThemeMode(mode) }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .testTag("settings_theme_$mode"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ThemeDot(mode)
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
                     }
+                    if (selected) {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                    }
+                }
+                if (index < themeChoices.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 58.dp, end = 16.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                    )
                 }
             }
         }
@@ -446,6 +441,26 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(20.dp))
+    }
+}
+
+/** Small color dot previewing a theme mode: half black / half white for system. */
+@Composable
+private fun ThemeDot(mode: String) {
+    Box(
+        modifier = Modifier
+            .size(26.dp)
+            .clip(CircleShape)
+            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+    ) {
+        when (mode) {
+            "white" -> Box(Modifier.fillMaxSize().background(Color(0xFFF7F7F7)))
+            "black" -> Box(Modifier.fillMaxSize().background(Color(0xFF0A0A0A)))
+            else -> Row(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFF0A0A0A)))
+                Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF7F7F7)))
+            }
+        }
     }
 }
 

@@ -7,6 +7,7 @@ import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -515,10 +516,17 @@ private fun BrowseAudioButton(
     isAttaching: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Button(
+    // Slim outline style (approved design): the chunky filled pills are
+    // gone; short single-line label, hairline border, 44dp tall.
+    OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.testTag("link_external_file_btn")
+        modifier = modifier.height(44.dp).testTag("link_external_file_btn"),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.onBackground
+        )
     ) {
         if (isAttaching) {
             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -527,7 +535,7 @@ private fun BrowseAudioButton(
         } else {
             Icon(Icons.Default.MusicNote, contentDescription = null)
             Spacer(Modifier.width(4.dp))
-            Text(stringResource(R.string.editor_browse))
+            Text(stringResource(R.string.editor_browse_short), maxLines = 1)
         }
     }
 }
@@ -598,18 +606,26 @@ private fun RecorderControls(
         RecordingState.IDLE -> {
             val finishedFile = activeFile
             if (finishedFile == null) {
-                // Record and Browse share one equal row (approved design).
+                // Record and Browse share one equal row (approved design),
+                // both slim outline buttons with single-line labels.
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
+                    OutlinedButton(
                         onClick = {
                             if (hasExistingRecorded) confirmRecord = true
                             else permission.launch(android.Manifest.permission.RECORD_AUDIO)
                         },
-                        modifier = Modifier.weight(1f).testTag("start_recording_btn")
+                        modifier = Modifier.weight(1f).height(44.dp).testTag("start_recording_btn"),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(
+                            1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onBackground
+                        )
                     ) {
                         Icon(Icons.Default.Mic, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.editor_tap_to_record))
+                        Text(stringResource(R.string.editor_record_short), maxLines = 1)
                     }
                     BrowseAudioButton(
                         onClick = onBrowseClick,
