@@ -19,9 +19,11 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         existingAudioRemoved = handle[EXISTING_AUDIO_REMOVED] ?: false,
         existingAudioType = handle[EXISTING_AUDIO_TYPE] ?: "none",
         existingAudioPath = handle[EXISTING_AUDIO_PATH],
+        existingAudioDisplayName = handle[EXISTING_AUDIO_DISPLAY_NAME],
         existingSecondaryAudioRemoved = handle[EXISTING_SECONDARY_AUDIO_REMOVED] ?: false,
         existingSecondaryAudioType = handle[EXISTING_SECONDARY_AUDIO_TYPE] ?: "none",
         existingSecondaryAudioPath = handle[EXISTING_SECONDARY_AUDIO_PATH],
+        existingSecondaryAudioDisplayName = handle[EXISTING_SECONDARY_AUDIO_DISPLAY_NAME],
         existingFavorite = handle[EXISTING_FAVORITE] ?: false,
         existingCreatedAt = handle[EXISTING_CREATED_AT] ?: 0L,
         newAttachmentPath = handle[NEW_ATTACHMENT_PATH],
@@ -41,9 +43,11 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         handle[EXISTING_AUDIO_REMOVED] = draft.existingAudioRemoved
         handle[EXISTING_AUDIO_TYPE] = draft.existingAudioType
         handle[EXISTING_AUDIO_PATH] = draft.existingAudioPath
+        handle[EXISTING_AUDIO_DISPLAY_NAME] = draft.existingAudioDisplayName
         handle[EXISTING_SECONDARY_AUDIO_REMOVED] = draft.existingSecondaryAudioRemoved
         handle[EXISTING_SECONDARY_AUDIO_TYPE] = draft.existingSecondaryAudioType
         handle[EXISTING_SECONDARY_AUDIO_PATH] = draft.existingSecondaryAudioPath
+        handle[EXISTING_SECONDARY_AUDIO_DISPLAY_NAME] = draft.existingSecondaryAudioDisplayName
         handle[EXISTING_FAVORITE] = draft.existingFavorite
         handle[EXISTING_CREATED_AT] = draft.existingCreatedAt
         handle[NEW_ATTACHMENT_PATH] = draft.newAttachmentPath
@@ -61,9 +65,11 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         const val EXISTING_AUDIO_REMOVED = "draft.existingAudioRemoved"
         const val EXISTING_AUDIO_TYPE = "draft.existingAudioType"
         const val EXISTING_AUDIO_PATH = "draft.existingAudioPath"
+        const val EXISTING_AUDIO_DISPLAY_NAME = "draft.existingAudioDisplayName"
         const val EXISTING_SECONDARY_AUDIO_REMOVED = "draft.existingSecondaryAudioRemoved"
         const val EXISTING_SECONDARY_AUDIO_TYPE = "draft.existingSecondaryAudioType"
         const val EXISTING_SECONDARY_AUDIO_PATH = "draft.existingSecondaryAudioPath"
+        const val EXISTING_SECONDARY_AUDIO_DISPLAY_NAME = "draft.existingSecondaryAudioDisplayName"
         const val EXISTING_FAVORITE = "draft.existingFavorite"
         const val EXISTING_CREATED_AT = "draft.existingCreatedAt"
         const val NEW_ATTACHMENT_PATH = "draft.newAttachmentPath"
