@@ -23,9 +23,11 @@ internal class EditorDraftDiskStore(context: Context) {
             existingAudioRemoved = json.optBoolean("existingAudioRemoved"),
             existingAudioType = json.optString("existingAudioType", "none"),
             existingAudioPath = optional("existingAudioPath"),
+            existingAudioDisplayName = optional("existingAudioDisplayName"),
             existingSecondaryAudioRemoved = json.optBoolean("existingSecondaryAudioRemoved"),
             existingSecondaryAudioType = json.optString("existingSecondaryAudioType", "none"),
             existingSecondaryAudioPath = optional("existingSecondaryAudioPath"),
+            existingSecondaryAudioDisplayName = optional("existingSecondaryAudioDisplayName"),
             existingFavorite = json.optBoolean("existingFavorite"),
             existingCreatedAt = json.optLong("existingCreatedAt"),
             newAttachmentPath = optional("newAttachmentPath"),
@@ -45,9 +47,11 @@ internal class EditorDraftDiskStore(context: Context) {
             put("existingAudioRemoved", draft.existingAudioRemoved)
             put("existingAudioType", draft.existingAudioType)
             put("existingAudioPath", draft.existingAudioPath ?: JSONObject.NULL)
+            put("existingAudioDisplayName", draft.existingAudioDisplayName ?: JSONObject.NULL)
             put("existingSecondaryAudioRemoved", draft.existingSecondaryAudioRemoved)
             put("existingSecondaryAudioType", draft.existingSecondaryAudioType)
             put("existingSecondaryAudioPath", draft.existingSecondaryAudioPath ?: JSONObject.NULL)
+            put("existingSecondaryAudioDisplayName", draft.existingSecondaryAudioDisplayName ?: JSONObject.NULL)
             put("existingFavorite", draft.existingFavorite)
             put("existingCreatedAt", draft.existingCreatedAt)
             put("newAttachmentPath", draft.newAttachmentPath ?: JSONObject.NULL)

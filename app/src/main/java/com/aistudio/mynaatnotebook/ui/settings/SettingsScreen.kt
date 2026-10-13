@@ -55,6 +55,7 @@ import com.aistudio.mynaatnotebook.data.ImportMode
 import com.aistudio.mynaatnotebook.data.NaatCategories
 import com.aistudio.mynaatnotebook.data.NaatEntity
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
+import com.aistudio.mynaatnotebook.ui.reader.ThinSeekBar
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
@@ -64,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.io.File
 
 @Composable
@@ -223,31 +225,70 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+            modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            // Theme choices as visual cards (approved design): each card
+            // shows its own colors, the selected one gets a bold border —
+            // no radio list. Order: system, white, black.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 listOf(
                     "system" to stringResource(R.string.settings_theme_system),
                     "white" to stringResource(R.string.settings_theme_white),
                     "black" to stringResource(R.string.settings_theme_black)
                 ).forEach { (mode, title) ->
-                    Row(
+                    val selected = themeMode == mode
+                    Card(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .weight(1f)
+                            .border(
+                                if (selected) 2.dp else 1.dp,
+                                if (selected) MaterialTheme.colorScheme.onBackground
+                                else MaterialTheme.colorScheme.outline,
+                                RoundedCornerShape(12.dp)
+                            )
                             .clickable { settingsViewModel.setThemeMode(mode) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .testTag("settings_theme_$mode"),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        RadioButton(
-                            selected = themeMode == mode,
-                            onClick = { settingsViewModel.setThemeMode(mode) }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = title, fontWeight = FontWeight.SemiBold)
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            // Miniature preview of the theme's own surface.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp))
+                            ) {
+                                when (mode) {
+                                    "white" -> Box(
+                                        Modifier.fillMaxSize().background(Color(0xFFF7F7F7))
+                                    )
+                                    "black" -> Box(
+                                        Modifier.fillMaxSize().background(Color(0xFF0A0A0A))
+                                    )
+                                    else -> Row(Modifier.fillMaxSize()) {
+                                        Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFF0A0A0A)))
+                                        Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF7F7F7)))
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = title,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
@@ -281,13 +322,25 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Slider(
-                    value = pendingFontSize,
-                    onValueChange = { pendingFontSize = it },
-                    onValueChangeFinished = { settingsViewModel.setGlobalFontSize(pendingFontSize) },
-                    valueRange = 12f..36f,
-                    steps = 23, // 24 steps total = 12..36 sp in exact 1-sp increments
-                    modifier = Modifier.testTag("global_font_slider")
+                // Same thin seek line as the reader (approved design); the
+                // stock slider's thick track and stick thumb are gone. The
+                // drag moves the local pending value in exact 1-sp steps and
+                // the DataStore commit is debounced, so a drag still writes
+                // once — never a write-storm.
+                LaunchedEffect(pendingFontSize) {
+                    if (pendingFontSize != globalFontSize) {
+                        delay(350)
+                        settingsViewModel.setGlobalFontSize(pendingFontSize)
+                    }
+                }
+                ThinSeekBar(
+                    fraction = (pendingFontSize - 12f) / 24f,
+                    onFractionChange = { fraction ->
+                        pendingFontSize = (12f + fraction * 24f).roundToInt().toFloat()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("global_font_slider")
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 // Sample preview — real salam text in authentic Nastaliq + RTL
@@ -322,44 +375,44 @@ fun SettingsScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // Grouped rows in one card (approved design) instead of two loose
+        // buttons: icon well, title + subtitle, chevron.
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Button(
-                onClick = {
-                    val timestamp = System.currentTimeMillis()
-                    val fileName = "NaatNotebook_backup_$timestamp.zip"
-                    exportBackupLauncher.launch(fileName)
-                },
-                enabled = !backupWorking,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .testTag("export_backup_btn"),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onBackground),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.Download, contentDescription = stringResource(R.string.settings_export_cd))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(R.string.settings_export_zip), fontSize = 12.sp)
-            }
-
-            Button(
-                onClick = {
-                    importBackupLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
-                },
-                enabled = !backupWorking,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .testTag("import_backup_btn"),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onBackground),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.Upload, contentDescription = stringResource(R.string.settings_import_cd))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(R.string.settings_import_zip), fontSize = 12.sp)
+            Column {
+                SettingsActionRow(
+                    icon = Icons.Default.Download,
+                    title = stringResource(R.string.settings_export_zip),
+                    subtitle = stringResource(R.string.settings_export_subtitle),
+                    contentDescription = stringResource(R.string.settings_export_cd),
+                    enabled = !backupWorking,
+                    testTag = "export_backup_btn",
+                    onClick = {
+                        val timestamp = System.currentTimeMillis()
+                        val fileName = "NaatNotebook_backup_$timestamp.zip"
+                        exportBackupLauncher.launch(fileName)
+                    }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 68.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                )
+                SettingsActionRow(
+                    icon = Icons.Default.Upload,
+                    title = stringResource(R.string.settings_import_zip),
+                    subtitle = stringResource(R.string.settings_import_subtitle),
+                    contentDescription = stringResource(R.string.settings_import_cd),
+                    enabled = !backupWorking,
+                    testTag = "import_backup_btn",
+                    onClick = {
+                        importBackupLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                    }
+                )
             }
         }
 
@@ -393,6 +446,61 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(20.dp))
+    }
+}
+
+/** One tappable row inside the Settings data card: icon well, title + subtitle, chevron. */
+@Composable
+private fun SettingsActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    contentDescription: String,
+    enabled: Boolean,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = if (enabled) MaterialTheme.colorScheme.onBackground else HighContrastGray,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontWeight = FontWeight.SemiBold,
+                color = if (enabled) MaterialTheme.colorScheme.onBackground else HighContrastGray
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = HighContrastGray
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowRight,
+            contentDescription = null,
+            tint = HighContrastGray,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

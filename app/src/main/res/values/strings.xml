@@ -38,6 +38,8 @@
     <string name="settings_backup_description">All database records and audio assets are saved strictly locally. Safeguard your work below.</string>
     <string name="settings_export_cd">Export</string>
     <string name="settings_export_zip">Export ZIP</string>
+    <string name="settings_export_subtitle">Save a copy of your whole library</string>
+    <string name="settings_import_subtitle">Restore entries from a backup file</string>
     <string name="settings_import_cd">Import</string>
     <string name="settings_import_zip">Import ZIP</string>
     <string name="settings_about">NaatBook %1$s\n100%% Offline | Zero Data Tracking</string>
@@ -86,8 +88,9 @@
     <string name="library_delete_cd">Delete entry</string>
 
     <!-- Editor -->
-    <string name="editor_title_edit">Edit Notebook Entry</string>
-    <string name="editor_title_add">Add New Notebook Entry</string>
+    <string name="editor_title_edit">Edit NaatBook Entry</string>
+    <string name="editor_title_add">Add New NaatBook Entry</string>
+    <string name="editor_details_title">Details</string>
     <string name="editor_close_cd">Close modal</string>
     <string name="editor_title_label">Title (Required)</string>
     <string name="editor_poet_label">Poet Name (Optional)</string>

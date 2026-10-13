@@ -26,6 +26,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -98,22 +102,29 @@ fun AddNaatModal(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // The non-draggable editor sheet constrains this list's height. Keeping a
-    // single LazyColumn avoids nested scroll jank with the IME.
-    LazyColumn(
+    // The form scrolls in the weighted list; the Save bar is pinned below it
+    // (approved design) so saving never needs a scroll to the form's end.
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
-            .imePadding(),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .imePadding()
     ) {
-        item(key = "header") { EditorHeader(viewModel, onClose) }
-        item(key = "metadata") { EditorMetadataSection(viewModel) }
-        item(key = "audio") { EditorAudioSection(viewModel) }
-        item(key = "save") { EditorSaveSection(viewModel) }
-        item(key = "bottom-space") { Spacer(Modifier.height(8.dp)) }
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item(key = "header") { EditorHeader(viewModel, onClose) }
+            item(key = "metadata") { EditorMetadataSection(viewModel) }
+            item(key = "audio") { EditorAudioSection(viewModel) }
+            item(key = "bottom-space") { Spacer(Modifier.height(8.dp)) }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            EditorSaveSection(viewModel)
+        }
     }
 }
 
@@ -145,10 +156,8 @@ private fun EditorHeader(viewModel: NaatViewModel, onClose: () -> Unit) {
 @Composable
 private fun EditorMetadataSection(viewModel: NaatViewModel) {
     val context = LocalContext.current
-    val folderLabel = stringResource(R.string.editor_folder_label)
     val metadata by viewModel.editorMetadata.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
-    var showCategoryDropdown by remember { mutableStateOf(false) }
     val lyricsDictationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -164,107 +173,169 @@ private fun EditorMetadataSection(viewModel: NaatViewModel) {
         }
     }
 
-    val folderState = if (showCategoryDropdown) "expanded" else "collapsed"
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // Details card (approved design): borderless fields grouped in one
+        // card, divided by a hairline — the grouped-form look of pro apps.
+        EditorSectionCard {
+            EditorCardLabel(stringResource(R.string.editor_details_title))
+            TextField(
+                value = metadata.title,
+                onValueChange = { value -> viewModel.updateDraft { it.copy(title = value) } },
+                label = { Text(stringResource(R.string.editor_title_label)) },
+                modifier = Modifier.fillMaxWidth().testTag("add_naat_title"),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                singleLine = true,
+                enabled = !isSaving,
+                colors = borderlessFieldColors()
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            TextField(
+                value = metadata.poet,
+                onValueChange = { value -> viewModel.updateDraft { it.copy(poet = value) } },
+                label = { Text(stringResource(R.string.editor_poet_label)) },
+                modifier = Modifier.fillMaxWidth().testTag("add_naat_poet"),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                singleLine = true,
+                enabled = !isSaving,
+                colors = borderlessFieldColors()
+            )
+        }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = metadata.title,
-            onValueChange = { value -> viewModel.updateDraft { it.copy(title = value) } },
-            label = { Text(stringResource(R.string.editor_title_label)) },
-            modifier = Modifier.fillMaxWidth().testTag("add_naat_title"),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            singleLine = true,
-            enabled = !isSaving
-        )
-        OutlinedTextField(
-            value = metadata.poet,
-            onValueChange = { value -> viewModel.updateDraft { it.copy(poet = value) } },
-            label = { Text(stringResource(R.string.editor_poet_label)) },
-            modifier = Modifier.fillMaxWidth().testTag("add_naat_poet"),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-            singleLine = true,
-            enabled = !isSaving
-        )
-        Box(Modifier.fillMaxWidth()) {
-            // The read-only field stays visually consistent with the rest of the
-            // editor. A single full-size semantic overlay owns all activation so
-            // every part of the input—not just the trailing affordance—opens it.
-            OutlinedTextField(
-                value = metadata.category,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text(folderLabel) },
-                trailingIcon = {
-                    Icon(
-                        imageVector = if (showCategoryDropdown) {
-                            Icons.Default.KeyboardArrowUp
-                        } else {
-                            Icons.Default.KeyboardArrowDown
-                        },
-                        contentDescription = null
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clearAndSetSemantics { }
+        // Folder chips (approved design): one tap picks the folder; the old
+        // read-only field + dropdown menu is gone.
+        Column {
+            Text(
+                text = stringResource(R.string.editor_folder_label),
+                style = MaterialTheme.typography.bodyMedium,
+                color = HighContrastGray,
+                modifier = Modifier.padding(start = 4.dp)
             )
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = folderLabel
-                        stateDescription = "${metadata.category}, $folderState"
-                    }
-                    .clickable(role = Role.DropdownList) {
-                        showCategoryDropdown = !showCategoryDropdown
-                    }
-                    .testTag("folder_location_dropdown")
-            )
-            DropdownMenu(
-                expanded = showCategoryDropdown,
-                onDismissRequest = { showCategoryDropdown = false }
+            Spacer(modifier = Modifier.height(8.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.testTag("folder_location_dropdown")
             ) {
-                NaatCategories.ALL.forEach { category ->
-                    DropdownMenuItem(
-                        text = { Text(category) },
-                        onClick = {
-                            viewModel.updateDraft { it.copy(category = category) }
-                            showCategoryDropdown = false
-                        }
+                items(NaatCategories.ALL) { category ->
+                    FolderChip(
+                        label = category,
+                        selected = metadata.category == category,
+                        enabled = !isSaving,
+                        onClick = { viewModel.updateDraft { it.copy(category = category) } }
                     )
                 }
             }
         }
-        OutlinedTextField(
-            value = metadata.lyrics,
-            onValueChange = { value -> viewModel.updateDraft { it.copy(lyrics = value) } },
-            label = { Text(stringResource(R.string.editor_lyrics_label)) },
-            placeholder = { Text(stringResource(R.string.editor_lyrics_hint)) },
-            textStyle = LocalTextStyle.current.copy(
-                fontFamily = if (usesArabicScript(metadata.lyrics)) NastaliqFamily else FontFamily.Default,
-                lineHeight = if (usesArabicScript(metadata.lyrics)) 32.sp else LocalTextStyle.current.lineHeight
-            ),
-            trailingIcon = {
-                IconButton(
-                    onClick = {
-                        try {
-                            lyricsDictationLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                putExtra(
-                                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                                )
-                                putExtra(RecognizerIntent.EXTRA_PROMPT, context.getString(R.string.editor_dictate_prompt))
-                            })
-                        } catch (_: Exception) {
-                            Toast.makeText(context, context.getString(R.string.editor_stt_unsupported), Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier.testTag("lyrics_dictate_mic")
-                ) { Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.editor_dictate_cd), tint = HighContrastGray) }
-            },
-            modifier = Modifier.fillMaxWidth().height(180.dp).testTag("add_naat_lyrics"),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            enabled = !isSaving
+
+        // Lyrics in their own card (approved design).
+        EditorSectionCard {
+            EditorCardLabel(stringResource(R.string.editor_lyrics_label))
+            TextField(
+                value = metadata.lyrics,
+                onValueChange = { value -> viewModel.updateDraft { it.copy(lyrics = value) } },
+                placeholder = { Text(stringResource(R.string.editor_lyrics_hint)) },
+                textStyle = LocalTextStyle.current.copy(
+                    fontFamily = if (usesArabicScript(metadata.lyrics)) NastaliqFamily else FontFamily.Default,
+                    lineHeight = if (usesArabicScript(metadata.lyrics)) 32.sp else LocalTextStyle.current.lineHeight
+                ),
+                trailingIcon = {
+                    IconButton(
+                        onClick = {
+                            try {
+                                lyricsDictationLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(
+                                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                    )
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, context.getString(R.string.editor_dictate_prompt))
+                                })
+                            } catch (_: Exception) {
+                                Toast.makeText(context, context.getString(R.string.editor_stt_unsupported), Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.testTag("lyrics_dictate_mic")
+                    ) { Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.editor_dictate_cd), tint = HighContrastGray) }
+                },
+                modifier = Modifier.fillMaxWidth().height(180.dp).testTag("add_naat_lyrics"),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                enabled = !isSaving,
+                colors = borderlessFieldColors()
+            )
+        }
+    }
+}
+
+/** The editor's grouped-section card, matching the audio card's styling. */
+@Composable
+private fun EditorSectionCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+        ),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            content = content
+        )
+    }
+}
+
+/** Small caps label at the top of an editor section card. */
+@Composable
+private fun EditorCardLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.5.sp
+        ),
+        color = HighContrastGray,
+        modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 2.dp)
+    )
+}
+
+/** Borderless field colors so fields sit directly on their section card. */
+@Composable
+private fun borderlessFieldColors(): TextFieldColors = TextFieldDefaults.colors(
+    focusedContainerColor = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent,
+    disabledContainerColor = Color.Transparent,
+    errorContainerColor = Color.Transparent,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    disabledIndicatorColor = Color.Transparent,
+    errorIndicatorColor = Color.Transparent
+)
+
+/** One folder choice in the editor's chip row. */
+@Composable
+private fun FolderChip(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = Modifier
+            .then(
+                if (selected) Modifier.background(MaterialTheme.colorScheme.onBackground, shape)
+                else Modifier.border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
+            .testTag("folder_chip_$label"),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (selected) MaterialTheme.colorScheme.background
+                    else MaterialTheme.colorScheme.onBackground,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }
@@ -345,27 +416,15 @@ private fun EditorAudioSection(viewModel: NaatViewModel) {
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 ExistingAttachments(attachments, activeRecordingFile != null, viewModel)
-                Text(stringResource(R.string.editor_recorder_title), fontWeight = FontWeight.SemiBold)
-                RecorderControls(viewModel)
                 HorizontalDivider()
-                Text(stringResource(R.string.editor_link_title), fontWeight = FontWeight.SemiBold)
-                Button(
-                    onClick = { audioPicker.launch("audio/*") },
+                RecorderControls(
+                    viewModel = viewModel,
+                    onBrowseClick = { audioPicker.launch("audio/*") },
                     // Disable while attaching or when a new file is already picked
                     // (prevents silently replacing the pending attachment).
-                    enabled = !isAttaching && attachments.newAttachmentPath == null,
-                    modifier = Modifier.testTag("link_external_file_btn")
-                ) {
-                    if (isAttaching) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.editor_attaching))
-                    } else {
-                        Icon(Icons.Default.MusicNote, contentDescription = null)
-                        Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.editor_browse))
-                    }
-                }
+                    browseEnabled = !isAttaching && attachments.newAttachmentPath == null,
+                    isAttaching = isAttaching
+                )
                 attachments.newAttachmentPath?.let { path ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -415,11 +474,25 @@ private fun ExistingAttachments(
                     tint = HighContrastGray
                 )
                 Spacer(Modifier.width(6.dp))
-                Text(
-                    if (type == "recorded") stringResource(R.string.editor_current_voice_note) else stringResource(R.string.editor_current_linked_audio),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (type == "recorded") stringResource(R.string.editor_current_voice_note) else stringResource(R.string.editor_current_linked_audio),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    // The linked file's original name, so the user can see
+                    // WHICH file is attached (recordings need no name).
+                    val displayName = if (secondary) draft.existingSecondaryAudioDisplayName
+                                      else draft.existingAudioDisplayName
+                    if (type == "local_file" && !displayName.isNullOrBlank()) {
+                        Text(
+                            text = displayName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HighContrastGray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
                 AudioAttachmentPreview(path, viewModel)
                 IconButton(onClick = {
                     viewModel.updateDraft {
@@ -434,8 +507,38 @@ private fun ExistingAttachments(
     }
 }
 
+/** The Browse button shared by the recorder's idle layouts. */
 @Composable
-private fun RecorderControls(viewModel: NaatViewModel) {
+private fun BrowseAudioButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    isAttaching: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.testTag("link_external_file_btn")
+    ) {
+        if (isAttaching) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.editor_attaching))
+        } else {
+            Icon(Icons.Default.MusicNote, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(R.string.editor_browse))
+        }
+    }
+}
+
+@Composable
+private fun RecorderControls(
+    viewModel: NaatViewModel,
+    onBrowseClick: () -> Unit,
+    browseEnabled: Boolean,
+    isAttaching: Boolean
+) {
     val context = LocalContext.current
     val state by viewModel.recordingState.collectAsStateWithLifecycle()
     val activeFile by viewModel.activeRecordingFile.collectAsStateWithLifecycle()
@@ -495,16 +598,25 @@ private fun RecorderControls(viewModel: NaatViewModel) {
         RecordingState.IDLE -> {
             val finishedFile = activeFile
             if (finishedFile == null) {
-                Button(
-                    onClick = {
-                        if (hasExistingRecorded) confirmRecord = true
-                        else permission.launch(android.Manifest.permission.RECORD_AUDIO)
-                    },
-                    modifier = Modifier.testTag("start_recording_btn")
-                ) {
-                    Icon(Icons.Default.Mic, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.editor_tap_to_record))
+                // Record and Browse share one equal row (approved design).
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            if (hasExistingRecorded) confirmRecord = true
+                            else permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                        },
+                        modifier = Modifier.weight(1f).testTag("start_recording_btn")
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.editor_tap_to_record))
+                    }
+                    BrowseAudioButton(
+                        onClick = onBrowseClick,
+                        enabled = browseEnabled,
+                        isAttaching = isAttaching,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -529,6 +641,13 @@ private fun RecorderControls(viewModel: NaatViewModel) {
                         modifier = Modifier.testTag("rerecord_btn")
                     ) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.editor_rerecord_cd)) }
                 }
+                Spacer(Modifier.height(8.dp))
+                BrowseAudioButton(
+                    onClick = onBrowseClick,
+                    enabled = browseEnabled,
+                    isAttaching = isAttaching,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }

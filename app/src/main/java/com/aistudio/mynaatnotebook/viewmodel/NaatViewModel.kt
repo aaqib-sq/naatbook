@@ -72,8 +72,10 @@ class NaatViewModel @Inject constructor(
         .map {
             EditorAttachmentDraft(
                 it.existingAudioRemoved, it.existingAudioType, it.existingAudioPath,
+                it.existingAudioDisplayName,
                 it.existingSecondaryAudioRemoved, it.existingSecondaryAudioType,
-                it.existingSecondaryAudioPath, it.newAttachmentPath,
+                it.existingSecondaryAudioPath, it.existingSecondaryAudioDisplayName,
+                it.newAttachmentPath,
                 it.newAttachmentName, it.finishedRecordingPath
             )
         }
@@ -83,8 +85,10 @@ class NaatViewModel @Inject constructor(
             SharingStarted.Eagerly,
             EditorAttachmentDraft(
                 initialDraft.existingAudioRemoved, initialDraft.existingAudioType,
-                initialDraft.existingAudioPath, initialDraft.existingSecondaryAudioRemoved,
+                initialDraft.existingAudioPath, initialDraft.existingAudioDisplayName,
+                initialDraft.existingSecondaryAudioRemoved,
                 initialDraft.existingSecondaryAudioType, initialDraft.existingSecondaryAudioPath,
+                initialDraft.existingSecondaryAudioDisplayName,
                 initialDraft.newAttachmentPath, initialDraft.newAttachmentName,
                 initialDraft.finishedRecordingPath
             )
@@ -623,8 +627,10 @@ class NaatViewModel @Inject constructor(
                 lyrics = naat.lyrics.orEmpty(),
                 existingAudioType = naat.audioType,
                 existingAudioPath = naat.audioPath,
+                existingAudioDisplayName = naat.audioDisplayName,
                 existingSecondaryAudioType = naat.secondaryAudioType,
                 existingSecondaryAudioPath = naat.secondaryAudioPath,
+                existingSecondaryAudioDisplayName = naat.secondaryAudioDisplayName,
                 existingFavorite = naat.isFavorite,
                 existingCreatedAt = naat.createdAt
             ), immediate = true)
@@ -632,6 +638,19 @@ class NaatViewModel @Inject constructor(
         _editingNaat.value = naat
         _showAddModal.value = true
     }
+
+    /** The picker's original file name, for display only (never a storage path). */
+    private fun resolveDisplayName(uri: Uri): String? = runCatching {
+        context.contentResolver.query(
+            uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                cursor.getString(0)?.trim()?.takeIf { it.isNotBlank() }?.take(120)
+            } else {
+                null
+            }
+        }
+    }.getOrNull()
 
     // --- Local device file attachment ---
     private fun resolveAudioExtension(uri: Uri): String {
@@ -717,7 +736,8 @@ class NaatViewModel @Inject constructor(
                 val success = audioFiles.exclusive {
                     val file = copyLocalFileToAppStorageLocked(uri)
                     if (file != null && _editorDraft.value.active) {
-                        adoptLinkedFileLocked(file)
+                        val displayName = withContext(Dispatchers.IO) { resolveDisplayName(uri) }
+                        adoptLinkedFileLocked(file, displayName)
                         true
                     } else {
                         deleteOnIo(file?.absolutePath)
@@ -733,7 +753,7 @@ class NaatViewModel @Inject constructor(
     }
 
     /** Called only while [audioFiles] is held; replaces a draft-owned linked file atomically. */
-    private suspend fun adoptLinkedFileLocked(file: File) {
+    private suspend fun adoptLinkedFileLocked(file: File, displayName: String? = null) {
         if (_recordingState.value != RecordingState.IDLE) finalizeRecordingLocked()
         withContext(Dispatchers.Main.immediate) { playbackController.stopPreview() }
         val draft = _editorDraft.value
@@ -745,7 +765,10 @@ class NaatViewModel @Inject constructor(
         withContext(Dispatchers.Main.immediate) {
             persistDraft(draft.copy(
                 newAttachmentPath = file.absolutePath,
-                newAttachmentName = file.name
+                // Show the user the name of the file THEY picked, not the
+                // internal storage name. Callers without a picker name keep
+                // the plain file name as a fallback.
+                newAttachmentName = displayName ?: file.name
             ))
         }
     }
@@ -814,6 +837,22 @@ class NaatViewModel @Inject constructor(
                         else -> null
                     }
 
+                    fun existingDisplayName(type: String): String? = when {
+                        !draft.existingAudioRemoved && draft.existingAudioType == type ->
+                            draft.existingAudioDisplayName
+                        !draft.existingSecondaryAudioRemoved && draft.existingSecondaryAudioType == type ->
+                            draft.existingSecondaryAudioDisplayName
+                        else -> null
+                    }
+
+                    // The linked slot's display name follows the same source as
+                    // its path: a fresh pick wins, otherwise the kept file's name.
+                    val linkedDisplayName = if (draft.newAttachmentPath != null) {
+                        draft.newAttachmentName
+                    } else {
+                        existingDisplayName("local_file")
+                    }
+
                     val recordingPath = finishedRecording?.absolutePath ?: existingPath("recorded")
                     val linkedPath = draft.newAttachmentPath ?: existingPath("local_file")
                     val audioType = when {
@@ -842,7 +881,10 @@ class NaatViewModel @Inject constructor(
                             createdAt = persistedAt,
                             updatedAt = persistedAt,
                             secondaryAudioType = secondaryAudioType,
-                            secondaryAudioPath = secondaryAudioPath
+                            secondaryAudioPath = secondaryAudioPath,
+                            audioDisplayName = if (audioType == "local_file") linkedDisplayName else null,
+                            secondaryAudioDisplayName =
+                                if (secondaryAudioType == "local_file") linkedDisplayName else null
                         )
                         val id = repository.insert(entity).toInt()
                         entity.copy(id = id)
@@ -859,7 +901,10 @@ class NaatViewModel @Inject constructor(
                             createdAt = draft.existingCreatedAt,
                             updatedAt = persistedAt,
                             secondaryAudioType = secondaryAudioType,
-                            secondaryAudioPath = secondaryAudioPath
+                            secondaryAudioPath = secondaryAudioPath,
+                            audioDisplayName = if (audioType == "local_file") linkedDisplayName else null,
+                            secondaryAudioDisplayName =
+                                if (secondaryAudioType == "local_file") linkedDisplayName else null
                         )
                         repository.update(entity)
                         entity
