@@ -28,6 +28,9 @@ import javax.inject.Singleton
 private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
 private val KEY_FONT_SIZE = floatPreferencesKey("font_size")
 private val KEY_FOLDERS_WITH_ENTRIES = stringSetPreferencesKey("folders_with_entries")
+private val KEY_READER_FONT = stringPreferencesKey("reader_font")
+private val KEY_TITLE_FONT = stringPreferencesKey("title_font")
+private val KEY_CUSTOM_FONTS = stringPreferencesKey("custom_fonts")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -55,6 +58,33 @@ class SettingsStore @Inject constructor(
 
     suspend fun setFontSize(size: Float) {
         context.settingsDataStore.edit { it[KEY_FONT_SIZE] = size }
+    }
+
+    /** Reader lyrics font choice: a FontChoices key, or "custom:<id>". */
+    val readerFont: Flow<String> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_READER_FONT] ?: "auto" }
+
+    suspend fun setReaderFont(choice: String) {
+        context.settingsDataStore.edit { it[KEY_READER_FONT] = choice }
+    }
+
+    /** Entry-title font choice: a FontChoices key, or "custom:<id>". */
+    val titleFont: Flow<String> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_TITLE_FONT] ?: "sans" }
+
+    suspend fun setTitleFont(choice: String) {
+        context.settingsDataStore.edit { it[KEY_TITLE_FONT] = choice }
+    }
+
+    /** Imported-font registry as a JSON array string (see CustomFontStore). */
+    val customFontsJson: Flow<String> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_CUSTOM_FONTS] ?: "[]" }
+
+    suspend fun setCustomFontsJson(json: String) {
+        context.settingsDataStore.edit { it[KEY_CUSTOM_FONTS] = json }
     }
 
     /**

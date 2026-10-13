@@ -40,7 +40,10 @@ class BackupAtomicityTest {
             .allowMainThreadQueries()
             .build()
         repository = NaatRepository(database.naatDao())
-        manager = BackupManager(context, repository, AudioFileLifecycleCoordinator())
+        manager = BackupManager(
+            context, repository, AudioFileLifecycleCoordinator(),
+            CustomFontStore(context, SettingsStore(context))
+        )
         File(context.filesDir, "audio").deleteRecursively()
     }
 

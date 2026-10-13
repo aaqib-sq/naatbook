@@ -42,6 +42,7 @@ import com.aistudio.mynaatnotebook.ui.editor.NonDismissibleEditorSheet
 import com.aistudio.mynaatnotebook.ui.library.LibraryScreen
 import com.aistudio.mynaatnotebook.ui.reader.LyricsReaderScreen
 import com.aistudio.mynaatnotebook.ui.settings.SettingsScreen
+import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
@@ -69,6 +70,11 @@ fun NaatApp(
     val selectedNaat by viewModel.selectedNaat.collectAsStateWithLifecycle()
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
     val foldersWithEntries by settingsViewModel.foldersWithEntries.collectAsStateWithLifecycle()
+    // Title font resolved once here and handed to the surfaces that render
+    // entry titles (library rows, recents, mini player).
+    val titleFontChoice by settingsViewModel.titleFont.collectAsStateWithLifecycle()
+    val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
+    val titleFontFamily = FontChoices.resolveTitle(titleFontChoice, customFamilies)
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val isAttaching by viewModel.isAttachingFile.collectAsStateWithLifecycle()
@@ -188,6 +194,7 @@ fun NaatApp(
                             Column {
                                 GlobalMiniPlayer(
                                     viewModel = viewModel,
+                                    titleFontFamily = titleFontFamily,
                                     onOpen = {
                                         viewModel.openNowPlayingEntry { found ->
                                             if (found && !showAddModal && navigationDebouncePassed()) {
@@ -235,7 +242,8 @@ fun NaatApp(
                                         onEdit = ::openEditorById,
                                         onAddEntry = ::openAdd,
                                         foldersWithEntries = foldersWithEntries,
-                                        onFoldersSeen = settingsViewModel::markFoldersWithEntries
+                                        onFoldersSeen = settingsViewModel::markFoldersWithEntries,
+                                        titleFontFamily = titleFontFamily
                                     )
                                 }
                             }

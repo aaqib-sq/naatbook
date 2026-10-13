@@ -72,7 +72,8 @@ fun LibraryScreen(
     onEdit: (Int) -> Unit,
     onAddEntry: () -> Unit,
     foldersWithEntries: Set<String>,
-    onFoldersSeen: (Set<String>) -> Unit
+    onFoldersSeen: (Set<String>) -> Unit,
+    titleFontFamily: FontFamily
 ) {
     val context = LocalContext.current
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -248,7 +249,8 @@ fun LibraryScreen(
                             RecentNaatCard(
                                 naat = naat,
                                 isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
-                                onClick = { onOpenReader(naat.id) }
+                                onClick = { onOpenReader(naat.id) },
+                                titleFontFamily = titleFontFamily
                             )
                         }
                     }
@@ -383,7 +385,8 @@ fun LibraryScreen(
                             onItemClick = { onOpenReader(naat.id) },
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
-                            onEditClick = { onEdit(naat.id) }
+                            onEditClick = { onEdit(naat.id) },
+                            titleFontFamily = titleFontFamily
                         )
                         }
                     }
@@ -466,7 +469,8 @@ fun LibraryScreen(
                             onItemClick = { onOpenReader(naat.id) },
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
-                            onEditClick = { onEdit(naat.id) }
+                            onEditClick = { onEdit(naat.id) },
+                            titleFontFamily = titleFontFamily
                         )
                     }
                 }
@@ -599,7 +603,8 @@ fun RecentNaatCard(
     naat: NaatSummary,
     isPlaying: Boolean = false,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    titleFontFamily: FontFamily = FontFamily.SansSerif
 ) {
     val cardBorder = if (isPlaying) MaterialTheme.colorScheme.onBackground
                      else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
@@ -674,6 +679,7 @@ fun RecentNaatCard(
                 text = naat.title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
+                fontFamily = titleFontFamily,
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -772,7 +778,8 @@ fun NaatRowItem(
     onItemClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onFavoriteClick: () -> Unit,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    titleFontFamily: FontFamily = FontFamily.SansSerif
 ) {
     val cardBg = MaterialTheme.colorScheme.surfaceVariant
     // Playing entry: white (onBackground) border in the app's monochrome
@@ -803,6 +810,7 @@ fun NaatRowItem(
                         text = naat.title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
+                        fontFamily = titleFontFamily,
                         color = MaterialTheme.colorScheme.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

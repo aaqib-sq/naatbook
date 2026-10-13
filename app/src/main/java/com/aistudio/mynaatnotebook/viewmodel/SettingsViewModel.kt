@@ -1,9 +1,15 @@
 package com.aistudio.mynaatnotebook.viewmodel
 
+import android.net.Uri
+import androidx.compose.ui.text.font.FontFamily
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.mynaatnotebook.data.CustomFont
+import com.aistudio.mynaatnotebook.data.CustomFontStore
 import com.aistudio.mynaatnotebook.data.NaatViewModelDefaults
+import com.aistudio.mynaatnotebook.data.PendingFontImport
 import com.aistudio.mynaatnotebook.data.SettingsStore
+import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +25,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settingsStore: SettingsStore
+    private val settingsStore: SettingsStore,
+    private val customFontStore: CustomFontStore
 ) : ViewModel() {
 
     private val _themeMode = MutableStateFlow(NaatViewModelDefaults.DEFAULT_THEME_MODE)
@@ -32,11 +39,45 @@ class SettingsViewModel @Inject constructor(
     /** Folders that have held entries before (drives empty-folder copy choice). */
     val foldersWithEntries: StateFlow<Set<String>> = _foldersWithEntries.asStateFlow()
 
+    private val _readerFont = MutableStateFlow(FontChoices.AUTO)
+    /** Reader lyrics font choice key (FontChoices key or "custom:<id>"). */
+    val readerFont: StateFlow<String> = _readerFont.asStateFlow()
+
+    private val _titleFont = MutableStateFlow(FontChoices.SANS)
+    /** Entry-title font choice key (FontChoices key or "custom:<id>"). */
+    val titleFont: StateFlow<String> = _titleFont.asStateFlow()
+
+    private val _customFonts = MutableStateFlow<List<CustomFont>>(emptyList())
+    /** User-imported fonts (registry order). */
+    val customFonts: StateFlow<List<CustomFont>> = _customFonts.asStateFlow()
+
+    private val _customFamilies = MutableStateFlow<Map<String, FontFamily>>(emptyMap())
+    /** Loaded families for imported fonts, by id; rebuilt on registry change. */
+    val customFamilies: StateFlow<Map<String, FontFamily>> = _customFamilies.asStateFlow()
+
+    private val _pendingFontImport = MutableStateFlow<PendingFontImport?>(null)
+    /** A validated font file awaiting its name-and-save step, if any. */
+    val pendingFontImport: StateFlow<PendingFontImport?> = _pendingFontImport.asStateFlow()
+
+    private val _fontError = MutableStateFlow<String?>(null)
+    /** Last font import/delete error to show the user, if any. */
+    val fontError: StateFlow<String?> = _fontError.asStateFlow()
+
     init {
         // DataStore emits current settings once, then on every change
         viewModelScope.launch { settingsStore.themeMode.collect { _themeMode.value = it } }
         viewModelScope.launch { settingsStore.fontSize.collect { _globalFontSize.value = it } }
         viewModelScope.launch { settingsStore.foldersWithEntries.collect { _foldersWithEntries.value = it } }
+        viewModelScope.launch { settingsStore.readerFont.collect { _readerFont.value = it } }
+        viewModelScope.launch { settingsStore.titleFont.collect { _titleFont.value = it } }
+        viewModelScope.launch {
+            customFontStore.fonts.collect { fonts ->
+                _customFonts.value = fonts
+                _customFamilies.value = fonts.mapNotNull { font ->
+                    customFontStore.familyFor(font)?.let { font.id to it }
+                }.toMap()
+            }
+        }
     }
 
     fun markFoldersWithEntries(names: Set<String>) {
@@ -54,5 +95,56 @@ class SettingsViewModel @Inject constructor(
     fun setGlobalFontSize(size: Float) {
         _globalFontSize.value = size
         viewModelScope.launch { settingsStore.setFontSize(size) }
+    }
+
+    fun setReaderFont(choice: String) {
+        _readerFont.value = choice
+        viewModelScope.launch { settingsStore.setReaderFont(choice) }
+    }
+
+    fun setTitleFont(choice: String) {
+        _titleFont.value = choice
+        viewModelScope.launch { settingsStore.setTitleFont(choice) }
+    }
+
+    /** Phase 1 of font import: validate the picked file, then await a name. */
+    fun beginFontImport(uri: Uri) {
+        viewModelScope.launch {
+            runCatching { customFontStore.beginImport(uri) }
+                .onSuccess { _pendingFontImport.value = it }
+                .onFailure { _fontError.value = it.message ?: "Could not import that font." }
+        }
+    }
+
+    fun confirmFontImport(name: String) {
+        val pending = _pendingFontImport.value ?: return
+        _pendingFontImport.value = null
+        viewModelScope.launch {
+            runCatching { customFontStore.commitImport(pending, name) }
+                .onFailure { _fontError.value = it.message ?: "Could not save that font." }
+        }
+    }
+
+    fun cancelFontImport() {
+        val pending = _pendingFontImport.value ?: return
+        _pendingFontImport.value = null
+        customFontStore.discardImport(pending)
+    }
+
+    fun deleteCustomFont(id: String) {
+        viewModelScope.launch {
+            val deleted = customFontStore.deleteFont(id) ?: return@launch
+            // A choice pointing at the deleted font falls back to its default.
+            if (_readerFont.value == FontChoices.customKey(deleted.id)) {
+                setReaderFont(FontChoices.AUTO)
+            }
+            if (_titleFont.value == FontChoices.customKey(deleted.id)) {
+                setTitleFont(FontChoices.SANS)
+            }
+        }
+    }
+
+    fun clearFontError() {
+        _fontError.value = null
     }
 }
