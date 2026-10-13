@@ -48,12 +48,15 @@ enum class ImportMode { MERGE, REPLACE }
 class BackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: NaatRepository,
-    private val audioFiles: AudioFileLifecycleCoordinator
+    private val audioFiles: AudioFileLifecycleCoordinator,
+    private val customFontStore: CustomFontStore
 ) {
     private companion object {
         const val FORMAT_VERSION = 2
         const val DATA_ENTRY = "naatbook_data.json"
         const val V2_AUDIO_PREFIX = "audio/"
+        const val V2_FONTS_PREFIX = "fonts/"
+        val V2_FONT_NAME = Regex("^fonts/([0-9a-fA-F-]{36})\\.(ttf|otf)$")
         const val LEGACY_RECORDINGS_PREFIX = "recordings/"
         const val LEGACY_LINKED_PREFIX = "linked/"
         const val MAX_ENTRIES = 10_000
@@ -72,7 +75,9 @@ class BackupManager @Inject constructor(
     private data class StagedArchive(
         val formatVersion: Int,
         val entries: JSONArray,
-        val audioByArchivePath: Map<String, File>
+        val audioByArchivePath: Map<String, File>,
+        val fontsByArchivePath: Map<String, File> = emptyMap(),
+        val fontMeta: List<Pair<String, String>> = emptyList()
     )
     private data class PlannedAudio(val staged: File, val destination: File, val digest: String)
     private data class PlannedEntry(
@@ -133,9 +138,25 @@ class BackupManager @Inject constructor(
                     put("secondaryAudioDisplayName", naat.secondaryAudioDisplayName ?: JSONObject.NULL)
                 })
             }
+            // Imported fonts travel with the backup (approved design), so a
+            // restore on a new phone keeps the user's own fonts too.
+            val customFonts = customFontStore.snapshot()
+                .mapNotNull { font ->
+                    val file = customFontStore.fileFor(font)
+                    if (file.isFile) font to file else null
+                }
+            val fontsJson = JSONArray()
+            customFonts.forEach { (font, _) ->
+                fontsJson.put(JSONObject().apply {
+                    put("id", font.id)
+                    put("name", font.name)
+                    put("file", "$V2_FONTS_PREFIX${font.fileName}")
+                })
+            }
             val root = JSONObject().apply {
                 put("formatVersion", FORMAT_VERSION)
                 put("entries", entries)
+                put("customFonts", fontsJson)
             }
             onProgress(0.35f)
 
@@ -152,6 +173,11 @@ class BackupManager @Inject constructor(
                         FileInputStream(packed.source).use { it.copyTo(zip, BUFFER_SIZE) }
                         zip.closeEntry()
                         onProgress(0.35f + (index + 1f) / audioList.size.coerceAtLeast(1) * 0.45f)
+                    }
+                    customFonts.forEach { (font, file) ->
+                        zip.putNextEntry(ZipEntry("$V2_FONTS_PREFIX${font.fileName}"))
+                        FileInputStream(file).use { it.copyTo(zip, BUFFER_SIZE) }
+                        zip.closeEntry()
                     }
                     zip.finish()
                     zip.flush()
@@ -273,6 +299,15 @@ class BackupManager @Inject constructor(
             val committed = commitRestorePlan(newEntries.map { it.entity }, neededAudio.values) { p ->
                 onProgress(0.68f + p * 0.32f)
             }
+            // Adopt the backup's imported fonts (new ids only, cap applies;
+            // each file is re-validated by the font store before adoption).
+            staged.fontMeta.forEach { (fontId, fontName) ->
+                val stagedFile = staged.fontsByArchivePath.values
+                    .firstOrNull { it.name.substringBefore('.') == fontId }
+                if (stagedFile != null) {
+                    runCatching { customFontStore.restoreFont(fontId, fontName, stagedFile) }
+                }
+            }
             var removedExisting = 0
             if (mode == ImportMode.REPLACE && existingEntries.isNotEmpty()) {
                 // The backup is fully committed; only now remove the old rows
@@ -342,6 +377,7 @@ class BackupManager @Inject constructor(
             ?: throw IOException("Could not open input stream")
         val budget = ExtractionBudget()
         val audio = linkedMapOf<String, File>()
+        val fonts = linkedMapOf<String, File>()
         var jsonContent: String? = null
         var entryCount = 0
 
@@ -374,6 +410,20 @@ class BackupManager @Inject constructor(
                             throw error
                         }
                     }
+                    V2_FONT_NAME.matches(name) -> {
+                        val destination = safeBackupDestination(stagingDir, name)
+                            ?: throw IOException("Unsafe backup entry: $name")
+                        if (fonts.putIfAbsent(name, destination) != null) {
+                            throw IOException("Duplicate backup entry: $name")
+                        }
+                        destination.parentFile?.mkdirs()
+                        try {
+                            FileOutputStream(destination).use { copyEntry(zip, it, budget) }
+                        } catch (error: Exception) {
+                            destination.delete()
+                            throw error
+                        }
+                    }
                     else -> copyEntry(zip, null, budget)
                 }
                 zip.closeEntry()
@@ -389,7 +439,30 @@ class BackupManager @Inject constructor(
                 if (file.sha256() != expected) throw IOException("Audio checksum mismatch: $archivePath")
             }
         }
-        return StagedArchive(version, entries, audio)
+        // Imported-font registry (v2 only; older backups simply have none).
+        val fontMeta: List<Pair<String, String>> = if (version == FORMAT_VERSION) {
+            val root = JSONObject(document)
+            val array = root.optJSONArray("customFonts")
+            buildList {
+                if (array != null) {
+                    for (i in 0 until array.length()) {
+                        val obj = array.getJSONObject(i)
+                        val id = obj.optString("id")
+                        val name = obj.optString("name")
+                        val file = obj.optString("file")
+                        // Only adopt fonts whose payload is actually staged
+                        // under the strict fonts/<uuid>.<ext> name.
+                        if (id.isNotBlank() && name.isNotBlank() &&
+                            V2_FONT_NAME.matches(file) && fonts.containsKey(file) &&
+                            file.removePrefix(V2_FONTS_PREFIX).substringBefore('.') == id
+                        ) {
+                            add(id to name)
+                        }
+                    }
+                }
+            }
+        } else emptyList()
+        return StagedArchive(version, entries, audio, fonts, fontMeta)
     }
 
     private fun buildRestorePlan(staged: StagedArchive): RestorePlan {
