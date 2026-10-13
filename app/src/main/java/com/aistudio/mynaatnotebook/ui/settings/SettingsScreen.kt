@@ -52,9 +52,12 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.audio.RecordingState
+import com.aistudio.mynaatnotebook.data.CustomFont
 import com.aistudio.mynaatnotebook.data.ImportMode
 import com.aistudio.mynaatnotebook.data.NaatCategories
 import com.aistudio.mynaatnotebook.data.NaatEntity
+import com.aistudio.mynaatnotebook.data.PendingFontImport
+import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.reader.ThinSeekBar
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
@@ -77,8 +80,28 @@ fun SettingsScreen(
     val context = LocalContext.current
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
     val globalFontSize by settingsViewModel.globalFontSize.collectAsStateWithLifecycle()
+    val readerFont by settingsViewModel.readerFont.collectAsStateWithLifecycle()
+    val titleFont by settingsViewModel.titleFont.collectAsStateWithLifecycle()
+    val customFonts by settingsViewModel.customFonts.collectAsStateWithLifecycle()
+    val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
+    val pendingFontImport by settingsViewModel.pendingFontImport.collectAsStateWithLifecycle()
+    val fontError by settingsViewModel.fontError.collectAsStateWithLifecycle()
     val backupProgress by backupViewModel.progress.collectAsStateWithLifecycle()
     val backupWorking by backupViewModel.isWorking.collectAsStateWithLifecycle()
+
+    // Which font picker is open: "reader", "title", or null.
+    var fontPickerTarget by remember { mutableStateOf<String?>(null) }
+    // Custom font awaiting delete confirmation.
+    var fontToDelete by remember { mutableStateOf<CustomFont?>(null) }
+
+    // Font file picker — any file is offered; CustomFontStore validates
+    // strictly (extension + magic + real parse) before anything is kept.
+    val importFontLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            if (uri != null) settingsViewModel.beginFontImport(uri)
+        }
+    )
 
     // Create zip launcher
     val exportBackupLauncher = rememberLauncherForActivityResult(
@@ -105,6 +128,75 @@ fun SettingsScreen(
 
     // Import dialog: choose merge vs replace first. Replace is destructive,
     // so it needs a second, explicit warning confirmation before anything runs.
+    // --- Font dialogs (picker / naming / delete / error) ---
+    fontPickerTarget?.let { target ->
+        val isReader = target == "reader"
+        FontPickerDialog(
+            title = stringResource(
+                if (isReader) R.string.settings_reader_font_picker else R.string.settings_title_font_picker
+            ),
+            builtinKeys = if (isReader) FontChoices.READER_KEYS else FontChoices.TITLE_KEYS,
+            currentChoice = if (isReader) readerFont else titleFont,
+            customFonts = customFonts,
+            customFamilies = customFamilies,
+            onPick = { choice ->
+                if (isReader) settingsViewModel.setReaderFont(choice)
+                else settingsViewModel.setTitleFont(choice)
+                fontPickerTarget = null
+            },
+            onDismiss = { fontPickerTarget = null }
+        )
+    }
+
+    pendingFontImport?.let { pending ->
+        FontNameDialog(
+            pending = pending,
+            onSave = { name -> settingsViewModel.confirmFontImport(name) },
+            onCancel = { settingsViewModel.cancelFontImport() }
+        )
+    }
+
+    fontToDelete?.let { font ->
+        val inUse = readerFont == FontChoices.customKey(font.id) ||
+            titleFont == FontChoices.customKey(font.id)
+        AlertDialog(
+            onDismissRequest = { fontToDelete = null },
+            title = { Text(stringResource(R.string.settings_font_delete_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        if (inUse) R.string.settings_font_delete_in_use else R.string.settings_font_delete_message,
+                        font.name
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    settingsViewModel.deleteCustomFont(font.id)
+                    fontToDelete = null
+                }) { Text(stringResource(R.string.common_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { fontToDelete = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
+
+    fontError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { settingsViewModel.clearFontError() },
+            title = { Text(stringResource(R.string.settings_font_error_title)) },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { settingsViewModel.clearFontError() }) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            }
+        )
+    }
+
     pendingImportUri?.let { uri ->
         var importMode by remember(uri) { mutableStateOf(ImportMode.MERGE) }
         var confirmReplace by remember(uri) { mutableStateOf(false) }
@@ -351,6 +443,106 @@ fun SettingsScreen(
                             .padding(top = 8.dp)
                     )
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                // Font choice rows (approved design): current choice as the
+                // subtitle; tapping opens the picker with live samples.
+                FontChoiceRow(
+                    title = stringResource(R.string.settings_reader_font),
+                    choiceLabel = fontChoiceLabel(readerFont, customFonts),
+                    testTag = "reader_font_btn",
+                    onClick = { fontPickerTarget = "reader" }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 60.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                )
+                FontChoiceRow(
+                    title = stringResource(R.string.settings_title_font),
+                    choiceLabel = fontChoiceLabel(titleFont, customFonts),
+                    testTag = "title_font_btn",
+                    onClick = { fontPickerTarget = "title" }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // My Fonts (approved design): imported fonts live here — each row
+        // shows the font's name, a sample in the font itself, and a delete
+        // action; the import button opens the system file picker.
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_my_fonts),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (customFonts.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.settings_my_fonts_empty),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = HighContrastGray,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+                customFonts.forEach { font ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = font.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "مدینہ کا سفر",
+                                fontFamily = customFamilies[font.id] ?: FontFamily.Default,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = HighContrastGray,
+                                maxLines = 1
+                            )
+                        }
+                        IconButton(
+                            onClick = { fontToDelete = font },
+                            modifier = Modifier.testTag("myfont_delete_${font.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.settings_font_delete_cd, font.name)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { importFontLauncher.launch(arrayOf("*/*")) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("import_font_btn"),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(
+                        1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onBackground
+                    )
+                ) {
+                    Text(stringResource(R.string.settings_import_font), maxLines = 1)
+                }
             }
         }
 
@@ -462,6 +654,204 @@ private fun ThemeDot(mode: String) {
             }
         }
     }
+}
+
+/** Display label for a stored font choice (built-in name or the custom font's own name). */
+@Composable
+private fun fontChoiceLabel(choice: String, customFonts: List<CustomFont>): String {
+    FontChoices.customId(choice)?.let { id ->
+        return customFonts.firstOrNull { it.id == id }?.name ?: stringResource(R.string.settings_font_custom_missing)
+    }
+    return stringResource(
+        when (choice) {
+            FontChoices.AUTO -> R.string.settings_font_auto
+            FontChoices.SERIF -> R.string.settings_font_serif
+            FontChoices.NASTALIQ -> R.string.settings_font_nastaliq
+            else -> R.string.settings_font_sans
+        }
+    )
+}
+
+/** One tappable font-choice row inside the typography card (name + current choice + chevron). */
+@Composable
+private fun FontChoiceRow(
+    title: String,
+    choiceLabel: String,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Aa", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                choiceLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline
+        )
+    }
+}
+
+/** Font picker: built-in choices first, then the user's imported fonts, each with a live sample. */
+@Composable
+private fun FontPickerDialog(
+    title: String,
+    builtinKeys: List<String>,
+    currentChoice: String,
+    customFonts: List<CustomFont>,
+    customFamilies: Map<String, FontFamily>,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                builtinKeys.forEach { key ->
+                    FontPickerRow(
+                        label = fontChoiceLabel(key, customFonts),
+                        sample = when (key) {
+                            FontChoices.AUTO -> stringResource(R.string.settings_font_auto_desc)
+                            FontChoices.NASTALIQ -> "مدینہ کا سفر"
+                            else -> "Madina ka Safar"
+                        },
+                        family = FontChoices.builtinFamily(key),
+                        selected = currentChoice == key,
+                        testTag = "font_picker_row_$key",
+                        onClick = { onPick(key) }
+                    )
+                }
+                customFonts.forEach { font ->
+                    val key = FontChoices.customKey(font.id)
+                    FontPickerRow(
+                        label = font.name,
+                        sample = "مدینہ کا سفر",
+                        family = customFamilies[font.id] ?: FontFamily.Default,
+                        selected = currentChoice == key,
+                        testTag = "font_picker_row_$key",
+                        onClick = { onPick(key) }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun FontPickerRow(
+    label: String,
+    sample: String,
+    family: FontFamily,
+    selected: Boolean,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                sample,
+                fontFamily = family,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (selected) {
+            Icon(imageVector = Icons.Default.Check, contentDescription = null)
+        }
+    }
+}
+
+/** Naming step after a font file validates: shows the real file, an editable name, and a live sample. */
+@Composable
+private fun FontNameDialog(
+    pending: PendingFontImport,
+    onSave: (String) -> Unit,
+    onCancel: () -> Unit
+) {
+    var name by remember(pending) { mutableStateOf(pending.suggestedName) }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.settings_font_new_title)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.settings_font_file_label, pending.sourceName),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.settings_font_name_label)) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("font_name_field")
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "مدینہ کا سفر",
+                    fontFamily = pending.family,
+                    fontSize = 26.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    stringResource(R.string.settings_font_sample_caption),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(name) },
+                enabled = name.isNotBlank(),
+                modifier = Modifier.testTag("font_save_btn")
+            ) { Text(stringResource(R.string.settings_font_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.common_cancel)) }
+        }
+    )
 }
 
 /** One tappable row inside the Settings data card: icon well, title + subtitle, chevron. */
