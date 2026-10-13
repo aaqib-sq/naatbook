@@ -14,7 +14,12 @@
     <string name="library_now_playing">Playing</string>
     <string name="empty_guide_title">Nothing here yet</string>
     <string name="empty_guide_add">Add first entry</string>
+    <string name="empty_guide_add_new">Add new entry</string>
     <string name="empty_guide_import_hint">or import a backup from Settings</string>
+    <string name="library_empty_folder_deleted_title">This folder is empty</string>
+    <string name="library_empty_folder_deleted_body">All entries in this folder were deleted.</string>
+    <string name="player_menu_speed">Speed</string>
+    <string name="player_more_cd">More options</string>
     <string name="common_delete">Delete</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_discard">Discard</string>

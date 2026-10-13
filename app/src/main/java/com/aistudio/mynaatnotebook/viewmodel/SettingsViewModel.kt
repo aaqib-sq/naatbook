@@ -28,10 +28,21 @@ class SettingsViewModel @Inject constructor(
     private val _globalFontSize = MutableStateFlow(NaatViewModelDefaults.DEFAULT_FONT_SIZE)
     val globalFontSize: StateFlow<Float> = _globalFontSize.asStateFlow()
 
+    private val _foldersWithEntries = MutableStateFlow<Set<String>>(emptySet())
+    /** Folders that have held entries before (drives empty-folder copy choice). */
+    val foldersWithEntries: StateFlow<Set<String>> = _foldersWithEntries.asStateFlow()
+
     init {
         // DataStore emits current settings once, then on every change
         viewModelScope.launch { settingsStore.themeMode.collect { _themeMode.value = it } }
         viewModelScope.launch { settingsStore.fontSize.collect { _globalFontSize.value = it } }
+        viewModelScope.launch { settingsStore.foldersWithEntries.collect { _foldersWithEntries.value = it } }
+    }
+
+    fun markFoldersWithEntries(names: Set<String>) {
+        if (names.isEmpty() || _foldersWithEntries.value.containsAll(names)) return
+        _foldersWithEntries.value = _foldersWithEntries.value + names
+        viewModelScope.launch { settingsStore.markFoldersWithEntries(names) }
     }
 
     /** Suspend writes -> exactly one DataStore transaction per committed user action. */

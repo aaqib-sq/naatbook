@@ -68,7 +68,9 @@ fun LibraryScreen(
     viewModel: NaatViewModel,
     onOpenReader: (Int) -> Unit,
     onEdit: (Int) -> Unit,
-    onAddEntry: () -> Unit
+    onAddEntry: () -> Unit,
+    foldersWithEntries: Set<String>,
+    onFoldersSeen: (Set<String>) -> Unit
 ) {
     val context = LocalContext.current
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -81,6 +83,13 @@ fun LibraryScreen(
     // Now-playing highlight: the entry whose audio is currently loaded.
     val nowPlaying by viewModel.playbackController.nowPlaying.collectAsStateWithLifecycle()
     val hasPlaybackSession by viewModel.playbackController.hasActiveSession.collectAsStateWithLifecycle()
+
+    // Remember every folder that currently holds entries, so an emptied
+    // folder can later show "deleted" copy instead of "first entry" copy.
+    LaunchedEffect(categoryCounts) {
+        val nonEmpty = categoryCounts.filterValues { it > 0 }.keys
+        if (nonEmpty.isNotEmpty()) onFoldersSeen(nonEmpty)
+    }
 
     // Entry pending deletion - deletions also remove attached audio, so confirm first
     var deleteCandidate by remember { mutableStateOf<NaatSummary?>(null) }
@@ -346,12 +355,13 @@ fun LibraryScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         EmptyStateGuide(
+                            titleText = stringResource(R.string.empty_guide_title),
                             bodyText = if (favoritesOnly && searchQuery.isBlank()) {
                                 stringResource(R.string.library_empty_favorites)
                             } else {
                                 stringResource(R.string.library_empty_search)
                             },
-                            showAddButton = false,
+                            buttonText = null,
                             onAddEntry = onAddEntry
                         )
                     }
@@ -417,9 +427,24 @@ fun LibraryScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Copy depends on the folder's history: a folder that once
+                    // held entries gets "deleted" copy; a brand-new folder
+                    // gets the first-entry copy.
+                    val folderHadEntries = selectedFolder != null && selectedFolder in foldersWithEntries &&
+                        searchQuery.isBlank()
                     EmptyStateGuide(
-                        bodyText = stringResource(R.string.library_empty_folder),
-                        showAddButton = true,
+                        titleText = stringResource(
+                            if (folderHadEntries) R.string.library_empty_folder_deleted_title
+                            else R.string.empty_guide_title
+                        ),
+                        bodyText = stringResource(
+                            if (folderHadEntries) R.string.library_empty_folder_deleted_body
+                            else R.string.library_empty_folder
+                        ),
+                        buttonText = stringResource(
+                            if (folderHadEntries) R.string.empty_guide_add_new
+                            else R.string.empty_guide_add
+                        ),
                         onAddEntry = onAddEntry
                     )
                 }
@@ -563,8 +588,9 @@ fun FolderSleekCard(
  */
 @Composable
 private fun EmptyStateGuide(
+    titleText: String,
     bodyText: String,
-    showAddButton: Boolean,
+    buttonText: String?,
     onAddEntry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -588,7 +614,7 @@ private fun EmptyStateGuide(
         }
         Spacer(modifier = Modifier.height(14.dp))
         Text(
-            text = stringResource(R.string.empty_guide_title),
+            text = titleText,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -600,7 +626,7 @@ private fun EmptyStateGuide(
             style = MaterialTheme.typography.bodyMedium,
             color = HighContrastGray
         )
-        if (showAddButton) {
+        if (buttonText != null) {
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = onAddEntry,
@@ -612,7 +638,7 @@ private fun EmptyStateGuide(
                 modifier = Modifier.testTag("empty_add_first_btn")
             ) {
                 Text(
-                    text = "+ " + stringResource(R.string.empty_guide_add),
+                    text = "+ " + buttonText,
                     fontWeight = FontWeight.Bold
                 )
             }

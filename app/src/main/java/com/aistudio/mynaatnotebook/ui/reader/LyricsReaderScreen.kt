@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -50,6 +53,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +73,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -219,7 +226,14 @@ fun LyricsReaderScreen(
         }
     }
 
-    val topContentPaddingPx = if (readerChromeVisible) topChromeHeightPx else 0
+    // In full screen the chrome is hidden, so lyrics would start at the very
+    // top edge — under the camera notch/punch-hole. Start them below the
+    // cutout (or status bar, whichever reaches further) plus a small margin.
+    val safeTopPx = maxOf(
+        WindowInsets.displayCutout.getTop(density),
+        WindowInsets.statusBars.getTop(density)
+    ) + with(density) { 12.dp.toPx() }.toInt()
+    val topContentPaddingPx = if (readerChromeVisible) topChromeHeightPx else safeTopPx
     val bottomContentPaddingPx = if (readerChromeVisible) bottomChromeHeightPx else 0
 
     Box(
@@ -375,6 +389,62 @@ private fun ReaderTopBar(
     }
 }
 
+/**
+ * Slim seek bar in the app's monochrome identity: a 3dp line (played part in
+ * onBackground, remainder at 25% alpha) with a small 12dp round thumb. The
+ * stock Material slider's thick track and tall stick thumb looked bulky in
+ * both the player and the font row, so both use this instead. The touch
+ * height stays 24dp so the thin line remains easy to grab.
+ */
+@Composable
+fun ThinSeekBar(
+    fraction: Float,
+    onFractionChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var widthPx by remember { mutableStateOf(0) }
+    val clamped = fraction.coerceIn(0f, 1f)
+    val active = MaterialTheme.colorScheme.onBackground
+    Box(
+        modifier = modifier
+            .height(24.dp)
+            .onSizeChanged { widthPx = it.width }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    if (widthPx > 0) {
+                        onFractionChange((down.position.x / widthPx).coerceIn(0f, 1f))
+                        drag(down.id) { change ->
+                            onFractionChange((change.position.x / widthPx).coerceIn(0f, 1f))
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(active.copy(alpha = 0.25f), RoundedCornerShape(2.dp))
+        )
+        if (clamped > 0f) {
+            Box(
+                Modifier
+                    .fillMaxWidth(clamped)
+                    .height(3.dp)
+                    .background(active, RoundedCornerShape(2.dp))
+            )
+        }
+        Box(
+            Modifier
+                .offset { IntOffset((widthPx * clamped).toInt() - (6.dp.toPx()).toInt(), 0) }
+                .size(12.dp)
+                .background(active, CircleShape)
+        )
+    }
+}
+
 @Composable
 private fun ReaderControls(
     fontSize: Float,
@@ -406,13 +476,18 @@ private fun ReaderControls(
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(stringResource(R.string.reader_font_label), style = MaterialTheme.typography.bodySmall, color = HighContrastGray)
-            Slider(
-                value = fontSize,
-                onValueChange = onFontSizeChange,
-                valueRange = 12f..36f,
-                steps = 23,
-                modifier = Modifier.weight(1f)
-            )
+            // Same thin line as the player seek, but only ~60% of the slot
+            // width so the font row takes visibly less room (user request).
+            Box(modifier = Modifier.weight(1f)) {
+                ThinSeekBar(
+                    fraction = (fontSize - 12f) / 24f,
+                    onFractionChange = { f ->
+                        val raw = 12f + f * 24f
+                        onFontSizeChange((raw * 2f).roundToInt() / 2f)
+                    },
+                    modifier = Modifier.fillMaxWidth(0.6f)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -597,7 +672,7 @@ private fun ReaderAudioControls(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
         if (attachments.size > 1) {
@@ -631,17 +706,18 @@ private fun ReaderAudioControls(
             fontWeight = FontWeight.SemiBold,
             color = HighContrastGray
         )
-        // Line 1: seek — current time, full-width slider, total time
+        // Line 1: seek — current time, full-width thin line, total time
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 formatTime(position),
                 style = MaterialTheme.typography.bodySmall,
                 color = HighContrastGray
             )
-            Slider(
-                value = position.toFloat(),
-                onValueChange = { controller.seekTo(it.toInt()) },
-                valueRange = 0f..(if (duration > 0) duration.toFloat() else 1000f),
+            ThinSeekBar(
+                fraction = if (duration > 0) position.toFloat() / duration.toFloat() else 0f,
+                onFractionChange = { f ->
+                    if (duration > 0) controller.seekTo((f * duration).toInt())
+                },
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp).testTag("reader_audio_seekbar")
             )
             Text(
@@ -665,9 +741,11 @@ private fun ReaderAudioControls(
 }
 
 /**
- * Transport row for the reader player: speed chip on the left, skip-back,
- * a large filled play/pause button and skip-forward in the middle, and the
- * sleep timer chip on the right.
+ * Transport row for the reader player: skip-back, a large filled play/pause
+ * button and skip-forward centered, with a three-dot overflow menu at the
+ * right edge holding playback speed and the sleep timer (both used rarely,
+ * so they no longer take permanent space in the player). When a sleep timer
+ * is running, its remaining time stays visible next to the dots.
  */
 @Composable
 private fun PlayerTransportControls(
@@ -678,88 +756,123 @@ private fun PlayerTransportControls(
     val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
     val sleepRemaining by controller.sleepTimerRemainingMs.collectAsStateWithLifecycle()
     var showSleepDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val chipBorder = MaterialTheme.colorScheme.outline
+    var menuExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val speedLabel = "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x"
+    val sleepLabel = sleepRemaining?.let { ms ->
+        val mins = (ms / 60_000L).toInt()
+        val secs = ((ms % 60_000L) / 1000L).toInt()
+        "%d:%02d".format(mins, secs)
+    }
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Speed chip: tap to cycle through speeds
-        TextButton(
-            onClick = { controller.cyclePlaybackSpeed() },
-            modifier = Modifier
-                .border(1.dp, chipBorder, RoundedCornerShape(16.dp))
-                .testTag("reader_speed_btn")
+    Box(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+        Row(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            // Skip backward 10s
+            IconButton(
+                onClick = { controller.skipBackward() },
+                modifier = Modifier.testTag("reader_skip_back")
+            ) {
+                Icon(
+                    Icons.Default.Replay10,
+                    contentDescription = stringResource(R.string.player_skip_back_cd),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            // Big filled play/pause
+            IconButton(
+                onClick = onPlayPause,
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(MaterialTheme.colorScheme.onBackground, CircleShape)
+                    .testTag("reader_play_pause")
+            ) {
+                Icon(
+                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (playing) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
+                    tint = MaterialTheme.colorScheme.background,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+            // Skip forward 10s
+            IconButton(
+                onClick = { controller.skipForward() },
+                modifier = Modifier.testTag("reader_skip_forward")
+            ) {
+                Icon(
+                    Icons.Default.Forward10,
+                    contentDescription = stringResource(R.string.player_skip_forward_cd),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
-        // Skip backward 10s
-        IconButton(
-            onClick = { controller.skipBackward() },
-            modifier = Modifier.testTag("reader_skip_back")
+        // Right edge: remaining sleep time (when a timer runs) + overflow menu
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.Replay10,
-                contentDescription = stringResource(R.string.player_skip_back_cd),
-                modifier = Modifier.size(28.dp)
-            )
-        }
-        // Big filled play/pause
-        IconButton(
-            onClick = onPlayPause,
-            modifier = Modifier
-                .size(56.dp)
-                .background(MaterialTheme.colorScheme.onBackground, CircleShape)
-                .testTag("reader_play_pause")
-        ) {
-            Icon(
-                if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (playing) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
-                tint = MaterialTheme.colorScheme.background,
-                modifier = Modifier.size(30.dp)
-            )
-        }
-        // Skip forward 10s
-        IconButton(
-            onClick = { controller.skipForward() },
-            modifier = Modifier.testTag("reader_skip_forward")
-        ) {
-            Icon(
-                Icons.Default.Forward10,
-                contentDescription = stringResource(R.string.player_skip_forward_cd),
-                modifier = Modifier.size(28.dp)
-            )
-        }
-        // Sleep timer chip
-        TextButton(
-            onClick = { showSleepDialog = true },
-            modifier = Modifier
-                .border(1.dp, chipBorder, RoundedCornerShape(16.dp))
-                .testTag("reader_sleep_timer_btn")
-        ) {
-            Icon(
-                Icons.Default.Bedtime,
-                contentDescription = stringResource(R.string.player_sleep_timer_cd),
-                modifier = Modifier.size(18.dp),
-                tint = if (sleepRemaining != null) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = sleepRemaining?.let { ms ->
-                    val mins = (ms / 60_000L).toInt()
-                    val secs = ((ms % 60_000L) / 1000L).toInt()
-                    "%d:%02d".format(mins, secs)
-                } ?: stringResource(R.string.player_sleep_timer_title),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            if (sleepLabel != null) {
+                Text(
+                    text = sleepLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HighContrastGray
+                )
+                Spacer(Modifier.width(2.dp))
+            }
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.testTag("reader_more_btn")
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.player_more_cd)
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(stringResource(R.string.player_menu_speed))
+                                Text(speedLabel, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        onClick = { controller.cyclePlaybackSpeed() },
+                        modifier = Modifier.testTag("reader_speed_btn")
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Bedtime,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.player_sleep_timer_title))
+                                if (sleepLabel != null) {
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(sleepLabel, color = HighContrastGray)
+                                }
+                            }
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            showSleepDialog = true
+                        },
+                        modifier = Modifier.testTag("reader_sleep_timer_btn")
+                    )
+                }
+            }
         }
     }
 

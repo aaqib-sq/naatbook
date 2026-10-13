@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +27,7 @@ import javax.inject.Singleton
 
 private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
 private val KEY_FONT_SIZE = floatPreferencesKey("font_size")
+private val KEY_FOLDERS_WITH_ENTRIES = stringSetPreferencesKey("folders_with_entries")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -53,6 +55,25 @@ class SettingsStore @Inject constructor(
 
     suspend fun setFontSize(size: Float) {
         context.settingsDataStore.edit { it[KEY_FONT_SIZE] = size }
+    }
+
+    /**
+     * Names of folders that have contained at least one entry at some point.
+     * Lets the library distinguish "brand-new folder, show first-entry copy"
+     * from "folder emptied by deletions, show deleted copy".
+     */
+    val foldersWithEntries: Flow<Set<String>> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_FOLDERS_WITH_ENTRIES] ?: emptySet() }
+
+    suspend fun markFoldersWithEntries(names: Set<String>) {
+        if (names.isEmpty()) return
+        context.settingsDataStore.edit { prefs ->
+            val current = prefs[KEY_FOLDERS_WITH_ENTRIES] ?: emptySet()
+            if (!current.containsAll(names)) {
+                prefs[KEY_FOLDERS_WITH_ENTRIES] = current + names
+            }
+        }
     }
 }
 
