@@ -3,6 +3,8 @@
 
     <!-- Common -->
     <string name="common_pause">Pause</string>
+    <string name="common_ok">OK</string>
+    <string name="mini_player_close">Close player</string>
     <string name="common_play">Play</string>
     <string name="player_sleep_timer_done">Sleep timer ended — playback paused</string>
     <string name="player_speed_cd">Playback speed</string>
@@ -35,6 +37,29 @@
     <string name="settings_theme_system_sub">Follows your phone\'s theme</string>
     <string name="settings_theme_white_sub">Always light</string>
     <string name="settings_theme_black_sub">Always dark</string>
+    <string name="settings_reader_font">Reader font</string>
+    <string name="settings_title_font">Title font</string>
+    <string name="settings_reader_font_picker">Choose reader font</string>
+    <string name="settings_title_font_picker">Choose title font</string>
+    <string name="settings_font_auto">Auto</string>
+    <string name="settings_font_auto_desc">Nastaliq for Urdu, Serif otherwise</string>
+    <string name="settings_font_serif">Serif</string>
+    <string name="settings_font_sans">Sans</string>
+    <string name="settings_font_nastaliq">Nastaliq</string>
+    <string name="settings_font_custom_missing">Imported font</string>
+    <string name="settings_my_fonts">My Fonts</string>
+    <string name="settings_my_fonts_empty">No imported fonts yet. Bring your own .ttf or .otf font file.</string>
+    <string name="settings_import_font">+ Import font</string>
+    <string name="settings_font_delete_cd">Delete font %1$s</string>
+    <string name="settings_font_delete_title">Delete this font?</string>
+    <string name="settings_font_delete_message">“%1$s” will be removed from the app.</string>
+    <string name="settings_font_delete_in_use">“%1$s” is in use right now. It will be removed and the default font will take its place.</string>
+    <string name="settings_font_error_title">Font not imported</string>
+    <string name="settings_font_new_title">New font</string>
+    <string name="settings_font_file_label">File: %1$s</string>
+    <string name="settings_font_name_label">Font name</string>
+    <string name="settings_font_sample_caption">Sample — this is how the font looks</string>
+    <string name="settings_font_save">Save font</string>
     <string name="settings_typography_title">Typography Adjustment</string>
     <string name="settings_font_size_label">Lyrics Default Text Size: %1$d sp</string>
     <string name="settings_backup_title">Privacy &amp; Local Database Backups</string>

@@ -179,7 +179,8 @@ private fun BottomBarTab(
 @Composable
 fun GlobalMiniPlayer(
     viewModel: NaatViewModel,
-    onOpen: () -> Unit
+    onOpen: () -> Unit,
+    titleFontFamily: FontFamily = FontFamily.SansSerif
 ) {
     val controller = viewModel.playbackController
     val nowPlaying by controller.nowPlaying.collectAsStateWithLifecycle()
@@ -223,6 +224,7 @@ fun GlobalMiniPlayer(
                     text = current.title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
+                    fontFamily = titleFontFamily,
                     color = fg,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -250,6 +252,23 @@ fun GlobalMiniPlayer(
                     contentDescription = if (isPlaying) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
                     tint = fg,
                     modifier = Modifier.size(26.dp)
+                )
+            }
+            // Dismiss (approved): full stop via the same controller.stop()
+            // path used on entry delete/switch — the session ends, the
+            // now-playing state clears, and this strip disappears. Pause
+            // alone could never remove the bar before.
+            IconButton(
+                onClick = { controller.stop() },
+                modifier = Modifier
+                    .size(40.dp)
+                    .testTag("mini_player_close")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.mini_player_close),
+                    tint = fg,
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
