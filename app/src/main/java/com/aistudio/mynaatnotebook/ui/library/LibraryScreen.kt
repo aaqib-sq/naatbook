@@ -14,6 +14,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -203,10 +204,59 @@ fun LibraryScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
+                // Recents first (approved design): the entries a user returns
+                // to most sit at the top as swipeable cards; the full lists
+                // stay inside the folder cards below.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp, start = 4.dp),
+                        .padding(bottom = 12.dp, start = 4.dp, end = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.library_recent_title),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = HighContrastGray,
+                        letterSpacing = 1.5.sp
+                    )
+                }
+
+                if (recentNaats.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.library_empty_folders),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = HighContrastGray
+                        )
+                    }
+                } else {
+                    // Room already applies updatedAt DESC and strict LIMIT 10,
+                    // so this strip stays bounded however large the library gets.
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        items(recentNaats, key = { it.id }) { naat ->
+                            RecentNaatCard(
+                                naat = naat,
+                                isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
+                                onClick = { onOpenReader(naat.id) }
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 28.dp, bottom = 12.dp, start = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -282,51 +332,6 @@ fun LibraryScreen(
                     }
                     if (rowIndex < folderRows.lastIndex) {
                         Spacer(modifier = Modifier.height(12.dp))
-                    }
-                }
-
-                // Room already applies updatedAt DESC and strict LIMIT 10. The UI never
-                // materializes all summaries merely to render this bounded section.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 28.dp, bottom = 12.dp, start = 4.dp, end = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.library_recent_title),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = HighContrastGray,
-                        letterSpacing = 1.5.sp
-                    )
-                }
-
-                if (recentNaats.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.library_empty_folders),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = HighContrastGray
-                        )
-                    }
-                } else {
-                    recentNaats.forEach { naat ->
-                        NaatRowItem(
-                            naat = naat,
-                            isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
-                            onItemClick = { onOpenReader(naat.id) },
-                            onDeleteClick = { deleteCandidate = naat },
-                            onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
-                            onEditClick = { onEdit(naat.id) }
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
 
@@ -572,6 +577,102 @@ fun FolderSleekCard(
                         color = HighContrastGray,
                         letterSpacing = 1.sp
                     ),
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+// --- Recent entry card (home strip) ---
+/**
+ * Compact card for the Recents strip at the top of the home screen. A tap
+ * opens the reader; favorite/edit/delete stay in the folder lists, where
+ * the full rows live. Mirrors the folder cards' monochrome styling, with
+ * the same white-border now-playing highlight as the list rows.
+ */
+@Composable
+fun RecentNaatCard(
+    naat: NaatSummary,
+    isPlaying: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardBorder = if (isPlaying) MaterialTheme.colorScheme.onBackground
+                     else MaterialTheme.colorScheme.outline
+    Card(
+        modifier = modifier
+            .width(198.dp)
+            .height(96.dp)
+            .border(if (isPlaying) 1.5.dp else 1.dp, cardBorder, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .testTag("recent_card_${naat.id}"),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val audioTypes = setOf(naat.audioType, naat.secondaryAudioType)
+                Icon(
+                    imageVector = if ("recorded" in audioTypes) Icons.Default.Mic else Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = HighContrastGray,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                    text = naat.category.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    ),
+                    color = HighContrastGray,
+                    maxLines = 1
+                )
+                if (isPlaying) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.testTag("now_playing_indicator_${naat.id}")
+                    ) {
+                        listOf(6.dp, 10.dp, 5.dp).forEach { barHeight ->
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .height(barHeight)
+                                    .background(
+                                        MaterialTheme.colorScheme.onBackground,
+                                        RoundedCornerShape(1.dp)
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = naat.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!naat.poet.isNullOrBlank()) {
+                Text(
+                    text = stringResource(R.string.library_by_poet, naat.poet),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HighContrastGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
