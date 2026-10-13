@@ -18,5 +18,11 @@ data class NaatEntity(
     /** Changes on every persisted edit; powers the Room-backed Recent Notebooks list. */
     val updatedAt: Long = System.currentTimeMillis(),
     val secondaryAudioType: String = "none",
-    val secondaryAudioPath: String? = null
+    val secondaryAudioPath: String? = null,
+    // Original file name of a linked audio (from the picker), kept only for
+    // display in the editor — internal storage names are meaningless
+    // ("linked_<timestamp>_file.mp3"). Null for recordings and for entries
+    // linked before this field existed.
+    val audioDisplayName: String? = null,
+    val secondaryAudioDisplayName: String? = null
 )

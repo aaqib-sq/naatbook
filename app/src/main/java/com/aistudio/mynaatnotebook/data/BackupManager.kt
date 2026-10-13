@@ -129,6 +129,8 @@ class BackupManager @Inject constructor(
                     put("isFavorite", naat.isFavorite)
                     put("createdAt", naat.createdAt)
                     put("updatedAt", naat.updatedAt)
+                    put("audioDisplayName", naat.audioDisplayName ?: JSONObject.NULL)
+                    put("secondaryAudioDisplayName", naat.secondaryAudioDisplayName ?: JSONObject.NULL)
                 })
             }
             val root = JSONObject().apply {
@@ -450,7 +452,10 @@ class BackupManager @Inject constructor(
                     updatedAt = updatedAt,
                     secondaryAudioType = if (secondary == null) "none"
                         else obj.optString("secondaryAudioType", "none"),
-                    secondaryAudioPath = secondary?.destination?.absolutePath
+                    secondaryAudioPath = secondary?.destination?.absolutePath,
+                    // Older backups have no display names; they stay null there.
+                    audioDisplayName = obj.nullableString("audioDisplayName"),
+                    secondaryAudioDisplayName = obj.nullableString("secondaryAudioDisplayName")
                 )
                 val signature = entrySignature(
                     title, poet, category, lyrics,

@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [NaatEntity::class], version = 4, exportSchema = true)
+@Database(entities = [NaatEntity::class], version = 5, exportSchema = true)
 abstract class NaatDatabase : RoomDatabase() {
 
     abstract fun naatDao(): NaatDao
@@ -50,6 +50,14 @@ abstract class NaatDatabase : RoomDatabase() {
                 // only truthful initial ordering until their next saved edit.
                 db.execSQL("UPDATE naats SET updatedAt = createdAt WHERE updatedAt = 0")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_naats_updatedAt ON naats(updatedAt)")
+            }
+        }
+
+        /** v4 -> v5: original display names for linked audio files (editor display only). */
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE naats ADD COLUMN audioDisplayName TEXT")
+                db.execSQL("ALTER TABLE naats ADD COLUMN secondaryAudioDisplayName TEXT")
             }
         }
     }
