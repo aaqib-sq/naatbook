@@ -171,6 +171,21 @@ fun LibraryScreen(
                     }
                 }
             )
+            if (searchQuery.isNotEmpty()) {
+                IconButton(
+                    onClick = { viewModel.setSearchQuery("") },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("search_clear_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.library_clear_search),
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
             IconButton(
                 onClick = {
                     try {
@@ -369,8 +384,15 @@ fun LibraryScreen(
                             } else {
                                 stringResource(R.string.library_empty_search)
                             },
-                            buttonText = null,
-                            onAddEntry = onAddEntry
+                            // Audit #7: an empty result caused by a search
+                            // query used to be a dead end — offer clearing it.
+                            buttonText = if (searchQuery.isNotBlank()) {
+                                stringResource(R.string.library_clear_search)
+                            } else null,
+                            onAddEntry = onAddEntry,
+                            onButtonClick = if (searchQuery.isNotBlank()) {
+                                { viewModel.setSearchQuery("") }
+                            } else null
                         )
                     }
                 } else {
@@ -429,6 +451,43 @@ fun LibraryScreen(
                 )
             }
 
+            // Audit #8: the favorites filter used to stay silently active
+            // inside folders (its chip only exists on Home). Show a removable
+            // indicator here so a partial list is never a mystery.
+            if (favoritesOnly) {
+                Row(
+                    modifier = Modifier
+                        .padding(start = 48.dp, bottom = 8.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { viewModel.setFavoritesOnly(false) }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .testTag("folder_favorites_chip"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = HighContrastRed,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = stringResource(R.string.library_favorites_title),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.library_favorites_filter_off_cd),
+                        tint = HighContrastGray,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+
             if (filteredNaats.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -441,21 +500,35 @@ fun LibraryScreen(
                     // gets the first-entry copy.
                     val folderHadEntries = selectedFolder != null && selectedFolder in foldersWithEntries &&
                         searchQuery.isBlank()
-                    EmptyStateGuide(
-                        titleText = stringResource(
-                            if (folderHadEntries) R.string.library_empty_folder_deleted_title
-                            else R.string.empty_guide_title
-                        ),
-                        bodyText = stringResource(
-                            if (folderHadEntries) R.string.library_empty_folder_deleted_body
-                            else R.string.library_empty_folder
-                        ),
-                        buttonText = stringResource(
-                            if (folderHadEntries) R.string.empty_guide_add_new
-                            else R.string.empty_guide_add
-                        ),
-                        onAddEntry = onAddEntry
-                    )
+                    if (searchQuery.isNotBlank()) {
+                        // Audit #7: the emptiness is caused by the search
+                        // filter, not by an empty folder — the honest action
+                        // is clearing the search (an entry added here would
+                        // stay invisible under the stale query).
+                        EmptyStateGuide(
+                            titleText = stringResource(R.string.empty_guide_title),
+                            bodyText = stringResource(R.string.library_empty_search),
+                            buttonText = stringResource(R.string.library_clear_search),
+                            onAddEntry = onAddEntry,
+                            onButtonClick = { viewModel.setSearchQuery("") }
+                        )
+                    } else {
+                        EmptyStateGuide(
+                            titleText = stringResource(
+                                if (folderHadEntries) R.string.library_empty_folder_deleted_title
+                                else R.string.empty_guide_title
+                            ),
+                            bodyText = stringResource(
+                                if (folderHadEntries) R.string.library_empty_folder_deleted_body
+                                else R.string.library_empty_folder
+                            ),
+                            buttonText = stringResource(
+                                if (folderHadEntries) R.string.empty_guide_add_new
+                                else R.string.empty_guide_add
+                            ),
+                            onAddEntry = onAddEntry
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
@@ -711,7 +784,8 @@ private fun EmptyStateGuide(
     bodyText: String,
     buttonText: String?,
     onAddEntry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onButtonClick: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier.padding(24.dp),
@@ -748,7 +822,7 @@ private fun EmptyStateGuide(
         if (buttonText != null) {
             Spacer(modifier = Modifier.height(16.dp))
             Button(
-                onClick = onAddEntry,
+                onClick = onButtonClick ?: onAddEntry,
                 shape = RoundedCornerShape(22.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.onBackground,
@@ -757,7 +831,7 @@ private fun EmptyStateGuide(
                 modifier = Modifier.testTag("empty_add_first_btn")
             ) {
                 Text(
-                    text = "+ " + buttonText,
+                    text = if (onButtonClick == null) "+ " + buttonText else buttonText,
                     fontWeight = FontWeight.Bold
                 )
             }

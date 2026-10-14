@@ -31,6 +31,10 @@ private val KEY_FOLDERS_WITH_ENTRIES = stringSetPreferencesKey("folders_with_ent
 private val KEY_READER_FONT = stringPreferencesKey("reader_font")
 private val KEY_TITLE_FONT = stringPreferencesKey("title_font")
 private val KEY_CUSTOM_FONTS = stringPreferencesKey("custom_fonts")
+private val KEY_LAST_BACKUP_AT = androidx.datastore.preferences.core.longPreferencesKey("last_backup_at")
+private val KEY_LAST_BACKUP_LABEL = stringPreferencesKey("last_backup_label")
+private val KEY_LAST_IMPORT_URI = stringPreferencesKey("last_import_uri")
+private val KEY_LAST_EXPORT_URI = stringPreferencesKey("last_export_uri")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -104,6 +108,43 @@ class SettingsStore @Inject constructor(
                 prefs[KEY_FOLDERS_WITH_ENTRIES] = current + names
             }
         }
+    }
+
+    // --- Backup bookkeeping (audit #12 + picker starting-point hints) ---
+
+    /** When the last successful export happened (epoch ms; 0 = never). */
+    val lastBackupAt: Flow<Long> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LAST_BACKUP_AT] ?: 0L }
+
+    /** Where the last successful export went (folder label or file name). */
+    val lastBackupLabel: Flow<String?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LAST_BACKUP_LABEL] }
+
+    suspend fun recordBackup(atMs: Long, label: String) {
+        context.settingsDataStore.edit { prefs ->
+            prefs[KEY_LAST_BACKUP_AT] = atMs
+            prefs[KEY_LAST_BACKUP_LABEL] = label
+        }
+    }
+
+    /** Last document the user picked for import; used as the picker's start hint. */
+    val lastImportUri: Flow<String?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LAST_IMPORT_URI] }
+
+    suspend fun setLastImportUri(uri: String) {
+        context.settingsDataStore.edit { it[KEY_LAST_IMPORT_URI] = uri }
+    }
+
+    /** Last document the user picked for export; used as the picker's start hint. */
+    val lastExportUri: Flow<String?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LAST_EXPORT_URI] }
+
+    suspend fun setLastExportUri(uri: String) {
+        context.settingsDataStore.edit { it[KEY_LAST_EXPORT_URI] = uri }
     }
 }
 

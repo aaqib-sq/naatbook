@@ -59,6 +59,7 @@ class BackupManager @Inject constructor(
 ) {
     private companion object {
         const val FORMAT_VERSION = 2
+        const val APP_FOLDER_RELATIVE_PATH = "Download/NaatBook"
         const val DATA_ENTRY = "naatbook_data.json"
         const val V2_AUDIO_PREFIX = "audio/"
         const val V2_FONTS_PREFIX = "fonts/"
@@ -108,6 +109,94 @@ class BackupManager @Inject constructor(
     }
 
     /**
+     * Builds the complete, fsynced backup zip into [stagedZip] and returns
+     * the entry count. Shared by the SAF export and the app-folder export
+     * so both produce byte-identical archives.
+     */
+    private suspend fun writeBackupZip(
+        stagedZip: File,
+        onProgress: (Float) -> Unit
+    ): Int {
+        onProgress(0.05f)
+        val naats = repository.allNaats.first()
+        onProgress(0.15f)
+        val audioIndex = buildAudioIndex(naats) { p -> onProgress(0.15f + p * 0.15f) }
+        val entries = JSONArray()
+        naats.forEach { naat ->
+            entries.put(JSONObject().apply {
+                put("id", naat.id)
+                put("title", naat.title)
+                put("poet", naat.poet ?: JSONObject.NULL)
+                put("category", naat.category)
+                put("lyrics", naat.lyrics ?: JSONObject.NULL)
+                put("audioType", naat.audioType)
+                put("audioPath", audioIndex.primaryPathByNaatId[naat.id] ?: JSONObject.NULL)
+                put("secondaryAudioType", naat.secondaryAudioType)
+                put(
+                    "secondaryAudioPath",
+                    audioIndex.secondaryPathByNaatId[naat.id] ?: JSONObject.NULL
+                )
+                put("isFavorite", naat.isFavorite)
+                put("createdAt", naat.createdAt)
+                put("updatedAt", naat.updatedAt)
+                put("audioDisplayName", naat.audioDisplayName ?: JSONObject.NULL)
+                put("secondaryAudioDisplayName", naat.secondaryAudioDisplayName ?: JSONObject.NULL)
+            })
+        }
+        // Imported fonts travel with the backup (approved design), so a
+        // restore on a new phone keeps the user's own fonts too.
+        val customFonts = customFontStore.snapshot()
+            .mapNotNull { font ->
+                val file = customFontStore.fileFor(font)
+                if (file.isFile) font to file else null
+            }
+        val fontsJson = JSONArray()
+        customFonts.forEach { (font, _) ->
+            fontsJson.put(JSONObject().apply {
+                put("id", font.id)
+                put("name", font.name)
+                put("file", "$V2_FONTS_PREFIX${font.fileName}")
+            })
+        }
+        val root = JSONObject().apply {
+            put("formatVersion", FORMAT_VERSION)
+            put("entries", entries)
+            put("customFonts", fontsJson)
+        }
+        onProgress(0.35f)
+
+        FileOutputStream(stagedZip).use { fileOutput ->
+            val buffered = BufferedOutputStream(fileOutput)
+            val zip = ZipOutputStream(buffered)
+            try {
+                zip.putNextEntry(ZipEntry(DATA_ENTRY))
+                zip.write(root.toString(4).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+                val audioList = audioIndex.uniqueFiles.toList()
+                audioList.forEachIndexed { index, packed ->
+                    zip.putNextEntry(ZipEntry(packed.relativePath))
+                    FileInputStream(packed.source).use { it.copyTo(zip, BUFFER_SIZE) }
+                    zip.closeEntry()
+                    onProgress(0.35f + (index + 1f) / audioList.size.coerceAtLeast(1) * 0.45f)
+                }
+                customFonts.forEach { (font, file) ->
+                    zip.putNextEntry(ZipEntry("$V2_FONTS_PREFIX${font.fileName}"))
+                    FileInputStream(file).use { it.copyTo(zip, BUFFER_SIZE) }
+                    zip.closeEntry()
+                }
+                zip.finish()
+                zip.flush()
+                buffered.flush()
+                fileOutput.fd.sync()
+            } finally {
+                zip.close()
+            }
+        }
+        onProgress(0.85f)
+        return naats.size
+    }
+
+    /**
      * Build and fsync the complete archive before opening the user destination.
      * A hashing/ZIP failure therefore cannot truncate a previously valid backup.
      */
@@ -121,82 +210,7 @@ class BackupManager @Inject constructor(
             // only from then on can a failure leave a partial file behind.
             var destinationTouched = false
         runCatching {
-            onProgress(0.05f)
-            val naats = repository.allNaats.first()
-            onProgress(0.15f)
-            val audioIndex = buildAudioIndex(naats) { p -> onProgress(0.15f + p * 0.15f) }
-            val entries = JSONArray()
-            naats.forEach { naat ->
-                entries.put(JSONObject().apply {
-                    put("id", naat.id)
-                    put("title", naat.title)
-                    put("poet", naat.poet ?: JSONObject.NULL)
-                    put("category", naat.category)
-                    put("lyrics", naat.lyrics ?: JSONObject.NULL)
-                    put("audioType", naat.audioType)
-                    put("audioPath", audioIndex.primaryPathByNaatId[naat.id] ?: JSONObject.NULL)
-                    put("secondaryAudioType", naat.secondaryAudioType)
-                    put(
-                        "secondaryAudioPath",
-                        audioIndex.secondaryPathByNaatId[naat.id] ?: JSONObject.NULL
-                    )
-                    put("isFavorite", naat.isFavorite)
-                    put("createdAt", naat.createdAt)
-                    put("updatedAt", naat.updatedAt)
-                    put("audioDisplayName", naat.audioDisplayName ?: JSONObject.NULL)
-                    put("secondaryAudioDisplayName", naat.secondaryAudioDisplayName ?: JSONObject.NULL)
-                })
-            }
-            // Imported fonts travel with the backup (approved design), so a
-            // restore on a new phone keeps the user's own fonts too.
-            val customFonts = customFontStore.snapshot()
-                .mapNotNull { font ->
-                    val file = customFontStore.fileFor(font)
-                    if (file.isFile) font to file else null
-                }
-            val fontsJson = JSONArray()
-            customFonts.forEach { (font, _) ->
-                fontsJson.put(JSONObject().apply {
-                    put("id", font.id)
-                    put("name", font.name)
-                    put("file", "$V2_FONTS_PREFIX${font.fileName}")
-                })
-            }
-            val root = JSONObject().apply {
-                put("formatVersion", FORMAT_VERSION)
-                put("entries", entries)
-                put("customFonts", fontsJson)
-            }
-            onProgress(0.35f)
-
-            FileOutputStream(stagedZip).use { fileOutput ->
-                val buffered = BufferedOutputStream(fileOutput)
-                val zip = ZipOutputStream(buffered)
-                try {
-                    zip.putNextEntry(ZipEntry(DATA_ENTRY))
-                    zip.write(root.toString(4).toByteArray(Charsets.UTF_8))
-                    zip.closeEntry()
-                    val audioList = audioIndex.uniqueFiles.toList()
-                    audioList.forEachIndexed { index, packed ->
-                        zip.putNextEntry(ZipEntry(packed.relativePath))
-                        FileInputStream(packed.source).use { it.copyTo(zip, BUFFER_SIZE) }
-                        zip.closeEntry()
-                        onProgress(0.35f + (index + 1f) / audioList.size.coerceAtLeast(1) * 0.45f)
-                    }
-                    customFonts.forEach { (font, file) ->
-                        zip.putNextEntry(ZipEntry("$V2_FONTS_PREFIX${font.fileName}"))
-                        FileInputStream(file).use { it.copyTo(zip, BUFFER_SIZE) }
-                        zip.closeEntry()
-                    }
-                    zip.finish()
-                    zip.flush()
-                    buffered.flush()
-                    fileOutput.fd.sync()
-                } finally {
-                    zip.close()
-                }
-            }
-            onProgress(0.85f)
+            val entryCount = writeBackupZip(stagedZip, onProgress)
 
             val descriptor = context.contentResolver.openFileDescriptor(outputUri, "w")
                 ?: throw IOException("Could not open output stream")
@@ -210,7 +224,7 @@ class BackupManager @Inject constructor(
                 }
             }
             onProgress(1f)
-            naats.size
+            entryCount
             }.onFailure {
                 Log.e("BackupManager", "Export failed", it)
                 // Audit fix: a failure DURING the final copy can leave a
@@ -227,6 +241,56 @@ class BackupManager @Inject constructor(
                 }
             }
                 .also { stagedZip.delete() }
+        }
+    }
+
+    /**
+     * One-tap export into the app's own folder, `Download/NaatBook`
+     * (approved design): MediaStore creates the folder automatically and no
+     * permission or picker is needed on Android 10+. The file stays
+     * IS_PENDING until the copy completes, and a failure deletes the pending
+     * row so no partial backup is left behind. Returns (entry count, label).
+     */
+    suspend fun exportBackupToAppFolder(
+        fileName: String,
+        onProgress: (Float) -> Unit = {}
+    ): Result<Pair<Int, String>> = withContext(Dispatchers.IO) {
+        audioFiles.exclusive {
+            val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
+            var pendingUri: Uri? = null
+            runCatching {
+                val entryCount = writeBackupZip(stagedZip, onProgress)
+                check(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    "The NaatBook folder needs Android 10 or newer — please use Choose another place"
+                }
+                val resolver = context.contentResolver
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/zip")
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, APP_FOLDER_RELATIVE_PATH)
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = resolver.insert(
+                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
+                ) ?: throw IOException("Could not create the backup file in Downloads")
+                pendingUri = uri
+                val written = resolver.openOutputStream(uri)?.use { output ->
+                    FileInputStream(stagedZip).use { input -> input.copyTo(output, BUFFER_SIZE) }
+                } ?: throw IOException("Could not write the backup file")
+                check(written > 0) { "Could not write the backup file" }
+                val publish = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                }
+                resolver.update(uri, publish, null, null)
+                pendingUri = null
+                onProgress(1f)
+                entryCount to "Download/NaatBook"
+            }.onFailure {
+                Log.e("BackupManager", "App-folder export failed", it)
+                pendingUri?.let { uri ->
+                    runCatching { context.contentResolver.delete(uri, null, null) }
+                }
+            }.also { stagedZip.delete() }
         }
     }
 

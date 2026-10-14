@@ -181,8 +181,13 @@ class PlaybackController @Inject constructor(
                 _sleepTimerRemainingMs.value = remaining.coerceAtLeast(0)
             }
             _sleepTimerRemainingMs.value = null
-            pause()
-            statusReporter.show(R.string.player_sleep_timer_done)
+            // Audit #13: if the user already stopped playback themselves,
+            // the timer finishing is not news — pause() is harmless either
+            // way, but the "timer done" toast used to fire into silence.
+            if (engine.hasActiveSession.value) {
+                pause()
+                statusReporter.show(R.string.player_sleep_timer_done)
+            }
         }
     }
 

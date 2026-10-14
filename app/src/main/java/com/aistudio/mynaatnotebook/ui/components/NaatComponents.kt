@@ -186,6 +186,11 @@ fun GlobalMiniPlayer(
     val nowPlaying by controller.nowPlaying.collectAsStateWithLifecycle()
     val hasSession by controller.hasActiveSession.collectAsStateWithLifecycle()
     val isPlaying by controller.isPlaying.collectAsStateWithLifecycle()
+    // Audit #10/#11: the strip used to give no position cue and no loading
+    // feedback — both come from flows the controller already exposes.
+    val position by controller.currentPosition.collectAsStateWithLifecycle()
+    val durationMs by controller.duration.collectAsStateWithLifecycle()
+    val preparing by controller.isPreparing.collectAsStateWithLifecycle()
 
     val current = nowPlaying
     if (current == null || !hasSession) return
@@ -247,12 +252,20 @@ fun GlobalMiniPlayer(
                     .size(40.dp)
                     .testTag("mini_player_play_pause")
             ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
-                    tint = fg,
-                    modifier = Modifier.size(26.dp)
-                )
+                if (preparing && !isPlaying) {
+                    CircularProgressIndicator(
+                        color = fg,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
+                        tint = fg,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
             }
             // Dismiss (approved): full stop via the same controller.stop()
             // path used on entry delete/switch — the session ends, the
@@ -269,6 +282,25 @@ fun GlobalMiniPlayer(
                     contentDescription = stringResource(R.string.mini_player_close),
                     tint = fg,
                     modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+        // Progress hairline (audit #10): same thin-line language as the
+        // reader's seek bar — played part in foreground, rest at low alpha.
+        if (durationMs > 0) {
+            val fraction = (position.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.5.dp)
+                    .background(fg.copy(alpha = 0.18f))
+                    .testTag("mini_player_progress")
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction)
+                        .height(2.5.dp)
+                        .background(fg)
                 )
             }
         }
@@ -354,9 +386,12 @@ fun AudioAttachmentPreview(
 // Formatting seconds duration
 fun formatTime(ms: Int): String {
     val totalSecs = ms / 1000
-    val mins = totalSecs / 60
+    val hours = totalSecs / 3600
+    val mins = (totalSecs % 3600) / 60
     val secs = totalSecs % 60
-    return String.format("%02d:%02d", mins, secs)
+    // Audit #16: long recordings (bayans) used to render as "90:00".
+    return if (hours > 0) String.format("%d:%02d:%02d", hours, mins, secs)
+    else String.format("%02d:%02d", mins, secs)
 }
 
 // Arabic-script detection (Urdu/Persian/Punjabi/Arabic): drives the Nastaliq
