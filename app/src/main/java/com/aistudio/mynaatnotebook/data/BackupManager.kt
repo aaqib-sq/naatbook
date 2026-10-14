@@ -294,6 +294,55 @@ class BackupManager @Inject constructor(
         }
     }
 
+    /**
+     * Build the same archive as the other exports into a plain [target]
+     * file. Google Drive sync stages the backup here, then uploads the file
+     * itself (and deletes it afterwards).
+     */
+    suspend fun exportBackupToFile(
+        target: File,
+        onProgress: (Float) -> Unit = {}
+    ): Result<Int> = withContext(Dispatchers.IO) {
+        audioFiles.exclusive {
+            val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
+            runCatching {
+                val entryCount = writeBackupZip(stagedZip, onProgress)
+                target.parentFile?.mkdirs()
+                FileInputStream(stagedZip).use { input ->
+                    FileOutputStream(target).use { output ->
+                        input.copyTo(output, BUFFER_SIZE)
+                        output.fd.sync()
+                    }
+                }
+                entryCount
+            }.onFailure {
+                Log.e("BackupManager", "File export failed", it)
+            }.also { stagedZip.delete() }
+        }
+    }
+
+    /**
+     * Cheap fingerprint of everything a backup would contain: entry count,
+     * edit times, and the imported-font registry. Drive auto-sync compares
+     * it against the fingerprint captured at the last successful sync and
+     * skips the upload when nothing changed.
+     */
+    suspend fun contentHash(): String {
+        val naats = repository.allNaats.first()
+        val fonts = customFontStore.snapshot()
+        val raw = buildString {
+            append(naats.size).append('|')
+            append(naats.maxOfOrNull { it.updatedAt } ?: 0L).append('|')
+            append(naats.sumOf { it.updatedAt }).append('|')
+            append(fonts.joinToString(",") { it.id })
+        }
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(raw.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") {
+            (it.toInt() and 0xff).toString(16).padStart(2, '0')
+        }
+    }
+
     private fun buildAudioIndex(
         naats: List<NaatEntity>,
         onProgress: (Float) -> Unit = {}

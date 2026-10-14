@@ -38,6 +38,10 @@ private val KEY_LAST_IMPORT_URI = stringPreferencesKey("last_import_uri")
 private val KEY_LAST_EXPORT_URI = stringPreferencesKey("last_export_uri")
 private val KEY_ONBOARDING_SEEN = androidx.datastore.preferences.core.booleanPreferencesKey("onboarding_seen")
 private val KEY_LAST_PLAYBACK_NAAT_ID = androidx.datastore.preferences.core.intPreferencesKey("last_playback_naat_id")
+private val KEY_DRIVE_EMAIL = stringPreferencesKey("drive_email")
+private val KEY_DRIVE_LAST_SYNC_AT = androidx.datastore.preferences.core.longPreferencesKey("drive_last_sync_at")
+private val KEY_DRIVE_AUTO_SYNC = androidx.datastore.preferences.core.booleanPreferencesKey("drive_auto_sync")
+private val KEY_DRIVE_LAST_HASH = stringPreferencesKey("drive_last_hash")
 private val KEY_LAST_PLAYBACK_POSITION_MS = androidx.datastore.preferences.core.longPreferencesKey("last_playback_position_ms")
 
 private val Context.settingsDataStore by preferencesDataStore(
@@ -192,6 +196,53 @@ class SettingsStore @Inject constructor(
         context.settingsDataStore.edit {
             it.remove(KEY_LAST_PLAYBACK_NAAT_ID)
             it.remove(KEY_LAST_PLAYBACK_POSITION_MS)
+        }
+    }
+
+    // --- Google Drive sync state ---
+
+    /** Connected Google account email for Drive sync; null = not connected. */
+    val driveEmail: Flow<String?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_DRIVE_EMAIL] }
+
+    suspend fun setDriveEmail(email: String) {
+        context.settingsDataStore.edit { it[KEY_DRIVE_EMAIL] = email }
+    }
+
+    /** When the last successful Drive sync finished (epoch ms; 0 = never). */
+    val driveLastSyncAt: Flow<Long> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_DRIVE_LAST_SYNC_AT] ?: 0L }
+
+    /** Content fingerprint captured at the last successful Drive sync. */
+    val driveLastHash: Flow<String?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_DRIVE_LAST_HASH] }
+
+    suspend fun recordDriveSync(atMs: Long, hash: String) {
+        context.settingsDataStore.edit { prefs ->
+            prefs[KEY_DRIVE_LAST_SYNC_AT] = atMs
+            prefs[KEY_DRIVE_LAST_HASH] = hash
+        }
+    }
+
+    /** Whether Drive auto-sync (on app open, when content changed) is on. */
+    val driveAutoSync: Flow<Boolean> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_DRIVE_AUTO_SYNC] ?: false }
+
+    suspend fun setDriveAutoSync(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_DRIVE_AUTO_SYNC] = enabled }
+    }
+
+    /** Forget the Drive connection entirely (local state only). */
+    suspend fun clearDriveState() {
+        context.settingsDataStore.edit { prefs ->
+            prefs.remove(KEY_DRIVE_EMAIL)
+            prefs.remove(KEY_DRIVE_LAST_SYNC_AT)
+            prefs.remove(KEY_DRIVE_AUTO_SYNC)
+            prefs.remove(KEY_DRIVE_LAST_HASH)
         }
     }
 }
