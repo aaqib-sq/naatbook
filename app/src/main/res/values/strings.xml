@@ -39,7 +39,7 @@
     <string name="settings_theme_black_sub">Always dark</string>
     <string name="settings_language_title">App Language</string>
     <string name="settings_language_system">Match System Language</string>
-    <string name="settings_language_system_sub">Follows your phone's language</string>
+    <string name="settings_language_system_sub">Follows your phone\'s language</string>
     <string name="settings_language_english" translatable="false">English</string>
     <string name="settings_language_english_sub">Always English</string>
     <string name="settings_language_urdu" translatable="false">اردو</string>
