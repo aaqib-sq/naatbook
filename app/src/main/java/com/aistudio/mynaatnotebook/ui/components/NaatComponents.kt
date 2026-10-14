@@ -218,7 +218,7 @@ fun GlobalMiniPlayer(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_cat_dome),
+                painter = painterResource(R.drawable.ic_app_logo),
                 contentDescription = null,
                 tint = fg,
                 modifier = Modifier.size(22.dp)

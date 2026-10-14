@@ -187,7 +187,7 @@ private fun OnboardingPage(page: Int) {
         Spacer(modifier = Modifier.height(64.dp))
         // Identity thread: the app's dome mark on every page (large on page 1).
         Icon(
-            painter = painterResource(R.drawable.ic_cat_dome),
+            painter = painterResource(R.drawable.ic_app_logo),
             contentDescription = null,
             tint = fg,
             modifier = Modifier.size(if (page == 0) 118.dp else 40.dp)

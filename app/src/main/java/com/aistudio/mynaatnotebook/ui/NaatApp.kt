@@ -356,7 +356,7 @@ fun NaatApp(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_cat_dome),
+                            painter = painterResource(R.drawable.ic_app_logo),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.size(84.dp)
