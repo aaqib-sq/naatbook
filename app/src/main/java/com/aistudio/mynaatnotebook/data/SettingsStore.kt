@@ -36,6 +36,8 @@ private val KEY_LAST_BACKUP_LABEL = stringPreferencesKey("last_backup_label")
 private val KEY_LAST_IMPORT_URI = stringPreferencesKey("last_import_uri")
 private val KEY_LAST_EXPORT_URI = stringPreferencesKey("last_export_uri")
 private val KEY_ONBOARDING_SEEN = androidx.datastore.preferences.core.booleanPreferencesKey("onboarding_seen")
+private val KEY_LAST_PLAYBACK_NAAT_ID = androidx.datastore.preferences.core.intPreferencesKey("last_playback_naat_id")
+private val KEY_LAST_PLAYBACK_POSITION_MS = androidx.datastore.preferences.core.longPreferencesKey("last_playback_position_ms")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -155,6 +157,30 @@ class SettingsStore @Inject constructor(
 
     suspend fun setOnboardingSeen() {
         context.settingsDataStore.edit { it[KEY_ONBOARDING_SEEN] = true }
+    }
+
+    /** Last entry playback point, for resume-after-process-death (audit #21). */
+    data class LastPlayback(val naatId: Int, val positionMs: Long)
+
+    val lastPlayback: Flow<LastPlayback?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { prefs ->
+            val id = prefs[KEY_LAST_PLAYBACK_NAAT_ID] ?: 0
+            if (id > 0) LastPlayback(id, prefs[KEY_LAST_PLAYBACK_POSITION_MS] ?: 0L) else null
+        }
+
+    suspend fun setLastPlayback(naatId: Int, positionMs: Long) {
+        context.settingsDataStore.edit {
+            it[KEY_LAST_PLAYBACK_NAAT_ID] = naatId
+            it[KEY_LAST_PLAYBACK_POSITION_MS] = positionMs
+        }
+    }
+
+    suspend fun clearLastPlayback() {
+        context.settingsDataStore.edit {
+            it.remove(KEY_LAST_PLAYBACK_NAAT_ID)
+            it.remove(KEY_LAST_PLAYBACK_POSITION_MS)
+        }
     }
 }
 
