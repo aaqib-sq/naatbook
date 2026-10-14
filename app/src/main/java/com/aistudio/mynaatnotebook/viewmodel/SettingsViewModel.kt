@@ -9,6 +9,7 @@ import com.aistudio.mynaatnotebook.data.CustomFont
 import com.aistudio.mynaatnotebook.data.CustomFontStore
 import com.aistudio.mynaatnotebook.data.NaatViewModelDefaults
 import com.aistudio.mynaatnotebook.data.PendingFontImport
+import com.aistudio.mynaatnotebook.data.LocaleHelper
 import com.aistudio.mynaatnotebook.data.SettingsStore
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,6 +34,10 @@ class SettingsViewModel @Inject constructor(
 
     private val _themeMode = MutableStateFlow(NaatViewModelDefaults.DEFAULT_THEME_MODE)
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+
+    private val _appLanguage = MutableStateFlow(LocaleHelper.SYSTEM)
+    /** App language override (LocaleHelper choice); UI applies it via recreate. */
+    val appLanguage: StateFlow<String> = _appLanguage.asStateFlow()
 
     private val _globalFontSize = MutableStateFlow(NaatViewModelDefaults.DEFAULT_FONT_SIZE)
     val globalFontSize: StateFlow<Float> = _globalFontSize.asStateFlow()
@@ -89,6 +94,7 @@ class SettingsViewModel @Inject constructor(
     init {
         // DataStore emits current settings once, then on every change
         viewModelScope.launch { settingsStore.themeMode.collect { _themeMode.value = it } }
+        viewModelScope.launch { settingsStore.appLanguage.collect { _appLanguage.value = it } }
         viewModelScope.launch { settingsStore.fontSize.collect { _globalFontSize.value = it } }
         viewModelScope.launch { settingsStore.foldersWithEntries.collect { _foldersWithEntries.value = it } }
         viewModelScope.launch { settingsStore.readerFont.collect { _readerFont.value = it } }
@@ -139,6 +145,11 @@ class SettingsViewModel @Inject constructor(
     fun setThemeMode(mode: String) {
         _themeMode.value = mode
         viewModelScope.launch { settingsStore.setThemeMode(mode) }
+    }
+
+    fun setAppLanguage(choice: String) {
+        _appLanguage.value = choice
+        viewModelScope.launch { settingsStore.setAppLanguage(choice) }
     }
 
     fun setGlobalFontSize(size: Float) {

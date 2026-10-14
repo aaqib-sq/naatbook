@@ -80,6 +80,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+    val appLanguage by settingsViewModel.appLanguage.collectAsStateWithLifecycle()
     val globalFontSize by settingsViewModel.globalFontSize.collectAsStateWithLifecycle()
     val readerFont by settingsViewModel.readerFont.collectAsStateWithLifecycle()
     val titleFont by settingsViewModel.titleFont.collectAsStateWithLifecycle()
@@ -410,7 +411,84 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 2. Default Font Sizing adjustment
+
+        // 2. App Language
+        Text(
+            text = stringResource(R.string.settings_language_title),
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            // Same grouped-row language as the theme card: title, subtitle,
+            // check on the selected row. Picking a row stores the choice and
+            // recreates the activity so every string (and the layout
+            // direction, for Urdu) re-resolves at once.
+            val languageChoices = listOf(
+                Triple(
+                    "system",
+                    stringResource(R.string.settings_language_system),
+                    stringResource(R.string.settings_language_system_sub)
+                ),
+                Triple(
+                    "en",
+                    stringResource(R.string.settings_language_english),
+                    stringResource(R.string.settings_language_english_sub)
+                ),
+                Triple(
+                    "ur",
+                    stringResource(R.string.settings_language_urdu),
+                    stringResource(R.string.settings_language_urdu_sub)
+                )
+            )
+            languageChoices.forEachIndexed { index, (mode, title, subtitle) ->
+                val selected = appLanguage == mode
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (!selected) {
+                                settingsViewModel.setAppLanguage(mode)
+                                (context as? Activity)?.recreate()
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .testTag("settings_language_$mode"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    if (selected) {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                    }
+                }
+                if (index < languageChoices.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 3. Default Font Sizing adjustment
         Text(
             text = stringResource(R.string.settings_typography_title),
             fontWeight = FontWeight.Bold,
