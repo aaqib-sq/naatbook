@@ -75,7 +75,8 @@ import java.io.File
 @Composable
 fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
-    backupViewModel: BackupViewModel
+    backupViewModel: BackupViewModel,
+    onShowIntro: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
@@ -624,6 +625,27 @@ fun SettingsScreen(
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // App intro replay (the first-launch pages, on demand).
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            SettingsActionRow(
+                icon = Icons.Default.MenuBook,
+                title = stringResource(R.string.settings_intro_title),
+                subtitle = stringResource(R.string.settings_intro_subtitle),
+                contentDescription = stringResource(R.string.settings_intro_cd),
+                enabled = true,
+                testTag = "settings_intro_btn",
+                onClick = onShowIntro
+            )
         }
 
         Spacer(modifier = Modifier.height(40.dp))

@@ -35,6 +35,7 @@ private val KEY_LAST_BACKUP_AT = androidx.datastore.preferences.core.longPrefere
 private val KEY_LAST_BACKUP_LABEL = stringPreferencesKey("last_backup_label")
 private val KEY_LAST_IMPORT_URI = stringPreferencesKey("last_import_uri")
 private val KEY_LAST_EXPORT_URI = stringPreferencesKey("last_export_uri")
+private val KEY_ONBOARDING_SEEN = androidx.datastore.preferences.core.booleanPreferencesKey("onboarding_seen")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -145,6 +146,15 @@ class SettingsStore @Inject constructor(
 
     suspend fun setLastExportUri(uri: String) {
         context.settingsDataStore.edit { it[KEY_LAST_EXPORT_URI] = uri }
+    }
+
+    /** First-launch intro (onboarding) completion flag. */
+    val onboardingSeen: Flow<Boolean> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_ONBOARDING_SEEN] ?: false }
+
+    suspend fun setOnboardingSeen() {
+        context.settingsDataStore.edit { it[KEY_ONBOARDING_SEEN] = true }
     }
 }
 

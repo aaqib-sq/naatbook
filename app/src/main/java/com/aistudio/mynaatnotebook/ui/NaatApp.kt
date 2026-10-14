@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -25,7 +27,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import android.content.Context
 import com.aistudio.mynaatnotebook.viewmodel.StatusMessage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,6 +45,7 @@ import com.aistudio.mynaatnotebook.ui.components.GlobalMiniPlayer
 import com.aistudio.mynaatnotebook.ui.components.NaatBottomNavigation
 import com.aistudio.mynaatnotebook.ui.editor.NonDismissibleEditorSheet
 import com.aistudio.mynaatnotebook.ui.library.LibraryScreen
+import com.aistudio.mynaatnotebook.ui.onboarding.OnboardingScreen
 import com.aistudio.mynaatnotebook.ui.reader.LyricsReaderScreen
 import com.aistudio.mynaatnotebook.ui.settings.SettingsScreen
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
@@ -69,6 +75,11 @@ fun NaatApp(
     val showAddModal by viewModel.showAddModal.collectAsStateWithLifecycle()
     val selectedNaat by viewModel.selectedNaat.collectAsStateWithLifecycle()
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+    // First-launch intro gate: null = store has not answered yet (splash),
+    // false = show the intro, true = straight into the app. introRequested
+    // is the Settings "App intro" replay.
+    val onboardingSeen by settingsViewModel.onboardingSeen.collectAsStateWithLifecycle()
+    var introRequested by rememberSaveable { mutableStateOf(false) }
     val foldersWithEntries by settingsViewModel.foldersWithEntries.collectAsStateWithLifecycle()
     // Title font resolved once here and handed to the surfaces that render
     // entry titles (library rows, recents, mini player).
@@ -235,7 +246,11 @@ fun NaatApp(
                             // fade, or simultaneous full-screen composition.
                             tabStateHolder.SaveableStateProvider(currentTab) {
                                 when (currentTab) {
-                                    2 -> SettingsScreen(settingsViewModel, backupViewModel)
+                                    2 -> SettingsScreen(
+                                        settingsViewModel,
+                                        backupViewModel,
+                                        onShowIntro = { introRequested = true }
+                                    )
                                     else -> LibraryScreen(
                                         viewModel = viewModel,
                                         onOpenReader = ::openReader,
@@ -294,6 +309,32 @@ fun NaatApp(
                             TextButton(onClick = { showDiscardConfirmation = false }) {
                                 Text(stringResource(R.string.discard_keep_editing))
                             }
+                        }
+                    )
+                }
+
+                // First-launch intro overlay (covers everything until done
+                // or skipped). While the store has not answered, a plain
+                // splash with the app mark avoids any flash of either UI.
+                if (onboardingSeen == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_cat_dome),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(84.dp)
+                        )
+                    }
+                } else if (onboardingSeen == false || introRequested) {
+                    OnboardingScreen(
+                        onDone = {
+                            introRequested = false
+                            settingsViewModel.setOnboardingSeen()
                         }
                     )
                 }
