@@ -288,7 +288,7 @@ private fun EditorSectionCard(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun EditorCardLabel(text: String) {
     Text(
-        text = text.uppercase(),
+        text = text.uppercase(java.util.Locale.ROOT),
         style = MaterialTheme.typography.labelSmall.copy(
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.5.sp

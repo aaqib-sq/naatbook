@@ -316,6 +316,32 @@ fun NaatApp(
                     )
                 }
 
+                // Audit #19: exact-duplicate warning for a brand-new entry.
+                val duplicateSavePrompt by viewModel.duplicateSavePrompt
+                    .collectAsStateWithLifecycle()
+                duplicateSavePrompt?.let { existingTitle ->
+                    AlertDialog(
+                        onDismissRequest = { viewModel.dismissDuplicateSavePrompt() },
+                        title = { Text(stringResource(R.string.editor_duplicate_title)) },
+                        text = {
+                            Text(stringResource(R.string.editor_duplicate_message, existingTitle))
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.dismissDuplicateSavePrompt()
+                                    viewModel.saveDraft(forceSave = true)
+                                }
+                            ) { Text(stringResource(R.string.editor_duplicate_save_anyway)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { viewModel.dismissDuplicateSavePrompt() }) {
+                                Text(stringResource(R.string.common_cancel))
+                            }
+                        }
+                    )
+                }
+
                 // First-launch intro overlay (covers everything until done
                 // or skipped). While the store has not answered, a plain
                 // splash with the app mark avoids any flash of either UI.
