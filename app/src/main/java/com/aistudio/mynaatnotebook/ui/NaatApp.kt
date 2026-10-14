@@ -51,6 +51,7 @@ import com.aistudio.mynaatnotebook.ui.settings.SettingsScreen
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
+import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 
@@ -63,7 +64,8 @@ private object NaatRoutes {
 fun NaatApp(
     viewModel: NaatViewModel,
     settingsViewModel: SettingsViewModel,
-    backupViewModel: BackupViewModel
+    backupViewModel: BackupViewModel,
+    driveViewModel: DriveViewModel
 ) {
     val context = LocalContext.current
     val navController = rememberNavController()
@@ -255,6 +257,7 @@ fun NaatApp(
                                     2 -> SettingsScreen(
                                         settingsViewModel,
                                         backupViewModel,
+                                        driveViewModel,
                                         onShowIntro = { introRequested = true }
                                     )
                                     else -> LibraryScreen(

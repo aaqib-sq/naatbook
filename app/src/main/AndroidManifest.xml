@@ -10,12 +10,18 @@
     <!-- Media-session notifications are exempt from this runtime grant on 33+,
          but declaring it keeps the notification channel fully authorized. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Google Drive backup (opt-in): the network is used only when the user
+         connects a Google account in Settings and syncs or restores. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!--
-      allowBackup is deliberately false: this is a 100% offline, privacy-focused app.
-      Android Auto Backup would otherwise silently upload the private database AND
-      voice recordings to Google Drive. Backup/restore is handled exclusively by the
-      in-app, user-controlled ZIP export/import in Settings.
+      allowBackup is deliberately false: Android Auto Backup would otherwise
+      silently upload the private database AND voice recordings to Google
+      Drive. Backup/restore is handled exclusively by the in-app,
+      user-controlled ZIP export/import in Settings, plus the optional
+      user-connected Google Drive sync (also in Settings). Auto Backup stays
+      off either way.
     -->
     <application
         android:name=".NaatBookApplication"

@@ -64,6 +64,7 @@ import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
+import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.isActive
@@ -76,6 +77,7 @@ import java.io.File
 fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
     backupViewModel: BackupViewModel,
+    driveViewModel: DriveViewModel,
     onShowIntro: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -93,6 +95,14 @@ fun SettingsScreen(
     val lastBackupText by settingsViewModel.lastBackupText.collectAsStateWithLifecycle()
     val lastImportUri by settingsViewModel.lastImportUri.collectAsStateWithLifecycle()
     val lastExportUri by settingsViewModel.lastExportUri.collectAsStateWithLifecycle()
+    val driveEmail by driveViewModel.connectedEmail.collectAsStateWithLifecycle()
+    val driveLastSyncText by driveViewModel.lastSyncText.collectAsStateWithLifecycle()
+    val driveAutoSync by driveViewModel.autoSync.collectAsStateWithLifecycle()
+    val driveSyncing by driveViewModel.isSyncing.collectAsStateWithLifecycle()
+    val driveProgress by driveViewModel.progress.collectAsStateWithLifecycle()
+    val drivePendingRestoreUri by driveViewModel.pendingRestoreUri.collectAsStateWithLifecycle()
+    val driveConsentIntent by driveViewModel.consentIntent.collectAsStateWithLifecycle()
+    var driveDisconnectConfirm by remember { mutableStateOf(false) }
 
     // Which font picker is open: "reader", "title", or null.
     var fontPickerTarget by remember { mutableStateOf<String?>(null) }
@@ -137,6 +147,37 @@ fun SettingsScreen(
             }
         }
     )
+
+    // Google Drive sign-in: the system account picker; the ViewModel reads
+    // the chosen account (or the failure) from the result intent.
+    val driveSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result -> driveViewModel.onSignInResult(result.data) }
+    )
+
+    // Google permission screen shown when a sync/download needs fresh
+    // consent; on success the interrupted action retries itself.
+    val driveConsentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            driveViewModel.onConsentResult(result.resultCode == Activity.RESULT_OK)
+        }
+    )
+    LaunchedEffect(driveConsentIntent) {
+        driveConsentIntent?.let { intent ->
+            driveViewModel.consumeConsentIntent()
+            driveConsentLauncher.launch(intent)
+        }
+    }
+
+    // A finished Drive download joins the exact same merge/replace import
+    // dialog flow as a locally picked backup file.
+    LaunchedEffect(drivePendingRestoreUri) {
+        drivePendingRestoreUri?.let { uri ->
+            driveViewModel.consumeRestoreUri()
+            pendingImportUri = uri
+        }
+    }
 
     // Import dialog: choose merge vs replace first. Replace is destructive,
     // so it needs a second, explicit warning confirmation before anything runs.
@@ -322,6 +363,25 @@ fun SettingsScreen(
                 modifier = Modifier.testTag("import_replace_dialog")
             )
         }
+    }
+
+    if (driveDisconnectConfirm) {
+        AlertDialog(
+            onDismissRequest = { driveDisconnectConfirm = false },
+            title = { Text(stringResource(R.string.settings_drive_disconnect_title)) },
+            text = { Text(stringResource(R.string.settings_drive_disconnect_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    driveDisconnectConfirm = false
+                    driveViewModel.disconnect()
+                }) { Text(stringResource(R.string.settings_drive_disconnect)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { driveDisconnectConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 
     Column(
@@ -694,6 +754,148 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .height(6.dp)
                         .testTag("backup_progress_bar"),
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HighContrastGray,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 4. Google Drive Backup (online, opt-in)
+        Text(
+            text = stringResource(R.string.settings_drive_title),
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.settings_drive_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = HighContrastGray
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column {
+                if (driveEmail == null) {
+                    SettingsActionRow(
+                        icon = Icons.Default.CloudSync,
+                        title = stringResource(R.string.settings_drive_connect),
+                        subtitle = stringResource(R.string.settings_drive_connect_subtitle),
+                        contentDescription = stringResource(R.string.settings_drive_connect),
+                        enabled = !driveSyncing && !backupWorking,
+                        testTag = "drive_connect_btn",
+                        onClick = {
+                            driveSignInLauncher.launch(driveViewModel.signInIntent())
+                        }
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = driveEmail!!,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = if (driveLastSyncText != null) {
+                                stringResource(
+                                    R.string.settings_drive_last_sync, driveLastSyncText!!
+                                )
+                            } else {
+                                stringResource(R.string.settings_drive_never_synced)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HighContrastGray,
+                            modifier = Modifier.testTag("drive_last_sync_text")
+                        )
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 14.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                    SettingsActionRow(
+                        icon = Icons.Default.CloudUpload,
+                        title = stringResource(R.string.settings_drive_sync_now),
+                        subtitle = stringResource(R.string.settings_drive_sync_subtitle),
+                        contentDescription = stringResource(R.string.settings_drive_sync_now),
+                        enabled = !driveSyncing && !backupWorking,
+                        testTag = "drive_sync_btn",
+                        onClick = { driveViewModel.syncNow() }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 68.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                    SettingsActionRow(
+                        icon = Icons.Default.CloudDownload,
+                        title = stringResource(R.string.settings_drive_restore),
+                        subtitle = stringResource(R.string.settings_drive_restore_subtitle),
+                        contentDescription = stringResource(R.string.settings_drive_restore),
+                        enabled = !driveSyncing && !backupWorking,
+                        testTag = "drive_restore_btn",
+                        onClick = { driveViewModel.restoreLatest() }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 68.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                    SettingsActionRow(
+                        icon = Icons.Default.CloudSync,
+                        title = stringResource(R.string.settings_drive_auto),
+                        subtitle = stringResource(R.string.settings_drive_auto_subtitle),
+                        contentDescription = stringResource(R.string.settings_drive_auto),
+                        enabled = !driveSyncing,
+                        testTag = "drive_auto_row",
+                        onClick = { driveViewModel.setAutoSync(!driveAutoSync) },
+                        trailing = {
+                            Switch(
+                                checked = driveAutoSync,
+                                onCheckedChange = { driveViewModel.setAutoSync(it) },
+                                modifier = Modifier.testTag("drive_auto_switch")
+                            )
+                        }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 68.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                    SettingsActionRow(
+                        icon = Icons.Default.CloudOff,
+                        title = stringResource(R.string.settings_drive_disconnect),
+                        subtitle = stringResource(R.string.settings_drive_disconnect_subtitle),
+                        contentDescription = stringResource(R.string.settings_drive_disconnect),
+                        enabled = !driveSyncing,
+                        testTag = "drive_disconnect_btn",
+                        onClick = { driveDisconnectConfirm = true }
+                    )
+                }
+            }
+        }
+
+        // Drive sync/download progress indicator
+        driveProgress?.let { progress ->
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(modifier = Modifier.fillMaxWidth()) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .testTag("drive_progress_bar"),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(

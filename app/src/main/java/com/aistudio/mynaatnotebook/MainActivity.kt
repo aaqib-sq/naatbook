@@ -10,6 +10,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.aistudio.mynaatnotebook.data.LocaleHelper
 import com.aistudio.mynaatnotebook.ui.NaatApp
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
+import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -20,6 +21,7 @@ class MainActivity : ComponentActivity() {
   private val viewModel: NaatViewModel by viewModels()
   private val settingsViewModel: SettingsViewModel by viewModels()
   private val backupViewModel: BackupViewModel by viewModels()
+  private val driveViewModel: DriveViewModel by viewModels()
 
   override fun attachBaseContext(newBase: Context) {
     // Apply the user's language choice before anything renders.
@@ -36,9 +38,17 @@ class MainActivity : ComponentActivity() {
       NaatApp(
         viewModel = viewModel,
         settingsViewModel = settingsViewModel,
-        backupViewModel = backupViewModel
+        backupViewModel = backupViewModel,
+        driveViewModel = driveViewModel
       )
     }
+  }
+
+  override fun onStart() {
+    super.onStart()
+    // Drive auto-sync (opt-in): uploads a fresh backup only when the
+    // library changed since the last sync; a no-op otherwise.
+    driveViewModel.maybeAutoSync()
   }
 
   override fun onStop() {
