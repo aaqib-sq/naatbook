@@ -92,6 +92,20 @@ class CustomFontStore @Inject constructor(
         emptyList()
     }
 
+    /**
+     * Audit #15: font names must stay distinguishable in the picker — two
+     * rows with the same name are indistinguishable. A taken name gains a
+     * " (2)", " (3)"… suffix instead of silently duplicating.
+     */
+    private fun uniqueName(desired: String, existing: List<CustomFont>): String {
+        val base = desired.trim().ifBlank { "My Font" }
+        val taken = existing.map { it.name.trim().lowercase() }.toSet()
+        if (base.lowercase() !in taken) return base
+        var suffix = 2
+        while ("$base ($suffix)".lowercase() in taken) suffix++
+        return "$base ($suffix)"
+    }
+
     private fun registryJson(fonts: List<CustomFont>): String {
         val array = JSONArray()
         fonts.forEach { font ->
@@ -220,7 +234,11 @@ class CustomFontStore @Inject constructor(
                 pending.tempFile.copyTo(destination, overwrite = true)
                 pending.tempFile.delete()
             }
-            val font = CustomFont(id, name.trim().ifBlank { pending.suggestedName }, fileName)
+            val font = CustomFont(
+                id,
+                uniqueName(name.trim().ifBlank { pending.suggestedName }, current),
+                fileName
+            )
             writeRegistry(current + font)
             font
         }
@@ -263,9 +281,38 @@ class CustomFontStore @Inject constructor(
             if (!stagedFile.renameTo(destination)) {
                 stagedFile.copyTo(destination, overwrite = true)
             }
-            writeRegistry(current + CustomFont(id, name, fileName))
+            writeRegistry(current + CustomFont(id, uniqueName(name, current), fileName))
             FontRestoreResult.ADOPTED
         }
+
+    /**
+     * Audit #20: a registry entry whose file is missing or no longer parses
+     * used to render silently as the default font forever. Prune such
+     * entries and report them so the caller can tell the user once.
+     */
+    suspend fun pruneBrokenEntries(): List<CustomFont> = withContext(Dispatchers.IO) {
+        val current = fonts.first()
+        val broken = current.filter { font ->
+            val file = fileFor(font)
+            !file.isFile || loadFamily(file) == null
+        }
+        if (broken.isNotEmpty()) writeRegistry(current - broken.toSet())
+        broken
+    }
+
+    /**
+     * Audit #23: abandoned phase-1 import temps (app killed between pick
+     * and naming) accumulated in cache forever. Drop any older than a day;
+     * a live pending import is minutes old at most.
+     */
+    suspend fun pruneStaleImportTemps() = withContext(Dispatchers.IO) {
+        val cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000
+        context.cacheDir.listFiles()?.forEach { file ->
+            if (file.name.startsWith("font-import-") && file.lastModified() < cutoff) {
+                file.delete()
+            }
+        }
+    }
 
     /** Current registry snapshot for backup export. */
     suspend fun snapshot(): List<CustomFont> = fonts.first()

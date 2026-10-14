@@ -360,9 +360,9 @@ fun LibraryScreen(
                 // Results list: global search across folders, and/or the favorites filter
                 Text(
                     text = when {
-                        favoritesOnly && searchQuery.isNotBlank() -> stringResource(R.string.library_favorites_query_title, searchQuery.trim().uppercase())
+                        favoritesOnly && searchQuery.isNotBlank() -> stringResource(R.string.library_favorites_query_title, searchQuery.trim().uppercase(java.util.Locale.ROOT))
                         favoritesOnly -> stringResource(R.string.library_favorites_title)
-                        else -> stringResource(R.string.library_results_title, searchQuery.trim().uppercase())
+                        else -> stringResource(R.string.library_results_title, searchQuery.trim().uppercase(java.util.Locale.ROOT))
                     },
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
@@ -717,7 +717,7 @@ fun RecentNaatCard(
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = naat.category.uppercase(),
+                    text = naat.category.uppercase(java.util.Locale.ROOT),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,

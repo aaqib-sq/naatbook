@@ -101,6 +101,26 @@ class NaatViewModel @Inject constructor(
     private val recordingGate = OperationGate()
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    private val _duplicateSavePrompt = MutableStateFlow<String?>(null)
+    /** Audit #19: title of an existing entry the new draft exactly matches. */
+    val duplicateSavePrompt: StateFlow<String?> = _duplicateSavePrompt.asStateFlow()
+
+    fun dismissDuplicateSavePrompt() {
+        _duplicateSavePrompt.value = null
+    }
+
+    /** Exact text-identity match (title + poet + folder + lyrics), new entries only. */
+    private suspend fun findTextDuplicate(draft: EditorDraft): NaatEntity? {
+        fun norm(value: String?): String = value?.trim()?.lowercase().orEmpty()
+        val all = repository.allNaats.first()
+        return all.firstOrNull { entry ->
+            norm(entry.title) == norm(draft.title) &&
+                norm(entry.poet) == norm(draft.poet) &&
+                entry.category == draft.category &&
+                norm(entry.lyrics) == norm(draft.lyrics)
+        }
+    }
     private val _isDeleting = MutableStateFlow(false)
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
     private val _isAttachingFile = MutableStateFlow(false)
@@ -844,7 +864,7 @@ class NaatViewModel @Inject constructor(
     }
 
     // --- CRUD DB Operations ---
-    fun saveDraft() {
+    fun saveDraft(forceSave: Boolean = false) {
         if (!saveGate.tryStart()) return
         // Defensive: UI blocks blank titles, but never trust the UI alone.
         if (_editorDraft.value.title.isBlank()) {
@@ -852,6 +872,31 @@ class NaatViewModel @Inject constructor(
             statusReporter.show(R.string.editor_title_required)
             return
         }
+        // Audit #19: a brand-new entry whose title, poet, folder and lyrics
+        // exactly match an existing one is almost certainly an accidental
+        // re-add — warn before saving instead of silently duplicating. The
+        // check is async; the save gate stays held until it resolves.
+        val draftSnapshot = _editorDraft.value
+        if (!forceSave && draftSnapshot.editingId == null) {
+            viewModelScope.launch {
+                val duplicate = try {
+                    findTextDuplicate(draftSnapshot)
+                } catch (error: Exception) {
+                    null // a failed check must never block a save
+                }
+                if (duplicate != null) {
+                    saveGate.finish()
+                    _duplicateSavePrompt.value = duplicate.title
+                } else {
+                    performSaveDraft()
+                }
+            }
+            return
+        }
+        performSaveDraft()
+    }
+
+    private fun performSaveDraft() {
         _isSaving.value = true
 
         viewModelScope.launch {
