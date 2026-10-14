@@ -10,6 +10,7 @@ import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.audio.PlaybackController
 import com.aistudio.mynaatnotebook.data.BackupManager
 import com.aistudio.mynaatnotebook.data.ImportMode
+import com.aistudio.mynaatnotebook.data.SettingsStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -26,7 +27,8 @@ import javax.inject.Inject
 class BackupViewModel @Inject constructor(
     private val backupManager: BackupManager,
     private val statusReporter: StatusReporter,
-    private val playbackController: PlaybackController
+    private val playbackController: PlaybackController,
+    private val settingsStore: SettingsStore
 ) : ViewModel() {
 
     private val _isWorking = MutableStateFlow(false)
@@ -47,6 +49,35 @@ class BackupViewModel @Inject constructor(
                 }
                 result.onSuccess { count ->
                     statusReporter.show(R.string.status_export_success, count)
+                    settingsStore.recordBackup(
+                        System.currentTimeMillis(),
+                        uri.lastPathSegment?.substringAfterLast('/') ?: "Chosen place"
+                    )
+                    settingsStore.setLastExportUri(uri.toString())
+                }.onFailure {
+                    statusReporter.show(R.string.status_export_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                }
+            } finally {
+                _progress.value = null
+                _isWorking.value = false
+            }
+        }
+    }
+
+    /** One-tap export into Download/NaatBook (no picker). */
+    fun backupNotebookToAppFolder(fileName: String) {
+        if (_isWorking.value) return
+        _isWorking.value = true
+        _progress.value = 0f
+        viewModelScope.launch {
+            try {
+                statusReporter.show(R.string.status_exporting)
+                val result = backupManager.exportBackupToAppFolder(fileName) { p ->
+                    _progress.value = p.coerceIn(0f, 1f)
+                }
+                result.onSuccess { (count, label) ->
+                    statusReporter.show(R.string.status_export_success, count)
+                    settingsStore.recordBackup(System.currentTimeMillis(), label)
                 }.onFailure {
                     statusReporter.show(R.string.status_export_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
                 }
@@ -66,6 +97,7 @@ class BackupViewModel @Inject constructor(
         // a ghost over the new library. Stop playback up front instead.
         if (mode == ImportMode.REPLACE) playbackController.stop()
         viewModelScope.launch {
+            settingsStore.setLastImportUri(uri.toString())
             try {
                 statusReporter.show(R.string.status_importing)
                 val result = backupManager.importBackup(uri, mode) { p ->
