@@ -7,9 +7,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.aistudio.mynaatnotebook.R
+import com.aistudio.mynaatnotebook.audio.PlaybackController
 import com.aistudio.mynaatnotebook.data.BackupManager
 import com.aistudio.mynaatnotebook.data.ImportMode
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -23,7 +25,8 @@ import javax.inject.Inject
 @HiltViewModel
 class BackupViewModel @Inject constructor(
     private val backupManager: BackupManager,
-    private val statusReporter: StatusReporter
+    private val statusReporter: StatusReporter,
+    private val playbackController: PlaybackController
 ) : ViewModel() {
 
     private val _isWorking = MutableStateFlow(false)
@@ -58,6 +61,10 @@ class BackupViewModel @Inject constructor(
         if (_isWorking.value) return
         _isWorking.value = true
         _progress.value = 0f
+        // Audit fix: a REPLACE restore deletes the old library (and its audio
+        // files) — if an entry was playing, its mini player used to linger as
+        // a ghost over the new library. Stop playback up front instead.
+        if (mode == ImportMode.REPLACE) playbackController.stop()
         viewModelScope.launch {
             try {
                 statusReporter.show(R.string.status_importing)
@@ -77,6 +84,21 @@ class BackupViewModel @Inject constructor(
                         )
                     } else {
                         statusReporter.show(R.string.status_import_success, importResult.imported)
+                    }
+                    // Font outcome was previously invisible: if the backup
+                    // carried fonts that could not be restored (or new ones
+                    // that were), say so after the main message has been read.
+                    if (importResult.fontsFailed > 0 || importResult.fontsAdded > 0) {
+                        delay(2_800)
+                        if (importResult.fontsFailed > 0) {
+                            statusReporter.show(
+                                R.string.status_import_fonts_failed, importResult.fontsFailed
+                            )
+                        } else {
+                            statusReporter.show(
+                                R.string.status_import_fonts_restored, importResult.fontsAdded
+                            )
+                        }
                     }
                 }.onFailure {
                     statusReporter.show(R.string.status_import_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
