@@ -104,6 +104,10 @@
     <string name="settings_intro_title">App intro</string>
     <string name="settings_intro_subtitle">See the welcome pages again</string>
     <string name="settings_intro_cd">Show the app intro</string>
+    <string name="status_fonts_pruned">Removed %1$d font(s) whose files were missing</string>
+    <string name="editor_duplicate_title">Possible duplicate</string>
+    <string name="editor_duplicate_message">An entry with the same title, poet, folder and text already exists: \"%1$s\". Save another copy anyway?</string>
+    <string name="editor_duplicate_save_anyway">Save anyway</string>
     <string name="reader_copy_cd">Copy lyrics</string>
     <string name="reader_share_cd">Share lyrics</string>
     <string name="reader_copied">Lyrics copied</string>
