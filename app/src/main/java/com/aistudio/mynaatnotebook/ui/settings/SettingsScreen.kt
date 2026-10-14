@@ -88,9 +88,15 @@ fun SettingsScreen(
     val fontError by settingsViewModel.fontError.collectAsStateWithLifecycle()
     val backupProgress by backupViewModel.progress.collectAsStateWithLifecycle()
     val backupWorking by backupViewModel.isWorking.collectAsStateWithLifecycle()
+    val lastBackupText by settingsViewModel.lastBackupText.collectAsStateWithLifecycle()
+    val lastImportUri by settingsViewModel.lastImportUri.collectAsStateWithLifecycle()
+    val lastExportUri by settingsViewModel.lastExportUri.collectAsStateWithLifecycle()
 
     // Which font picker is open: "reader", "title", or null.
     var fontPickerTarget by remember { mutableStateOf<String?>(null) }
+    // Picker to return to after the font-delete dialog closes (audit #14:
+    // deleting several fonts used to mean reopening the picker every time).
+    var pickerTargetBeforeDelete by remember { mutableStateOf<String?>(null) }
     // Custom font awaiting delete confirmation.
     var fontToDelete by remember { mutableStateOf<CustomFont?>(null) }
 
@@ -103,11 +109,14 @@ fun SettingsScreen(
         }
     )
 
-    // Create zip launcher
+    // Export to a user-chosen place (SAF). The intent carries a starting-
+    // point hint: Android can't be forced to open a folder, but DocumentsUI
+    // honors EXTRA_INITIAL_URI on most devices (incl. Samsung).
     val exportBackupLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip"),
-        onResult = { uri ->
-            if (uri != null) {
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            val uri = result.data?.data
+            if (result.resultCode == Activity.RESULT_OK && uri != null) {
                 backupViewModel.backupNotebook(uri)
             }
         }
@@ -115,11 +124,12 @@ fun SettingsScreen(
 
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Open zip backup launcher
+    // Open zip backup launcher (same starting-point hint as export).
     val importBackupLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-        onResult = { uri ->
-            if (uri != null) {
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            val uri = result.data?.data
+            if (result.resultCode == Activity.RESULT_OK && uri != null) {
                 // Show confirmation before importing (prevents accidental duplicates)
                 pendingImportUri = uri
             }
@@ -145,6 +155,7 @@ fun SettingsScreen(
                 fontPickerTarget = null
             },
             onDeleteRequest = { font ->
+                pickerTargetBeforeDelete = fontPickerTarget
                 fontPickerTarget = null
                 fontToDelete = font
             },
@@ -167,8 +178,15 @@ fun SettingsScreen(
     fontToDelete?.let { font ->
         val inUse = readerFont == FontChoices.customKey(font.id) ||
             titleFont == FontChoices.customKey(font.id)
+        // Closing this dialog (either way) returns to the picker it came
+        // from, so removing several fonts doesn't need repeated reopening.
+        val closeDelete: () -> Unit = {
+            fontToDelete = null
+            fontPickerTarget = pickerTargetBeforeDelete
+            pickerTargetBeforeDelete = null
+        }
         AlertDialog(
-            onDismissRequest = { fontToDelete = null },
+            onDismissRequest = closeDelete,
             title = { Text(stringResource(R.string.settings_font_delete_title)) },
             text = {
                 Text(
@@ -181,11 +199,11 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     settingsViewModel.deleteCustomFont(font.id)
-                    fontToDelete = null
+                    closeDelete()
                 }) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { fontToDelete = null }) {
+                TextButton(onClick = closeDelete) {
                     Text(stringResource(R.string.common_cancel))
                 }
             }
@@ -508,9 +526,37 @@ fun SettingsScreen(
                     enabled = !backupWorking,
                     testTag = "export_backup_btn",
                     onClick = {
-                        val timestamp = System.currentTimeMillis()
-                        val fileName = "NaatNotebook_backup_$timestamp.zip"
-                        exportBackupLauncher.launch(fileName)
+                        // One-tap export into Download/NaatBook (approved
+                        // design) — no picker for the common case.
+                        val fileName = "NaatNotebook_backup_${System.currentTimeMillis()}.zip"
+                        backupViewModel.backupNotebookToAppFolder(fileName)
+                    },
+                    trailing = {
+                        IconButton(
+                            onClick = {
+                                val fileName = "NaatNotebook_backup_${System.currentTimeMillis()}.zip"
+                                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                    addCategory(Intent.CATEGORY_OPENABLE)
+                                    type = "application/zip"
+                                    putExtra(Intent.EXTRA_TITLE, fileName)
+                                    runCatching {
+                                        putExtra(
+                                            android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                                            backupInitialUri(lastExportUri)
+                                        )
+                                    }
+                                }
+                                exportBackupLauncher.launch(intent)
+                            },
+                            enabled = !backupWorking,
+                            modifier = Modifier.testTag("export_choose_place_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FolderOpen,
+                                contentDescription = stringResource(R.string.settings_export_choose_place_cd),
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
                     }
                 )
                 HorizontalDivider(
@@ -525,9 +571,37 @@ fun SettingsScreen(
                     enabled = !backupWorking,
                     testTag = "import_backup_btn",
                     onClick = {
-                        importBackupLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                            putExtra(
+                                Intent.EXTRA_MIME_TYPES,
+                                arrayOf("application/zip", "application/octet-stream")
+                            )
+                            runCatching {
+                                putExtra(
+                                    android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                                    backupInitialUri(lastImportUri)
+                                )
+                            }
+                        }
+                        importBackupLauncher.launch(intent)
                     }
                 )
+                if (lastBackupText != null) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 68.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_last_backup, lastBackupText!!),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = HighContrastGray,
+                        modifier = Modifier
+                            .padding(start = 68.dp, end = 14.dp, top = 10.dp, bottom = 12.dp)
+                            .testTag("last_backup_text")
+                    )
+                }
             }
         }
 
@@ -830,7 +904,8 @@ private fun SettingsActionRow(
     contentDescription: String,
     enabled: Boolean,
     testTag: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -867,13 +942,28 @@ private fun SettingsActionRow(
                 color = HighContrastGray
             )
         }
-        Icon(
-            imageVector = Icons.Default.KeyboardArrowRight,
-            contentDescription = null,
-            tint = HighContrastGray,
-            modifier = Modifier.size(20.dp)
-        )
+        if (trailing != null) {
+            trailing()
+        } else {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowRight,
+                contentDescription = null,
+                tint = HighContrastGray,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 
-// --- View D: Realtime Lyrics Reader & Distraction-free Performance Screen ---
+/**
+ * Starting-point hint for the system document picker: the document the user
+ * picked last time, else the app's own Download/NaatBook folder. Android
+ * treats EXTRA_INITIAL_URI as a hint — most DocumentsUI builds (incl.
+ * Samsung's) open there, but nothing can force it.
+ */
+private fun backupInitialUri(persisted: String?): Uri =
+    persisted?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        ?: android.provider.DocumentsContract.buildDocumentUri(
+            "com.android.externalstorage.documents",
+            "primary:Download/NaatBook"
+        )

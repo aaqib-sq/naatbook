@@ -63,6 +63,18 @@ class SettingsViewModel @Inject constructor(
     /** Last font import/delete error to show the user, if any. */
     val fontError: StateFlow<String?> = _fontError.asStateFlow()
 
+    private val _lastBackupText = MutableStateFlow<String?>(null)
+    /** "14 Oct 2026, 9:52 AM • Download/NaatBook" — null until the first backup. */
+    val lastBackupText: StateFlow<String?> = _lastBackupText.asStateFlow()
+
+    private val _lastImportUri = MutableStateFlow<String?>(null)
+    /** Last picked import document (picker starting-point hint). */
+    val lastImportUri: StateFlow<String?> = _lastImportUri.asStateFlow()
+
+    private val _lastExportUri = MutableStateFlow<String?>(null)
+    /** Last picked export document (picker starting-point hint). */
+    val lastExportUri: StateFlow<String?> = _lastExportUri.asStateFlow()
+
     init {
         // DataStore emits current settings once, then on every change
         viewModelScope.launch { settingsStore.themeMode.collect { _themeMode.value = it } }
@@ -78,6 +90,20 @@ class SettingsViewModel @Inject constructor(
                 }.toMap()
             }
         }
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                settingsStore.lastBackupAt, settingsStore.lastBackupLabel
+            ) { at, label -> at to label }.collect { (at, label) ->
+                _lastBackupText.value = if (at > 0L) {
+                    val date = java.text.SimpleDateFormat(
+                        "d MMM yyyy, h:mm a", java.util.Locale.getDefault()
+                    ).format(java.util.Date(at))
+                    if (label.isNullOrBlank()) date else "$date • $label"
+                } else null
+            }
+        }
+        viewModelScope.launch { settingsStore.lastImportUri.collect { _lastImportUri.value = it } }
+        viewModelScope.launch { settingsStore.lastExportUri.collect { _lastExportUri.value = it } }
     }
 
     fun markFoldersWithEntries(names: Set<String>) {
