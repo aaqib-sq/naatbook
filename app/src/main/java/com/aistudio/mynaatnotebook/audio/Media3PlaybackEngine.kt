@@ -58,6 +58,13 @@ class Media3PlaybackEngine @Inject constructor(
 
     internal var onSessionStopped: (() -> Unit)? = null
 
+    /**
+     * Audit fix: async playback failures (missing/corrupt file) used to be
+     * log-only — the tap looked dead to the user. The controller wires this
+     * to the shared status reporter so a failure is always announced.
+     */
+    internal var onPlaybackError: (() -> Unit)? = null
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
     private val _currentPosition = MutableStateFlow(0)
@@ -90,6 +97,7 @@ class Media3PlaybackEngine @Inject constructor(
 
             override fun onPlayerError(error: PlaybackException) {
                 Log.e(TAG, "Media3 playback failed", error)
+                onPlaybackError?.invoke()
                 scheduleTerminalStop()
             }
         })
