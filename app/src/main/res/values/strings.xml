@@ -182,6 +182,8 @@
     <string name="status_export_failed">Export Failed: %1$s</string>
     <string name="status_importing">Importing backup, please wait...</string>
     <string name="status_import_success">Library Restored Successfully! Loaded %1$d entries.</string>
+    <string name="status_import_fonts_restored">Also restored %1$d imported fonts from the backup</string>
+    <string name="status_import_fonts_failed">%1$d fonts from the backup could not be restored</string>
     <string name="status_import_success_skipped">Import complete: %1$d new entries added, %2$d already existed (skipped).</string>
     <string name="status_import_failed">Import Failed: %1$s</string>
     <string name="status_error_database">database error</string>

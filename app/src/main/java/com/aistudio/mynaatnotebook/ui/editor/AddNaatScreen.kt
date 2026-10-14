@@ -653,7 +653,11 @@ private fun RecorderControls(
                         modifier = Modifier.testTag("discard_recording_btn")
                     ) { Text(stringResource(R.string.common_discard), color = HighContrastRed) }
                     IconButton(
-                        onClick = viewModel::startRecording,
+                        // Audit fix: re-record used to call startRecording
+                        // directly, silently deleting the finished take. It now
+                        // goes through the same replace confirmation as the
+                        // main Record button.
+                        onClick = { confirmRecord = true },
                         modifier = Modifier.testTag("rerecord_btn")
                     ) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.editor_rerecord_cd)) }
                 }

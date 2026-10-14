@@ -54,6 +54,12 @@ class PlaybackController @Inject constructor(
             _previewPath.value = null
             if (wasEntrySession) scheduleServiceShutdown()
         }
+        // Async failures (file deleted outside the app, corrupt audio) must
+        // reach the user — previously they only hit the log and the controls
+        // silently reverted, so the play tap looked dead.
+        engine.onPlaybackError = {
+            statusReporter.show(R.string.status_playback_failed)
+        }
     }
 
     private fun cancelPendingServiceShutdown() {
