@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -80,6 +81,10 @@ import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -142,8 +147,8 @@ fun LyricsReaderScreen(
     var bottomChromeHeightPx by remember { mutableIntStateOf(0) }
 
     // Auto-scroll engine configuration.
-    var autoScrollActive by remember { mutableStateOf(false) }
-    var scrollSpeed by remember { mutableFloatStateOf(1f) }
+    var autoScrollActive by rememberSaveable { mutableStateOf(false) }
+    var scrollSpeed by rememberSaveable { mutableFloatStateOf(1f) }
 
     // Sizing controls.
     val defaultFontSize by settingsViewModel.globalFontSize.collectAsStateWithLifecycle()
@@ -377,6 +382,50 @@ private fun ReaderTopBar(
                     contentDescription = stringResource(R.string.reader_favorite_cd),
                     tint = if (naat.isFavorite) HighContrastRed else MaterialTheme.colorScheme.onBackground
                 )
+            }
+            // Audit #9: the kalaam text used to be trapped in the app — no
+            // copy, no share. Both live here now, next to Edit.
+            if (!naat.lyrics.isNullOrBlank()) {
+                val context = LocalContext.current
+                val clipboard = LocalClipboardManager.current
+                val shareText = buildString {
+                    append(naat.title)
+                    if (!naat.poet.isNullOrBlank()) append("\n— ").append(naat.poet)
+                    append("\n\n").append(naat.lyrics)
+                }
+                IconButton(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(shareText))
+                        Toast.makeText(
+                            context, context.getString(R.string.reader_copied), Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    modifier = Modifier.testTag("reader_copy_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = stringResource(R.string.reader_copy_cd),
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(
+                            Intent.createChooser(send, context.getString(R.string.reader_share_cd))
+                        )
+                    },
+                    modifier = Modifier.testTag("reader_share_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = stringResource(R.string.reader_share_cd),
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
             }
             IconButton(onClick = onEdit, modifier = Modifier.testTag("reader_edit_btn")) {
                 Icon(
@@ -777,6 +826,9 @@ private fun PlayerTransportControls(
 ) {
     val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
     val sleepRemaining by controller.sleepTimerRemainingMs.collectAsStateWithLifecycle()
+    // Audit #11: while Media3 prepares a file there used to be no feedback
+    // at all — the play tap looked ignored for a second or two.
+    val preparing by controller.isPreparing.collectAsStateWithLifecycle()
     var showSleepDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var menuExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val speedLabel = "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x"
@@ -811,12 +863,20 @@ private fun PlayerTransportControls(
                     .background(MaterialTheme.colorScheme.onBackground, CircleShape)
                     .testTag("reader_play_pause")
             ) {
-                Icon(
-                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (playing) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
-                    tint = MaterialTheme.colorScheme.background,
-                    modifier = Modifier.size(30.dp)
-                )
+                if (preparing && !playing) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.background,
+                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(26.dp)
+                    )
+                } else {
+                    Icon(
+                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (playing) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
+                        tint = MaterialTheme.colorScheme.background,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
             }
             // Skip forward 10s
             IconButton(
