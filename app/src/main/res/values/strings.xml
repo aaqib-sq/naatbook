@@ -47,8 +47,6 @@
     <string name="settings_font_sans">Sans</string>
     <string name="settings_font_nastaliq">Nastaliq</string>
     <string name="settings_font_custom_missing">Imported font</string>
-    <string name="settings_my_fonts">My Fonts</string>
-    <string name="settings_my_fonts_empty">No imported fonts yet. Bring your own .ttf or .otf font file.</string>
     <string name="settings_import_font">+ Import font</string>
     <string name="settings_font_delete_cd">Delete font %1$s</string>
     <string name="settings_font_delete_title">Delete this font?</string>
@@ -66,7 +64,9 @@
     <string name="settings_backup_description">All database records and audio assets are saved strictly locally. Safeguard your work below.</string>
     <string name="settings_export_cd">Export</string>
     <string name="settings_export_zip">Export ZIP</string>
-    <string name="settings_export_subtitle">Save a copy of your whole library</string>
+    <string name="settings_export_subtitle">Save a copy of your whole library into Download/NaatBook</string>
+    <string name="settings_export_choose_place_cd">Choose another place for the backup</string>
+    <string name="settings_last_backup">Last backup: %1$s</string>
     <string name="settings_import_subtitle">Restore entries from a backup file</string>
     <string name="settings_import_cd">Import</string>
     <string name="settings_import_zip">Import ZIP</string>
@@ -75,6 +75,9 @@
     <!-- Reader -->
     <string name="reader_tap_hint">Tap once to show controls</string>
     <string name="reader_close_cd">Close Reader</string>
+    <string name="reader_copy_cd">Copy lyrics</string>
+    <string name="reader_share_cd">Share lyrics</string>
+    <string name="reader_copied">Lyrics copied</string>
     <string name="reader_poet">Poet: %1$s</string>
     <string name="reader_unknown_poet">Unknown Poet</string>
     <string name="reader_favorite_cd">Toggle favorite</string>
@@ -92,6 +95,8 @@
     <!-- Library -->
     <string name="library_search_cd">Search icon</string>
     <string name="library_search_hint">Search Naats, Poets, Lyrics...</string>
+    <string name="library_clear_search">Clear search</string>
+    <string name="library_favorites_filter_off_cd">Show all entries (turn off favorites filter)</string>
     <string name="library_voice_prompt">Speak Naat keyword...</string>
     <string name="library_stt_unsupported">Speech-to-Text not supported or offline</string>
     <string name="library_voice_search_cd">Voice search</string>
