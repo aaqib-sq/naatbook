@@ -124,6 +124,9 @@ fun NaatApp(
         if (currentRoute == NaatRoutes.READER && selectedNaat == null) navController.popBackStack()
     }
 
+    // Audit #21: one-shot resume-point restore after process death.
+    LaunchedEffect(Unit) { viewModel.restoreLastPlaybackIfNeeded() }
+
     AppBackHandler(
         currentRoute,
         currentTab,
