@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.aistudio.mynaatnotebook.data.NaatEntity
+import com.aistudio.mynaatnotebook.data.SettingsStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,8 @@ class PlaybackController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val engine: Media3PlaybackEngine,
     private val playbackRequests: PlaybackRequestRegistry,
-    private val statusReporter: StatusReporter
+    private val statusReporter: StatusReporter,
+    private val settingsStore: SettingsStore
 ) {
     private val _nowPlaying = MutableStateFlow<NowPlaying?>(null)
     val nowPlaying: StateFlow<NowPlaying?> = _nowPlaying.asStateFlow()
@@ -96,6 +98,10 @@ class PlaybackController @Inject constructor(
         // existing service alive avoids a stop/start race between consecutive entry requests.
         _previewPath.value = null
         _nowPlaying.value = NowPlaying(naat.id, naat.title, naat.poet, path)
+        // Audit #21: the new entry becomes the resume point from position 0;
+        // the saver below then keeps it current while it plays.
+        lastSavedPositionMs = 0L
+        timerScope.launch { settingsStore.setLastPlayback(naat.id, 0L) }
         val requestToken = playbackRequests.register(
             PlaybackRequest(path, naat.id, naat.title, naat.poet)
         )
@@ -104,10 +110,38 @@ class PlaybackController @Inject constructor(
         } catch (error: Exception) {
             playbackRequests.discard(requestToken)
             _nowPlaying.value = null
+            timerScope.launch { settingsStore.clearLastPlayback() }
             engine.stop()
             MediaPlaybackService.stop(context)
             Log.e("PlaybackController", "Unable to start background playback", error)
             statusReporter.show(R.string.status_playback_failed)
+        }
+    }
+
+    /**
+     * Audit #21: re-create the last entry session PAUSED at its saved
+     * position after a process death. Same service route as [playEntry], so
+     * the session gets its notification and lock-screen controls; nothing
+     * plays until the user taps play.
+     */
+    fun restoreEntry(naat: NaatEntity, positionMs: Long) {
+        val path = naat.audioPath ?: return
+        cancelPendingServiceShutdown()
+        _previewPath.value = null
+        _nowPlaying.value = NowPlaying(naat.id, naat.title, naat.poet, path)
+        lastSavedPositionMs = positionMs
+        val requestToken = playbackRequests.register(
+            PlaybackRequest(
+                path, naat.id, naat.title, naat.poet,
+                startPositionMs = positionMs, autoplay = false
+            )
+        )
+        try {
+            MediaPlaybackService.playEntry(context, requestToken)
+        } catch (error: Exception) {
+            playbackRequests.discard(requestToken)
+            _nowPlaying.value = null
+            Log.e("PlaybackController", "Unable to restore playback session", error)
         }
     }
 
@@ -130,7 +164,16 @@ class PlaybackController @Inject constructor(
         _previewPath.value == path && engine.hasActiveSession()
 
     fun hasActiveSession(): Boolean = engine.hasActiveSession()
-    fun pause() = engine.pause()
+    fun pause() {
+        engine.pause()
+        // Audit #21: pin the exact pause point as the resume position.
+        val np = _nowPlaying.value
+        if (np != null && _previewPath.value == null) {
+            val pos = engine.currentPosition.value.toLong()
+            lastSavedPositionMs = pos
+            timerScope.launch { settingsStore.setLastPlayback(np.naatId, pos) }
+        }
+    }
     fun resume() = engine.resume()
     fun togglePlayPause() = engine.togglePlayPause()
     fun seekTo(positionMs: Int) = engine.seekTo(positionMs)
@@ -164,6 +207,36 @@ class PlaybackController @Inject constructor(
     private val timerScope = kotlinx.coroutines.CoroutineScope(
         kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate
     )
+
+    // --- Audit #21: resume-after-process-death persistence ---
+    private var lastSavedPositionMs = -1L
+
+    init {
+        // A session that truly ended (finished, errored, stopped, service
+        // torn down) leaves nothing to resume. Entry switches do not fire
+        // this — they save their own fresh point in playEntry.
+        engine.onSessionFinished = {
+            if (_nowPlaying.value != null) {
+                timerScope.launch { settingsStore.clearLastPlayback() }
+            }
+        }
+        // While an entry session runs, keep its position saved (at most
+        // every ~5 s of movement, including seeks) so a system kill loses
+        // only a few seconds. Preview playback never touches the point.
+        timerScope.launch {
+            engine.currentPosition.collect { positionMs ->
+                val np = _nowPlaying.value ?: return@collect
+                if (_previewPath.value != null) return@collect
+                val pos = positionMs.toLong()
+                if (lastSavedPositionMs < 0L ||
+                    kotlin.math.abs(pos - lastSavedPositionMs) >= 5_000L
+                ) {
+                    lastSavedPositionMs = pos
+                    settingsStore.setLastPlayback(np.naatId, pos)
+                }
+            }
+        }
+    }
 
     /**
      * Starts a sleep timer that pauses playback after [minutes].

@@ -10,7 +10,11 @@ data class PlaybackRequest(
     val path: String,
     val naatId: Int,
     val title: String,
-    val artist: String?
+    val artist: String?,
+    /** Audit #21: resume point for a restored (paused) session. */
+    val startPositionMs: Long = 0L,
+    /** Audit #21: false = prepare paused at [startPositionMs], do not play. */
+    val autoplay: Boolean = true
 )
 
 /**

@@ -65,6 +65,15 @@ class Media3PlaybackEngine @Inject constructor(
      */
     internal var onPlaybackError: (() -> Unit)? = null
 
+    /**
+     * Audit #21: fired by [ensureIdle] BEFORE state is cleared, while the
+     * ending session is still identifiable. Entry-switching via [play] does
+     * not go through [ensureIdle], so this means "the session truly ended"
+     * (natural end, error, explicit stop, service teardown) — the playback
+     * controller uses it to drop the persisted resume point.
+     */
+    internal var onSessionFinished: (() -> Unit)? = null
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
     private val _currentPosition = MutableStateFlow(0)
@@ -136,6 +145,45 @@ class Media3PlaybackEngine @Inject constructor(
         startProgressTracking()
     }
 
+    /**
+     * Audit #21: load an entry PAUSED at [positionMs] — the resume-after-
+     * process-death restore. Same session shape as [play] (so the mini
+     * player, reader and notification all bind to it), but nothing sounds
+     * until the user presses play.
+     */
+    @MainThread
+    fun preparePaused(
+        audioPath: String,
+        mediaId: String,
+        title: String,
+        artist: String?,
+        positionMs: Long
+    ) {
+        check(!released) { "Playback engine has been released" }
+        clear(notifyOwner = false)
+        playbackGeneration++
+        val uri = when {
+            audioPath.startsWith("content://") -> Uri.parse(audioPath)
+            else -> Uri.fromFile(File(audioPath))
+        }
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .build()
+        val item = MediaItem.Builder()
+            .setMediaId(mediaId)
+            .setUri(uri)
+            .setMediaMetadata(metadata)
+            .build()
+        player.setMediaItem(item)
+        _hasActiveSession.value = true
+        _isPreparing.value = true
+        player.prepare()
+        player.seekTo(positionMs.coerceAtLeast(0L))
+        publishState()
+        startProgressTracking()
+    }
+
     fun pause() {
         if (hasActiveSession()) player.pause()
         publishState()
@@ -185,7 +233,10 @@ class Media3PlaybackEngine @Inject constructor(
 
     /** Idempotently return the process singleton to a resource-safe idle state. */
     fun ensureIdle() {
-        if (!released) clear(notifyOwner = true)
+        if (!released) {
+            if (hasActiveSession()) onSessionFinished?.invoke()
+            clear(notifyOwner = true)
+        }
     }
 
     internal fun isIdle(): Boolean =
