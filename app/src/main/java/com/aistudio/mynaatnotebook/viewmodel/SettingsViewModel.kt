@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.ui.text.font.FontFamily
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.data.CustomFont
 import com.aistudio.mynaatnotebook.data.CustomFontStore
 import com.aistudio.mynaatnotebook.data.NaatViewModelDefaults
@@ -26,7 +27,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settingsStore: SettingsStore,
-    private val customFontStore: CustomFontStore
+    private val customFontStore: CustomFontStore,
+    private val statusReporter: StatusReporter
 ) : ViewModel() {
 
     private val _themeMode = MutableStateFlow(NaatViewModelDefaults.DEFAULT_THEME_MODE)
@@ -114,6 +116,17 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.lastImportUri.collect { _lastImportUri.value = it } }
         viewModelScope.launch { settingsStore.lastExportUri.collect { _lastExportUri.value = it } }
         viewModelScope.launch { settingsStore.onboardingSeen.collect { _onboardingSeen.value = it } }
+        // Font-registry housekeeping (audit #20 + #23): drop registry
+        // entries whose files vanished (they used to render silently as
+        // the default font) and clear stale import temps. Runs once per
+        // process; a removal is announced, never silent.
+        viewModelScope.launch {
+            val removed = customFontStore.pruneBrokenEntries()
+            if (removed.isNotEmpty()) {
+                statusReporter.show(R.string.status_fonts_pruned, removed.size)
+            }
+            customFontStore.pruneStaleImportTemps()
+        }
     }
 
     fun markFoldersWithEntries(names: Set<String>) {
