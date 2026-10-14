@@ -144,6 +144,14 @@ fun SettingsScreen(
                 else settingsViewModel.setTitleFont(choice)
                 fontPickerTarget = null
             },
+            onDeleteRequest = { font ->
+                fontPickerTarget = null
+                fontToDelete = font
+            },
+            onImport = {
+                fontPickerTarget = null
+                importFontLauncher.launch(arrayOf("*/*"))
+            },
             onDismiss = { fontPickerTarget = null }
         )
     }
@@ -466,86 +474,6 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // My Fonts (approved design): imported fonts live here — each row
-        // shows the font's name, a sample in the font itself, and a delete
-        // action; the import button opens the system file picker.
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_my_fonts),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (customFonts.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.settings_my_fonts_empty),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = HighContrastGray,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                }
-                customFonts.forEach { font ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = font.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "مدینہ کا سفر",
-                                fontFamily = customFamilies[font.id] ?: FontFamily.Default,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = HighContrastGray,
-                                maxLines = 1
-                            )
-                        }
-                        IconButton(
-                            onClick = { fontToDelete = font },
-                            modifier = Modifier.testTag("myfont_delete_${font.id}")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = stringResource(R.string.settings_font_delete_cd, font.name)
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = { importFontLauncher.launch(arrayOf("*/*")) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .testTag("import_font_btn"),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(
-                        1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onBackground
-                    )
-                ) {
-                    Text(stringResource(R.string.settings_import_font), maxLines = 1)
-                }
-            }
-        }
-
         Spacer(modifier = Modifier.height(24.dp))
 
         // 3. Local Backup & Restore Offline
@@ -714,7 +642,12 @@ private fun FontChoiceRow(
     }
 }
 
-/** Font picker: built-in choices first, then the user's imported fonts, each with a live sample. */
+/**
+ * Font picker — the single home for fonts (approved design): built-in
+ * choices first, then the user's imported fonts (each with a trash action),
+ * and an import button at the bottom. There is deliberately no separate
+ * "My Fonts" card on the main settings screen anymore.
+ */
 @Composable
 private fun FontPickerDialog(
     title: String,
@@ -723,6 +656,8 @@ private fun FontPickerDialog(
     customFonts: List<CustomFont>,
     customFamilies: Map<String, FontFamily>,
     onPick: (String) -> Unit,
+    onDeleteRequest: (CustomFont) -> Unit,
+    onImport: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -752,8 +687,27 @@ private fun FontPickerDialog(
                         family = customFamilies[font.id] ?: FontFamily.Default,
                         selected = currentChoice == key,
                         testTag = "font_picker_row_$key",
-                        onClick = { onPick(key) }
+                        onClick = { onPick(key) },
+                        onDelete = { onDeleteRequest(font) },
+                        deleteTestTag = "font_picker_delete_${font.id}"
                     )
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onImport,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("import_font_btn"),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(
+                        1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onBackground
+                    )
+                ) {
+                    Text(stringResource(R.string.settings_import_font), maxLines = 1)
                 }
             }
         },
@@ -770,7 +724,9 @@ private fun FontPickerRow(
     family: FontFamily,
     selected: Boolean,
     testTag: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+    deleteTestTag: String? = null
 ) {
     Row(
         modifier = Modifier
@@ -793,6 +749,17 @@ private fun FontPickerRow(
         }
         if (selected) {
             Icon(imageVector = Icons.Default.Check, contentDescription = null)
+        }
+        if (onDelete != null) {
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.testTag(deleteTestTag ?: "font_picker_delete")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.settings_font_delete_cd, label)
+                )
+            }
         }
     }
 }

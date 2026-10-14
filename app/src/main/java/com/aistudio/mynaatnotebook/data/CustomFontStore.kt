@@ -108,9 +108,30 @@ class CustomFontStore @Inject constructor(
         settingsStore.setCustomFontsJson(registryJson(fonts))
     }
 
+    private fun sha256(file: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+    }
+
+    /** True when a byte-identical font is already imported (same content, any name). */
+    private fun isDuplicate(candidate: File, existing: List<CustomFont>): Boolean {
+        val candidateHash = sha256(candidate)
+        return existing.any { font ->
+            val file = fileFor(font)
+            file.isFile && sha256(file) == candidateHash
+        }
+    }
+
     /** Pure byte-level validation: extension, size, magic, real parse. */
-    fun validateFontFile(file: File): Boolean {
-        val ext = file.extension.lowercase()
+    fun validateFontFile(file: File): Boolean {        val ext = file.extension.lowercase()
         if (ext != "ttf" && ext != "otf") return false
         if (file.length() !in 1..MAX_FONT_BYTES) return false
         val header = ByteArray(4)
@@ -162,6 +183,9 @@ class CustomFontStore @Inject constructor(
             if (!validateFontFile(temp)) {
                 throw IOException("That file is not a valid font.")
             }
+            if (isDuplicate(temp, current)) {
+                throw IOException("This font is already added.")
+            }
             val family = loadFamily(temp)
                 ?: throw IOException("That file is not a valid font.")
             PendingFontImport(
@@ -183,6 +207,10 @@ class CustomFontStore @Inject constructor(
             val current = fonts.first()
             if (current.size >= MAX_FONTS) {
                 throw IOException("Font limit reached ($MAX_FONTS). Delete one first.")
+            }
+            if (isDuplicate(pending.tempFile, current)) {
+                pending.tempFile.delete()
+                throw IOException("This font is already added.")
             }
             val id = UUID.randomUUID().toString()
             val ext = pending.tempFile.extension.lowercase()
