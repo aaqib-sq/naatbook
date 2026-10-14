@@ -75,6 +75,15 @@ class SettingsViewModel @Inject constructor(
     /** Last picked export document (picker starting-point hint). */
     val lastExportUri: StateFlow<String?> = _lastExportUri.asStateFlow()
 
+    private val _onboardingSeen = MutableStateFlow<Boolean?>(null)
+    /** Null until the store answers, so the app can splash instead of flashing. */
+    val onboardingSeen: StateFlow<Boolean?> = _onboardingSeen.asStateFlow()
+
+    fun setOnboardingSeen() {
+        _onboardingSeen.value = true
+        viewModelScope.launch { settingsStore.setOnboardingSeen() }
+    }
+
     init {
         // DataStore emits current settings once, then on every change
         viewModelScope.launch { settingsStore.themeMode.collect { _themeMode.value = it } }
@@ -104,6 +113,7 @@ class SettingsViewModel @Inject constructor(
         }
         viewModelScope.launch { settingsStore.lastImportUri.collect { _lastImportUri.value = it } }
         viewModelScope.launch { settingsStore.lastExportUri.collect { _lastExportUri.value = it } }
+        viewModelScope.launch { settingsStore.onboardingSeen.collect { _onboardingSeen.value = it } }
     }
 
     fun markFoldersWithEntries(names: Set<String>) {
