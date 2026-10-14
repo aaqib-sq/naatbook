@@ -1,11 +1,13 @@
 package com.aistudio.mynaatnotebook
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.aistudio.mynaatnotebook.data.LocaleHelper
 import com.aistudio.mynaatnotebook.ui.NaatApp
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
@@ -18,6 +20,11 @@ class MainActivity : ComponentActivity() {
   private val viewModel: NaatViewModel by viewModels()
   private val settingsViewModel: SettingsViewModel by viewModels()
   private val backupViewModel: BackupViewModel by viewModels()
+
+  override fun attachBaseContext(newBase: Context) {
+    // Apply the user's language choice before anything renders.
+    super.attachBaseContext(LocaleHelper.wrap(newBase))
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // Handle the branded splash screen transition (must be called before super.onCreate).

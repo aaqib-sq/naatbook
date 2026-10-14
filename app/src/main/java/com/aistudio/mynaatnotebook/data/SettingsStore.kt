@@ -26,6 +26,7 @@ import javax.inject.Singleton
  */
 
 private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
+private val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
 private val KEY_FONT_SIZE = floatPreferencesKey("font_size")
 private val KEY_FOLDERS_WITH_ENTRIES = stringSetPreferencesKey("folders_with_entries")
 private val KEY_READER_FONT = stringPreferencesKey("reader_font")
@@ -61,6 +62,17 @@ class SettingsStore @Inject constructor(
 
     suspend fun setThemeMode(mode: String) {
         context.settingsDataStore.edit { it[KEY_THEME_MODE] = mode }
+    }
+
+    /** App language override: a LocaleHelper choice ("system" / "en" / "ur"). */
+    val appLanguage: Flow<String> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_APP_LANGUAGE] ?: LocaleHelper.SYSTEM }
+
+    suspend fun setAppLanguage(choice: String) {
+        // Mirror synchronously-readable copy first: attachBaseContext depends on it.
+        LocaleHelper.writeChoice(context, choice)
+        context.settingsDataStore.edit { it[KEY_APP_LANGUAGE] = choice }
     }
 
     suspend fun setFontSize(size: Float) {
