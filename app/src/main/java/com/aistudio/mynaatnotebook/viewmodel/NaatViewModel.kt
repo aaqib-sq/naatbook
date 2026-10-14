@@ -14,7 +14,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import com.aistudio.mynaatnotebook.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -125,6 +128,13 @@ class NaatViewModel @Inject constructor(
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
     private val _isAttachingFile = MutableStateFlow(false)
     val isAttachingFile: StateFlow<Boolean> = _isAttachingFile.asStateFlow()
+    /** Audit #18: the in-flight attach, so it can be cancelled. */
+    private var attachJob: Job? = null
+
+    /** Audit #18: cancel an in-progress file attach (partial copy is deleted). */
+    fun cancelAttach() {
+        attachJob?.cancel()
+    }
     private val _isOpeningNowPlaying = MutableStateFlow(false)
     val isOpeningNowPlaying: StateFlow<Boolean> = _isOpeningNowPlaying.asStateFlow()
 
@@ -409,7 +419,10 @@ class NaatViewModel @Inject constructor(
             if (!_editorDraft.value.active) startAddDraft() else _showAddModal.value = true
             return
         }
-        if (_isSaving.value || _isAttachingFile.value) return
+        if (_isSaving.value) return
+        // Audit #18: closing the editor during an attach cancels the attach
+        // instead of trapping the user until the copy finishes.
+        if (_isAttachingFile.value) cancelAttach()
         val draft = _editorDraft.value
         val activePath = if (_recordingState.value != RecordingState.IDLE) {
             stopRecorderForDiscardOnMain()
@@ -755,7 +768,16 @@ class NaatViewModel @Inject constructor(
             val input = context.contentResolver.openInputStream(uri) ?: return@withContext null
             input.use { inputStream ->
                 FileOutputStream(destination).use { outputStream ->
-                    inputStream.copyTo(outputStream)
+                    // Audit #18: chunked copy with cancellation checks — a
+                    // single copyTo() could not be interrupted, trapping
+                    // the user (and the editor) until a huge file finished.
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val count = inputStream.read(buffer)
+                        if (count < 0) break
+                        outputStream.write(buffer, 0, count)
+                    }
                     outputStream.fd.sync()
                 }
             }
@@ -770,6 +792,11 @@ class NaatViewModel @Inject constructor(
                 return@withContext null
             }
             destination
+        } catch (error: CancellationException) {
+            // Audit #18: a cancelled attach deletes its partial copy and
+            // stays a cancellation — never an error toast or a log scare.
+            runCatching { destination.delete() }
+            throw error
         } catch (error: Exception) {
             Log.e("NaatViewModel", "Failed to copy local file", error)
             runCatching { destination.delete() }
@@ -797,7 +824,7 @@ class NaatViewModel @Inject constructor(
     fun attachLocalFile(uri: Uri, onResult: (Boolean) -> Unit = {}) {
         if (!attachmentGate.tryStart()) return
         _isAttachingFile.value = true
-        viewModelScope.launch {
+        attachJob = viewModelScope.launch {
             try {
                 val success = audioFiles.exclusive {
                     val file = copyLocalFileToAppStorageLocked(uri)
@@ -811,15 +838,27 @@ class NaatViewModel @Inject constructor(
                     }
                 }
                 onResult(success)
+            } catch (error: CancellationException) {
+                // Audit #18: user cancelled (button or editor close). The
+                // partial copy was already deleted by the copy routine.
+                statusReporter.show(R.string.editor_attach_cancelled)
+                throw error
             } finally {
                 _isAttachingFile.value = false
                 attachmentGate.finish()
+                attachJob = null
             }
         }
     }
 
     /** Called only while [audioFiles] is held; replaces a draft-owned linked file atomically. */
     private suspend fun adoptLinkedFileLocked(file: File, displayName: String? = null) {
+        // Audit #18: the editor may have been closed (cancelling the attach)
+        // while the copy finished — never resurrect a discarded draft.
+        if (!_editorDraft.value.active) {
+            deleteOnIo(file.absolutePath)
+            return
+        }
         if (_recordingState.value != RecordingState.IDLE) finalizeRecordingLocked()
         withContext(Dispatchers.Main.immediate) { playbackController.stopPreview() }
         val draft = _editorDraft.value

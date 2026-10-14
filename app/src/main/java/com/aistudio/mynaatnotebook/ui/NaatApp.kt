@@ -182,7 +182,10 @@ fun NaatApp(
     }
 
     fun requestEditorClose() {
-        if (isSaving || isAttaching) return
+        if (isSaving) return
+        // Audit #18: an in-progress attach no longer traps the editor —
+        // closing cancels the attach and proceeds as usual.
+        if (isAttaching) viewModel.cancelAttach()
         if (viewModel.hasUnsavedEditorChanges()) {
             showDiscardConfirmation = true
         } else {
