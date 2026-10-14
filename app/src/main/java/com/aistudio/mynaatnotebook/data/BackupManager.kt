@@ -38,7 +38,13 @@ internal fun safeBackupDestination(baseDir: File, entryName: String): File? {
 }
 
 /** Result of an import: entries added, duplicates skipped (merge), old entries removed (replace). */
-data class ImportResult(val imported: Int, val skipped: Int, val removedExisting: Int = 0)
+data class ImportResult(
+    val imported: Int,
+    val skipped: Int,
+    val removedExisting: Int = 0,
+    val fontsAdded: Int = 0,
+    val fontsFailed: Int = 0
+)
 
 /** How an import treats the current library. */
 enum class ImportMode { MERGE, REPLACE }
@@ -111,6 +117,9 @@ class BackupManager @Inject constructor(
     ): Result<Int> = withContext(Dispatchers.IO) {
         audioFiles.exclusive {
             val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
+            // Set the moment the destination document is opened (truncated);
+            // only from then on can a failure leave a partial file behind.
+            var destinationTouched = false
         runCatching {
             onProgress(0.05f)
             val naats = repository.allNaats.first()
@@ -191,6 +200,7 @@ class BackupManager @Inject constructor(
 
             val descriptor = context.contentResolver.openFileDescriptor(outputUri, "w")
                 ?: throw IOException("Could not open output stream")
+            destinationTouched = true
             descriptor.use { pfd ->
                 FileInputStream(stagedZip).use { input ->
                     FileOutputStream(pfd.fileDescriptor).use { output ->
@@ -201,7 +211,21 @@ class BackupManager @Inject constructor(
             }
             onProgress(1f)
             naats.size
-            }.onFailure { Log.e("BackupManager", "Export failed", it) }
+            }.onFailure {
+                Log.e("BackupManager", "Export failed", it)
+                // Audit fix: a failure DURING the final copy can leave a
+                // partial zip at the destination that looks exactly like a
+                // real backup — remove it so it can never be trusted by
+                // mistake. A failure before the destination was opened left
+                // any previous backup untouched, so delete nothing then.
+                if (destinationTouched) {
+                    runCatching {
+                        android.provider.DocumentsContract.deleteDocument(
+                            context.contentResolver, outputUri
+                        )
+                    }
+                }
+            }
                 .also { stagedZip.delete() }
         }
     }
@@ -301,11 +325,24 @@ class BackupManager @Inject constructor(
             }
             // Adopt the backup's imported fonts (new ids only, cap applies;
             // each file is re-validated by the font store before adoption).
+            // Audit fix: count the outcome — fonts used to be dropped
+            // silently (duplicate content, cap, invalid file) while the
+            // success message only ever mentioned entries.
+            var fontsAdded = 0
+            var fontsFailed = 0
             staged.fontMeta.forEach { (fontId, fontName) ->
                 val stagedFile = staged.fontsByArchivePath.values
                     .firstOrNull { it.name.substringBefore('.') == fontId }
-                if (stagedFile != null) {
-                    runCatching { customFontStore.restoreFont(fontId, fontName, stagedFile) }
+                if (stagedFile == null) {
+                    fontsFailed++
+                } else {
+                    when (runCatching {
+                        customFontStore.restoreFont(fontId, fontName, stagedFile)
+                    }.getOrNull()) {
+                        CustomFontStore.FontRestoreResult.ADOPTED -> fontsAdded++
+                        CustomFontStore.FontRestoreResult.REJECTED -> fontsFailed++
+                        else -> Unit // ALREADY_PRESENT or unexpected: nothing lost
+                    }
                 }
             }
             var removedExisting = 0
@@ -323,7 +360,7 @@ class BackupManager @Inject constructor(
                     .forEach { path -> runCatching { File(path).delete() } }
             }
             onProgress(1f)
-            ImportResult(committed, skipped, removedExisting)
+            ImportResult(committed, skipped, removedExisting, fontsAdded, fontsFailed)
             }.onFailure { Log.e("BackupManager", "Import failed", it) }
                 .also { stagingDir.deleteRecursively() }
         }

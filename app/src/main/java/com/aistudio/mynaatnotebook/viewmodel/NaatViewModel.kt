@@ -233,15 +233,31 @@ class NaatViewModel @Inject constructor(
             val diskDraft = runCatching { draftDiskStore.read() }.getOrNull()
                 ?.takeIf { it.active }
             val candidate = diskDraft ?: _editorDraft.value.takeIf { it.active }
-            val activeFile = candidate?.finishedRecordingPath
+            // Audit fix: startRecording persists the take's path up front, so a
+            // process death mid-recording resurrects an UNFINISHED file here.
+            // Only a file that actually parses as playable audio may come back
+            // as a "finished" take; a partial file is dropped and removed.
+            val rawFile = candidate?.finishedRecordingPath
                 ?.let(::File)
                 ?.takeIf { it.isFile }
+            val activeFile = rawFile?.takeIf { isPlayableAudio(it) }
+            val staleFile = rawFile?.takeUnless { it == activeFile }
+            if (staleFile != null) runCatching { staleFile.delete() }
             withContext(Dispatchers.Main.immediate) {
                 if (draftRevision == 0L) {
                     diskDraft?.let {
-                        _editorDraft.value = it
-                        draftStore.save(it)
+                        val cleaned = if (staleFile != null &&
+                            it.finishedRecordingPath == staleFile.absolutePath
+                        ) it.copy(finishedRecordingPath = null) else it
+                        _editorDraft.value = cleaned
+                        draftStore.save(cleaned)
                         _showAddModal.value = true
+                    }
+                    if (staleFile != null &&
+                        _editorDraft.value.finishedRecordingPath == staleFile.absolutePath
+                    ) {
+                        _editorDraft.value =
+                            _editorDraft.value.copy(finishedRecordingPath = null)
                     }
                     _activeRecordingFile.value = activeFile
                 }

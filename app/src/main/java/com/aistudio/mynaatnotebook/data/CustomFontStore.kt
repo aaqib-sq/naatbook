@@ -238,24 +238,33 @@ class CustomFontStore @Inject constructor(
         target
     }
 
+    /** Outcome of a backup font restore, so the caller can report honestly. */
+    enum class FontRestoreResult { ADOPTED, ALREADY_PRESENT, REJECTED }
+
     /**
      * Backup restore hook: adopt a staged font file (already extracted by
-     * BackupManager) if its id is new and the cap allows. Re-validates.
+     * BackupManager) if its id is new and the cap allows. Re-validates, and
+     * applies the same content-duplicate guard as a manual import (audit
+     * fix: the restore path used to skip it, so a byte-identical font under
+     * a different id — e.g. a backup from another phone — duplicated).
      */
-    suspend fun restoreFont(id: String, name: String, stagedFile: File): Boolean =
+    suspend fun restoreFont(id: String, name: String, stagedFile: File): FontRestoreResult =
         withContext(Dispatchers.IO) {
-            if (!stagedFile.name.startsWith(id)) return@withContext false
+            if (!stagedFile.name.startsWith(id)) return@withContext FontRestoreResult.REJECTED
             val current = fonts.first()
-            if (current.size >= MAX_FONTS) return@withContext false
-            if (current.any { it.id == id }) return@withContext false
-            if (!validateFontFile(stagedFile)) return@withContext false
+            if (current.any { it.id == id }) return@withContext FontRestoreResult.ALREADY_PRESENT
+            if (!validateFontFile(stagedFile)) return@withContext FontRestoreResult.REJECTED
+            if (isDuplicate(stagedFile, current)) {
+                return@withContext FontRestoreResult.ALREADY_PRESENT
+            }
+            if (current.size >= MAX_FONTS) return@withContext FontRestoreResult.REJECTED
             val fileName = stagedFile.name
             val destination = File(fontsDir, fileName)
             if (!stagedFile.renameTo(destination)) {
                 stagedFile.copyTo(destination, overwrite = true)
             }
             writeRegistry(current + CustomFont(id, name, fileName))
-            true
+            FontRestoreResult.ADOPTED
         }
 
     /** Current registry snapshot for backup export. */
