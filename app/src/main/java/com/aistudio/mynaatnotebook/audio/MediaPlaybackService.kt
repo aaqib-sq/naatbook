@@ -66,13 +66,25 @@ class MediaPlaybackService : MediaSessionService() {
             try {
                 // onCreate has already attached MediaSession listeners, so this state change
                 // always raises the foreground notification and lock-screen controls.
-                engine.play(
-                    audioPath = request.path,
-                    mediaId = "naat:${request.naatId}",
-                    title = request.title,
-                    artist = request.artist,
-                    notifyPreviousOwner = false
-                )
+                if (request.autoplay) {
+                    engine.play(
+                        audioPath = request.path,
+                        mediaId = "naat:${request.naatId}",
+                        title = request.title,
+                        artist = request.artist,
+                        notifyPreviousOwner = false
+                    )
+                } else {
+                    // Audit #21 restore: same session, loaded paused at the
+                    // saved position; the notification shows it as resumable.
+                    engine.preparePaused(
+                        audioPath = request.path,
+                        mediaId = "naat:${request.naatId}",
+                        title = request.title,
+                        artist = request.artist,
+                        positionMs = request.startPositionMs
+                    )
+                }
                 triggerNotificationUpdate()
             } catch (error: Exception) {
                 Log.e(TAG, "Unable to start service-owned playback", error)

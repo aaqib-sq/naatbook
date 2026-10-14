@@ -36,7 +36,8 @@ class NaatViewModel @Inject constructor(
     private val audioFiles: AudioFileLifecycleCoordinator,
     private val audioRecorder: AudioRecorder,
     val playbackController: PlaybackController,
-    private val statusReporter: StatusReporter
+    private val statusReporter: StatusReporter,
+    private val settingsStore: SettingsStore
 ) : ViewModel() {
 
     private val draftStore = EditorDraftStore(savedStateHandle)
@@ -426,6 +427,35 @@ class NaatViewModel @Inject constructor(
     }
 
     /** Mini-player tap: resolve through Room; the list flow may still hold its initial empty value. */
+    private var playbackRestoreAttempted = false
+
+    /**
+     * Audit #21: after a process death, re-create the last entry session
+     * paused at its saved position (mini player + notification return,
+     * nothing auto-plays). Runs once per process; any rot in the saved
+     * point (entry deleted, file gone, barely started) just clears it.
+     */
+    fun restoreLastPlaybackIfNeeded() {
+        if (playbackRestoreAttempted) return
+        playbackRestoreAttempted = true
+        viewModelScope.launch {
+            val saved = settingsStore.lastPlayback.first() ?: return@launch
+            if (saved.positionMs < 3_000L) return@launch
+            if (playbackController.hasActiveSession()) return@launch
+            val naat = repository.getNaatById(saved.naatId)
+            val path = naat?.audioPath
+            if (naat == null || path == null) {
+                settingsStore.clearLastPlayback()
+                return@launch
+            }
+            if (!path.startsWith("content://") && !java.io.File(path).exists()) {
+                settingsStore.clearLastPlayback()
+                return@launch
+            }
+            playbackController.restoreEntry(naat, saved.positionMs)
+        }
+    }
+
     fun openNowPlayingEntry(onResolved: (Boolean) -> Unit = {}) {
         if (_isOpeningNowPlaying.value) return
         val requested = playbackController.nowPlaying.value ?: return
