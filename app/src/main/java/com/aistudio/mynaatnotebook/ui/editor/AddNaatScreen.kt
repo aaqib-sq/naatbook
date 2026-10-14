@@ -514,13 +514,16 @@ private fun BrowseAudioButton(
     onClick: () -> Unit,
     enabled: Boolean,
     isAttaching: Boolean,
+    onCancelAttach: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Slim outline style (approved design): the chunky filled pills are
     // gone; short single-line label, hairline border, 44dp tall.
     OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
+        // Audit #18: while attaching, the button stays live and acts as
+        // the cancel control — a huge copy no longer traps the user.
+        onClick = { if (isAttaching) onCancelAttach() else onClick() },
+        enabled = enabled || isAttaching,
         modifier = modifier.height(44.dp).testTag("link_external_file_btn"),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)),
@@ -532,6 +535,12 @@ private fun BrowseAudioButton(
             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.editor_attaching))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(R.string.common_cancel),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("editor_attach_cancel")
+            )
         } else {
             Icon(Icons.Default.MusicNote, contentDescription = null)
             Spacer(Modifier.width(4.dp))
@@ -631,6 +640,7 @@ private fun RecorderControls(
                         onClick = onBrowseClick,
                         enabled = browseEnabled,
                         isAttaching = isAttaching,
+                        onCancelAttach = viewModel::cancelAttach,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -666,6 +676,7 @@ private fun RecorderControls(
                     onClick = onBrowseClick,
                     enabled = browseEnabled,
                     isAttaching = isAttaching,
+                    onCancelAttach = viewModel::cancelAttach,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
