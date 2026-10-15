@@ -156,6 +156,7 @@ fun NaatApp(
         viewModel.loadNaat(
             id = id,
             onLoaded = { naat ->
+                viewModel.recordEntryOpened(naat.id)
                 viewModel.selectNaat(naat)
                 navController.navigate(NaatRoutes.READER) { launchSingleTop = true }
             },
