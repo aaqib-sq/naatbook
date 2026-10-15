@@ -73,6 +73,11 @@
     <string name="settings_export_zip">زپ برآمد کریں</string>
     <string name="settings_export_subtitle">اپنی پوری لائبریری کی ایک نقل Download/NaatBook میں محفوظ کریں</string>
     <string name="settings_export_choose_place_cd">بیک اپ کے لیے کوئی اور جگہ منتخب کریں</string>
+    <string name="settings_export_choice_title">بیک اپ کی قسم منتخب کریں</string>
+    <string name="settings_export_choice_full">مکمل بیک اپ</string>
+    <string name="settings_export_choice_full_desc">آڈیو سمیت ہر چیز</string>
+    <string name="settings_export_choice_entries">صرف اندراجات</string>
+    <string name="settings_export_choice_entries_desc">آڈیو فائلیں نہیں — بہت چھوٹی فائل</string>
     <string name="settings_last_backup">آخری بیک اپ: %1$s</string>
     <string name="settings_import_subtitle">بیک اپ فائل سے اندراجات بحال کریں</string>
     <string name="settings_import_cd">درآمد</string>
