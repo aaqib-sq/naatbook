@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,6 +30,62 @@ class NaatDatabaseMigrationTest {
     fun tearDown() {
         database?.close()
         context.deleteDatabase(TEST_DATABASE)
+    }
+
+    @Test
+    fun `migration 5 to 6 adds readerFontOverride with null default and keeps rows`() {
+        createVersionOneDatabase()
+
+        database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
+            .addMigrations(
+                NaatDatabase.MIGRATION_1_2,
+                NaatDatabase.MIGRATION_2_3,
+                NaatDatabase.MIGRATION_3_4,
+                NaatDatabase.MIGRATION_4_5
+            )
+            .allowMainThreadQueries()
+            .build()
+        val db5 = database!!.openHelper.writableDatabase
+        db5.execSQL(
+            "INSERT INTO naats " +
+                "(title, poet, category, lyrics, audioType, audioPath, isFavorite, " +
+                "createdAt, updatedAt, secondaryAudioType, secondaryAudioPath, " +
+                "audioDisplayName, secondaryAudioDisplayName) " +
+                "VALUES ('Font row', 'Poet', 'Naat', 'lyrics', 'none', NULL, 0, 1, 1, " +
+                "'none', NULL, NULL, NULL)"
+        )
+        database!!.close()
+        database = null
+
+        database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
+            .addMigrations(NaatDatabase.MIGRATION_5_6)
+            .allowMainThreadQueries()
+            .build()
+        val db6 = database!!.openHelper.writableDatabase
+
+        val columnNames = mutableListOf<String>()
+        db6.query("PRAGMA table_info(naats)").use { cursor ->
+            while (cursor.moveToNext()) columnNames += cursor.getString(1)
+        }
+        assertTrue(columnNames.contains("readerFontOverride"))
+
+        // v6 column arrives null for every pre-existing row; other columns intact.
+        assertEquals(0, db6
+            .query("SELECT COUNT(*) FROM naats WHERE readerFontOverride IS NOT NULL")
+            .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
+        db6.query("SELECT title, category, isFavorite FROM naats WHERE title = 'Font row'")
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Font row", cursor.getString(0))
+                assertEquals("Naat", cursor.getString(1))
+                assertEquals(0, cursor.getInt(2))
+            }
+
+        // A set override survives the migrated schema.
+        db6.execSQL("UPDATE naats SET readerFontOverride = 'nastaliq' WHERE title = 'Font row'")
+        assertEquals("nastaliq", db6
+            .query("SELECT readerFontOverride FROM naats WHERE title = 'Font row'")
+            .use { cursor -> cursor.moveToFirst(); cursor.getString(0) })
     }
 
     @Test

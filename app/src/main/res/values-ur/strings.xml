@@ -171,6 +171,8 @@
     <string name="editor_close_cd">ونڈو بند کریں</string>
     <string name="editor_title_label">عنوان (لازمی)</string>
     <string name="editor_poet_label">شاعر کا نام (اختیاری)</string>
+    <string name="editor_font_label">اس انٹری کا فونٹ</string>
+    <string name="editor_font_follow_settings">ترتیبات کے مطابق</string>
     <string name="editor_folder_label">فولڈر کی جگہ</string>
     <string name="editor_lyrics_label">اشعار</string>
     <string name="editor_lyrics_hint">یہاں اشعار لکھیں...</string>
