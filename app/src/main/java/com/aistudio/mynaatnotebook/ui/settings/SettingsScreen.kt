@@ -493,6 +493,49 @@ fun SettingsScreen(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
+        // Identity zone (top of page): the app's Noon mark + name +
+        // version/tagline. The bottom footer block was removed — this is the
+        // identity's single home on this page.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp)
+                .testTag("settings_identity_header"),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF0A0A0A)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_app_logo),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "NaatBook",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = stringResource(
+                        R.string.settings_identity_sub,
+                        BuildConfig.VERSION_NAME
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         Text(
             text = stringResource(R.string.settings_title),
             style = MaterialTheme.typography.headlineSmall,
@@ -533,12 +576,31 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { settingsViewModel.setThemeMode(mode) }
-                        .padding(horizontal = 16.dp, vertical = 9.dp)
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                         .testTag("settings_theme_$mode"),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ThemeDot(mode)
-                    Spacer(Modifier.width(16.dp))
+                    // Same tile treatment as every other settings row; the
+                    // radio indicator moved to the trailing end.
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = when (mode) {
+                                "white" -> Icons.Default.Brightness7
+                                "black" -> Icons.Default.Brightness2
+                                else -> Icons.Default.Contrast
+                            },
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
                             text = title,
@@ -551,12 +613,10 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (selected) {
-                        Icon(Icons.Default.Check, contentDescription = null)
-                    }
+                    RadioButton(selected = selected, onClick = null)
                 }
                 if (index < themeChoices.lastIndex) {
-                    SettingsRowDivider(58.dp)
+                    SettingsRowDivider(68.dp)
                 }
             }
         }
@@ -602,10 +662,27 @@ fun SettingsScreen(
                                 (context as? Activity)?.recreate()
                             }
                         }
-                        .padding(horizontal = 16.dp, vertical = 9.dp)
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                         .testTag("settings_language_$mode"),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Same tile treatment as every other settings row; the
+                    // radio indicator moved to the trailing end.
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
                             text = title,
@@ -618,12 +695,10 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (selected) {
-                        Icon(Icons.Default.Check, contentDescription = null)
-                    }
+                    RadioButton(selected = selected, onClick = null)
                 }
                 if (index < languageChoices.lastIndex) {
-                    SettingsRowDivider(16.dp)
+                    SettingsRowDivider(68.dp)
                 }
             }
         }
@@ -730,6 +805,11 @@ fun SettingsScreen(
                         exportChoiceTarget = ExportTarget.APP_FOLDER
                     },
                     trailing = {
+                        // Separate tap target (not part of the row's tap):
+                        // lets the user choose another place instead of the
+                        // one-tap Download/NaatBook export. The function is
+                        // preserved; the icon is restyled to the row's
+                        // secondary tone so the trailing grammar stays quiet.
                         IconButton(
                             onClick = { exportChoiceTarget = ExportTarget.CHOOSE_PLACE },
                             enabled = !backupWorking,
@@ -738,7 +818,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.FolderOpen,
                                 contentDescription = stringResource(R.string.settings_export_choose_place_cd),
-                                tint = MaterialTheme.colorScheme.onBackground
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -750,6 +830,8 @@ fun SettingsScreen(
                     contentDescription = stringResource(R.string.settings_import_cd),
                     enabled = !backupWorking,
                     testTag = "import_backup_btn",
+                    // Pure action row: no trailing glyph (trailing grammar).
+                    trailing = {},
                     onClick = {
                         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
@@ -825,6 +907,8 @@ fun SettingsScreen(
                         contentDescription = stringResource(R.string.settings_drive_connect),
                         enabled = !driveSyncing && !backupWorking,
                         testTag = "drive_connect_btn",
+                        // Pure action row: no trailing glyph (trailing grammar).
+                        trailing = {},
                         onClick = {
                             driveSignInLauncher.launch(driveViewModel.signInIntent())
                         }
@@ -858,6 +942,8 @@ fun SettingsScreen(
                         contentDescription = stringResource(R.string.settings_drive_sync_now),
                         enabled = !driveSyncing && !backupWorking,
                         testTag = "drive_sync_btn",
+                        // Pure action row: no trailing glyph (trailing grammar).
+                        trailing = {},
                         onClick = { driveViewModel.syncNow() }
                     )
                     SettingsRowDivider()
@@ -867,6 +953,8 @@ fun SettingsScreen(
                         contentDescription = stringResource(R.string.settings_drive_restore),
                         enabled = !driveSyncing && !backupWorking,
                         testTag = "drive_restore_btn",
+                        // Pure action row: no trailing glyph (trailing grammar).
+                        trailing = {},
                         onClick = { driveViewModel.restoreLatest() }
                     )
                     SettingsRowDivider()
@@ -948,6 +1036,8 @@ fun SettingsScreen(
                         contentDescription = stringResource(R.string.settings_drive_disconnect),
                         enabled = !driveSyncing,
                         testTag = "drive_disconnect_btn",
+                        // Pure action row: no trailing glyph (trailing grammar).
+                        trailing = {},
                         onClick = { driveDisconnectConfirm = true }
                     )
                 }
@@ -999,7 +1089,7 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         // About group: privacy policy + contact info. The app identity
-        // line below stays its single footer (per the approved design).
+        // lives in the header at the top of this page.
         SettingsGroupHeading(stringResource(R.string.settings_about_group))
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -1024,16 +1114,6 @@ fun SettingsScreen(
                 onClick = onOpenContactUs
             )
         }
-
-        Spacer(modifier = Modifier.height(40.dp))
-        Text(
-            text = stringResource(R.string.settings_about, BuildConfig.VERSION_NAME),
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(20.dp))
     }
 }
 
@@ -1078,26 +1158,6 @@ private fun SettingsRowDivider(start: Dp = 68.dp) {
     )
 }
 
-/** Small color dot previewing a theme mode: half black / half white for system. */
-@Composable
-private fun ThemeDot(mode: String) {
-    Box(
-        modifier = Modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-    ) {
-        when (mode) {
-            "white" -> Box(Modifier.fillMaxSize().background(Color(0xFFF7F7F7)))
-            "black" -> Box(Modifier.fillMaxSize().background(Color(0xFF0A0A0A)))
-            else -> Row(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFF0A0A0A)))
-                Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF7F7F7)))
-            }
-        }
-    }
-}
-
 /** Display label for a stored font choice (built-in name or the custom font's own name). */
 @Composable
 private fun fontChoiceLabel(choice: String, customFonts: List<CustomFont>): String {
@@ -1114,7 +1174,9 @@ private fun fontChoiceLabel(choice: String, customFonts: List<CustomFont>): Stri
     )
 }
 
-/** One tappable font-choice row inside the typography card (name + current choice + chevron). */
+/** One tappable font-choice row inside the typography card: name + current
+ * value at the trailing end (Telegram-Language-row style), no chevron and no
+ * duplicated subtitle. */
 @Composable
 private fun FontChoiceRow(
     title: String,
@@ -1140,18 +1202,18 @@ private fun FontChoiceRow(
             Text("Aa", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-            Text(
-                choiceLabel,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = choiceLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
