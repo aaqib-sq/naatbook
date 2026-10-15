@@ -27,7 +27,8 @@ object DatabaseModule {
                 NaatDatabase.MIGRATION_1_2,
                 NaatDatabase.MIGRATION_2_3,
                 NaatDatabase.MIGRATION_3_4,
-                NaatDatabase.MIGRATION_4_5
+                NaatDatabase.MIGRATION_4_5,
+                NaatDatabase.MIGRATION_5_6
             )
             // Never silently erase a notebook. A missing future migration must fail.
             .build()

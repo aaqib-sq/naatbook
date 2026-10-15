@@ -59,6 +59,8 @@ import com.aistudio.mynaatnotebook.data.NaatCategories
 import com.aistudio.mynaatnotebook.data.NaatEntity
 import com.aistudio.mynaatnotebook.data.PendingFontImport
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
+import com.aistudio.mynaatnotebook.ui.components.FontPickerDialog
+import com.aistudio.mynaatnotebook.ui.components.fontChoiceLabel
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.reader.ThinSeekBar
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
@@ -1159,22 +1161,6 @@ private fun SettingsRowDivider(start: Dp = 68.dp) {
     )
 }
 
-/** Display label for a stored font choice (built-in name or the custom font's own name). */
-@Composable
-private fun fontChoiceLabel(choice: String, customFonts: List<CustomFont>): String {
-    FontChoices.customId(choice)?.let { id ->
-        return customFonts.firstOrNull { it.id == id }?.name ?: stringResource(R.string.settings_font_custom_missing)
-    }
-    return stringResource(
-        when (choice) {
-            FontChoices.AUTO -> R.string.settings_font_auto
-            FontChoices.SERIF -> R.string.settings_font_serif
-            FontChoices.NASTALIQ -> R.string.settings_font_nastaliq
-            else -> R.string.settings_font_sans
-        }
-    )
-}
-
 /** One tappable font-choice row inside the typography card: name + current
  * value at the trailing end (Telegram-Language-row style), no chevron and no
  * duplicated subtitle. */
@@ -1216,128 +1202,6 @@ private fun FontChoiceRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-    }
-}
-
-/**
- * Font picker — the single home for fonts (approved design): built-in
- * choices first, then the user's imported fonts (each with a trash action),
- * and an import button at the bottom. There is deliberately no separate
- * "My Fonts" card on the main settings screen anymore.
- */
-@Composable
-private fun FontPickerDialog(
-    title: String,
-    builtinKeys: List<String>,
-    currentChoice: String,
-    customFonts: List<CustomFont>,
-    customFamilies: Map<String, FontFamily>,
-    onPick: (String) -> Unit,
-    onDeleteRequest: (CustomFont) -> Unit,
-    onImport: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                builtinKeys.forEach { key ->
-                    FontPickerRow(
-                        label = fontChoiceLabel(key, customFonts),
-                        sample = when (key) {
-                            FontChoices.AUTO -> stringResource(R.string.settings_font_auto_desc)
-                            FontChoices.NASTALIQ -> "مدینہ کا سفر"
-                            else -> "Madina ka Safar"
-                        },
-                        family = FontChoices.builtinFamily(key),
-                        selected = currentChoice == key,
-                        testTag = "font_picker_row_$key",
-                        onClick = { onPick(key) }
-                    )
-                }
-                customFonts.forEach { font ->
-                    val key = FontChoices.customKey(font.id)
-                    FontPickerRow(
-                        label = font.name,
-                        sample = "مدینہ کا سفر",
-                        family = customFamilies[font.id] ?: FontFamily.Default,
-                        selected = currentChoice == key,
-                        testTag = "font_picker_row_$key",
-                        onClick = { onPick(key) },
-                        onDelete = { onDeleteRequest(font) },
-                        deleteTestTag = "font_picker_delete_${font.id}"
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onImport,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .testTag("import_font_btn"),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(
-                        1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onBackground
-                    )
-                ) {
-                    Text(stringResource(R.string.settings_import_font), maxLines = 1)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-        }
-    )
-}
-
-@Composable
-private fun FontPickerRow(
-    label: String,
-    sample: String,
-    family: FontFamily,
-    selected: Boolean,
-    testTag: String,
-    onClick: () -> Unit,
-    onDelete: (() -> Unit)? = null,
-    deleteTestTag: String? = null
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp)
-            .testTag(testTag),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            Text(
-                sample,
-                fontFamily = family,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (selected) {
-            Icon(imageVector = Icons.Default.Check, contentDescription = null)
-        }
-        if (onDelete != null) {
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.testTag(deleteTestTag ?: "font_picker_delete")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.settings_font_delete_cd, label)
-                )
-            }
-        }
     }
 }
 
