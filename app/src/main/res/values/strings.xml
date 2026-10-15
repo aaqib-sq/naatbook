@@ -73,6 +73,11 @@
     <string name="settings_export_zip">Export ZIP</string>
     <string name="settings_export_subtitle">Save a copy of your whole library into Download/NaatBook</string>
     <string name="settings_export_choose_place_cd">Choose another place for the backup</string>
+    <string name="settings_export_choice_title">Choose backup type</string>
+    <string name="settings_export_choice_full">Full backup</string>
+    <string name="settings_export_choice_full_desc">Everything, including all audio</string>
+    <string name="settings_export_choice_entries">Entries only</string>
+    <string name="settings_export_choice_entries_desc">No audio files — a much smaller file</string>
     <string name="settings_last_backup">Last backup: %1$s</string>
     <string name="settings_import_subtitle">Restore entries from a backup file</string>
     <string name="settings_import_cd">Import</string>
