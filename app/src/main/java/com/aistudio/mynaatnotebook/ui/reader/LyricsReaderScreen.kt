@@ -159,6 +159,8 @@ fun LyricsReaderScreen(
 
     // Font choices (Settings → Typography): reader lyrics + header title.
     val readerFontChoice by settingsViewModel.readerFont.collectAsStateWithLifecycle()
+    /** Per-entry override wins; null follows the global Settings reader font. */
+    val effectiveReaderChoice = FontChoices.effectiveReaderChoice(naat.readerFontOverride, readerFontChoice)
     val titleFontChoice by settingsViewModel.titleFont.collectAsStateWithLifecycle()
     val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
 
@@ -265,7 +267,7 @@ fun LyricsReaderScreen(
             bottomChromePaddingPx = bottomContentPaddingPx,
             immersive = immersive,
             onIntentionalTap = ::toggleImmersiveChrome,
-            readerFontChoice = readerFontChoice,
+            readerFontChoice = effectiveReaderChoice,
             customFamilies = customFamilies
         )
 
@@ -690,7 +692,7 @@ private fun ReaderLyricsViewport(
             Text(
                 text = naat.lyrics,
                 fontSize = fontSize.sp,
-                // User's reader-font choice (Settings → Typography); AUTO
+                // Per-entry override (or the global reader font); AUTO
                 // resolves to the original Nastaliq-for-Urdu / Serif rule.
                 fontFamily = FontChoices.resolveReader(readerFontChoice, urduLyrics, customFamilies),
                 // Tall scripts (Nastaliq, and imported fonts which are
