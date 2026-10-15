@@ -43,6 +43,10 @@ class NaatRepository @Inject constructor(private val naatDao: NaatDao) {
         return naatDao.getNaatById(id)
     }
 
+    /** Records a Reader open for the recents strip; never touches updatedAt. */
+    suspend fun markOpened(id: Int): Int =
+        naatDao.markOpened(id, System.currentTimeMillis())
+
     suspend fun delete(naat: NaatEntity) = naatDao.deleteNaat(naat)
 
     suspend fun deleteById(id: Int) = naatDao.deleteNaatById(id)
