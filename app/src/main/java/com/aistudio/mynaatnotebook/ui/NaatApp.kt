@@ -316,6 +316,7 @@ fun NaatApp(
                 if (showAddModal) {
                     NonDismissibleEditorSheet(
                         viewModel = viewModel,
+                        settingsViewModel = settingsViewModel,
                         discardConfirmationVisible = showDiscardConfirmation,
                         onRequestClose = ::requestEditorClose
                     )

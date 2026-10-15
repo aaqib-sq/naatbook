@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
+import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 
 /**
  * A deliberately non-draggable modal sheet.
@@ -40,6 +41,7 @@ import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 @Composable
 fun NonDismissibleEditorSheet(
     viewModel: NaatViewModel,
+    settingsViewModel: SettingsViewModel,
     discardConfirmationVisible: Boolean,
     onRequestClose: () -> Unit
 ) {
@@ -101,6 +103,7 @@ fun NonDismissibleEditorSheet(
             ) {
                 AddNaatModal(
                     viewModel = viewModel,
+                    settingsViewModel = settingsViewModel,
                     onClose = onRequestClose
                 )
             }
