@@ -80,7 +80,7 @@
     <string name="settings_last_backup">Last backup: %1$s</string>
     <string name="settings_import_cd">Import</string>
     <string name="settings_import_zip">Import ZIP</string>
-    <string name="settings_about">NaatBook %1$s\n100%% Offline | Zero Data Tracking</string>
+    <string name="settings_identity_sub">%1$s · 100%% Offline | Zero Data Tracking</string>
 
     <!-- Reader -->
     <string name="reader_tap_hint">Tap once to show controls</string>

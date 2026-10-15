@@ -80,7 +80,7 @@
     <string name="settings_last_backup">آخری بیک اپ: %1$s</string>
     <string name="settings_import_cd">درآمد</string>
     <string name="settings_import_zip">زپ درآمد کریں</string>
-    <string name="settings_about">NaatBook %1$s\n100%% آف لائن | ڈیٹا کی کوئی نگرانی نہیں</string>
+    <string name="settings_identity_sub">%1$s · 100%% آف لائن | ڈیٹا کی کوئی نگرانی نہیں</string>
 
     <!-- Reader -->
     <string name="reader_tap_hint">کنٹرول دکھانے کے لیے ایک بار تھپتھپائیں</string>
