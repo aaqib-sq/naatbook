@@ -671,6 +671,9 @@ fun FolderSleekCard(
  * folder cards (approved design): a glass look — a soft vertical sheen
  * gradient and a brighter hairline border — so the strip reads as its own
  * species at a glance. Playing state keeps the solid white border.
+ *
+ * The title is the hero (big, bold, centered): the card's job is to let the
+ * user spot the naat and tap it. The poet line was removed by user order.
  */
 @Composable
 fun RecentNaatCard(
@@ -692,8 +695,8 @@ fun RecentNaatCard(
     )
     Card(
         modifier = modifier
-            .width(198.dp)
-            .height(96.dp)
+            .width(210.dp)
+            .height(124.dp)
             .border(if (isPlaying) 1.5.dp else 1.dp, cardBorder, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .testTag("recent_card_${naat.id}"),
@@ -706,7 +709,7 @@ fun RecentNaatCard(
             modifier = Modifier
                 .fillMaxSize()
                 .background(glassBrush)
-                .padding(12.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val audioTypes = setOf(naat.audioType, naat.secondaryAudioType)
@@ -749,29 +752,52 @@ fun RecentNaatCard(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = naat.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = titleFontFamily,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (!naat.poet.isNullOrBlank()) {
+            // The recognition block: centered in the remaining space so the
+            // card stays composed whether the title runs one line or two and
+            // whether or not there is a lyrics preview below it.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
-                    text = stringResource(R.string.library_by_poet, naat.poet),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = HighContrastGray,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp)
+                    text = naat.title,
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = titleFontFamily,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                    // Never letter-space the title: it breaks Nastaliq joining.
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+                firstLyricsLine(naat.lyrics)?.let { preview ->
+                    Text(
+                        text = preview,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
         }
     }
 }
+
+/**
+ * First displayable line of the lyrics for the recent-card preview.
+ * Returns null when there is nothing worth showing (null, blank, or
+ * whitespace-only lyrics). CRLF input is handled by trimming each line.
+ */
+internal fun firstLyricsLine(lyrics: String?): String? =
+    lyrics?.lineSequence()
+        ?.map { it.trim() }
+        ?.firstOrNull { it.isNotEmpty() }
 
 // --- Row Item representation inside a folder list ---
 /**
