@@ -268,7 +268,11 @@
     <string name="settings_drive_restore">Restore from Drive</string>
     <string name="settings_drive_restore_subtitle">Download the newest Drive backup and restore it here</string>
     <string name="settings_drive_auto">Automatic sync</string>
-    <string name="settings_drive_auto_subtitle">When the app opens, sync by itself if something changed</string>
+    <string name="settings_drive_auto_subtitle">Syncs by itself when something changes, on the schedule you choose</string>
+    <string name="settings_drive_interval_title">Auto-sync schedule</string>
+    <string name="settings_drive_interval_open">Every time the app opens</string>
+    <string name="settings_drive_interval_daily">Once a day</string>
+    <string name="settings_drive_interval_weekly">Once a week</string>
     <string name="settings_drive_disconnect">Disconnect account</string>
     <string name="settings_drive_disconnect_subtitle">Backups already in Drive stay there</string>
     <string name="settings_drive_disconnect_title">Disconnect Google account?</string>
