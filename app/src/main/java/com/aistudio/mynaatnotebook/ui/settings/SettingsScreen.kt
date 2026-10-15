@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.audio.RecordingState
 import com.aistudio.mynaatnotebook.data.CustomFont
+import com.aistudio.mynaatnotebook.data.DriveSyncInterval
 import com.aistudio.mynaatnotebook.data.ImportMode
 import com.aistudio.mynaatnotebook.data.NaatCategories
 import com.aistudio.mynaatnotebook.data.NaatEntity
@@ -98,6 +99,7 @@ fun SettingsScreen(
     val driveEmail by driveViewModel.connectedEmail.collectAsStateWithLifecycle()
     val driveLastSyncText by driveViewModel.lastSyncText.collectAsStateWithLifecycle()
     val driveAutoSync by driveViewModel.autoSync.collectAsStateWithLifecycle()
+    val driveSyncInterval by driveViewModel.syncInterval.collectAsStateWithLifecycle()
     val driveSyncing by driveViewModel.isSyncing.collectAsStateWithLifecycle()
     val driveProgress by driveViewModel.progress.collectAsStateWithLifecycle()
     val drivePendingRestoreUri by driveViewModel.pendingRestoreUri.collectAsStateWithLifecycle()
@@ -873,6 +875,63 @@ fun SettingsScreen(
                         modifier = Modifier.padding(start = 68.dp),
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                     )
+                    // Auto-sync schedule: shown only while auto-sync is on.
+                    // Same grouped-row language as the rest of the card (title
+                    // row + a check on the selected interval); monochrome.
+                    if (driveAutoSync) {
+                        Column(
+                            modifier = Modifier.padding(
+                                start = 68.dp,
+                                end = 14.dp,
+                                top = 10.dp,
+                                bottom = 4.dp
+                            )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_drive_interval_title),
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            val intervalChoices = listOf(
+                                DriveSyncInterval.OPEN to
+                                    stringResource(R.string.settings_drive_interval_open),
+                                DriveSyncInterval.DAILY to
+                                    stringResource(R.string.settings_drive_interval_daily),
+                                DriveSyncInterval.WEEKLY to
+                                    stringResource(R.string.settings_drive_interval_weekly)
+                            )
+                            intervalChoices.forEach { (interval, label) ->
+                                val selected = driveSyncInterval == interval
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(enabled = !driveSyncing) {
+                                            if (!selected) {
+                                                driveViewModel.setSyncInterval(interval)
+                                            }
+                                        }
+                                        .padding(vertical = 9.dp)
+                                        .testTag("drive_interval_${interval.key}"),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (selected) {
+                                        Icon(Icons.Default.Check, contentDescription = null)
+                                    }
+                                }
+                            }
+                        }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 68.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        )
+                    }
                     SettingsActionRow(
                         icon = Icons.Default.CloudOff,
                         title = stringResource(R.string.settings_drive_disconnect),
