@@ -243,6 +243,14 @@
     <string name="editor_attached_file">Attached file: %1$s</string>
     <string name="library_delete_message">"%1$s" will be permanently deleted%2$s</string>
     <string name="library_delete_with_audio"> along with its attached audio.</string>
+    <string name="category_name_naat">Naat</string>
+    <string name="category_name_hamd">Hamd</string>
+    <string name="category_name_manqabat">Manqabat</string>
+    <string name="category_name_salam">Salam</string>
+    <string name="category_name_qasida">Qasida</string>
+    <string name="category_name_nasheed">Nasheed</string>
+    <string name="category_name_my_kalam">My Kalam</string>
+    <string name="category_name_others">Others</string>
     <string name="library_entries_count">%1$d ENTRIES</string>
     <string name="status_playback_failed">Unable to start playback</string>
     <string name="settings_import_confirm_title">Import backup?</string>
