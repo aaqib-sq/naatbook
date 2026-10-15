@@ -10,7 +10,7 @@ android {
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.aistudio.mynaatnotebook.ptwyv"
+    applicationId = "com.aaqib.naatbook"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
