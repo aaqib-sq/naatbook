@@ -1,6 +1,7 @@
 package com.aistudio.mynaatnotebook.ui.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -62,7 +63,17 @@ private val POLICY_BLOCKS: List<PolicyBlock> = listOf(
 
 @Composable
 fun PrivacyPolicyScreen(onBack: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    // Explicit opaque theme background: the NavHost keeps the outgoing
+    // Settings content composed across the navigation transition, and this
+    // screen previously painted nothing, so Settings bled through the text.
+    // This matches the pattern every other full screen in the app uses
+    // (LyricsReaderScreen, AddNaatScreen, OnboardingScreen) and holds in
+    // both light and dark themes because it is a theme color, not a literal.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

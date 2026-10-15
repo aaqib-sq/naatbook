@@ -15,6 +15,21 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Package-visibility declarations (Android 11+, API 30+): without these,
+         resolveActivity() returns null even when suitable apps ARE installed.
+         The Contact Us screen launches intents directly and no longer relies
+         on a resolve pre-check, but these keep any future query truthful. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <!--
       allowBackup is deliberately false: Android Auto Backup would otherwise
       silently upload the private database AND voice recordings to Google
