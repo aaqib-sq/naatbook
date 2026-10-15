@@ -292,4 +292,37 @@
     <string name="status_drive_no_backup">No backup in Drive yet — sync first</string>
     <string name="status_drive_disconnected">Google account disconnected</string>
     <string name="status_drive_consent_needed">Google needs your permission to continue</string>
+    <!-- About section (Settings group, Privacy Policy + Contact Us screens) -->
+    <string name="about_back">Back</string>
+    <string name="settings_about_group">About</string>
+    <string name="settings_privacy_row">Privacy Policy</string>
+    <string name="settings_privacy_row_sub">How your data is handled</string>
+    <string name="settings_contact_row">Contact Us</string>
+    <string name="settings_contact_row_sub">Email and Instagram</string>
+    <string name="settings_copied">Copied to clipboard</string>
+    <string name="settings_open_failed">No app found to open this</string>
+    <string name="privacy_screen_title">Privacy Policy</string>
+    <string name="contact_screen_title">Contact Us</string>
+    <string name="contact_email_label">EMAIL</string>
+    <string name="contact_email_button">Write an email</string>
+    <string name="contact_instagram_label">INSTAGRAM</string>
+    <string name="contact_instagram_button">Open Instagram</string>
+    <string name="privacy_body_updated">Last updated: 15 October 2026</string>
+    <string name="privacy_body_intro">NaatBook is a personal notebook app for saving naats (lyrics, notes and audio). This policy explains what happens to your information when you use the app.</string>
+    <string name="privacy_h_data">Your data stays yours</string>
+    <string name="privacy_p_data_1">Everything you create in NaatBook — entries, text, folders, recordings and imported fonts — is stored locally on your own device.</string>
+    <string name="privacy_p_data_2">NaatBook has no user accounts, shows no ads, and includes no analytics or tracking.</string>
+    <string name="privacy_p_data_3">The developer never receives, collects, sells or shares your content or personal information.</string>
+    <string name="privacy_h_drive">Optional Google Drive backup</string>
+    <string name="privacy_p_drive_intro">NaatBook offers an optional backup feature that uses your own Google account:</string>
+    <string name="privacy_b_drive_1">The feature works only after you choose to connect your Google account inside the app.</string>
+    <string name="privacy_b_drive_2">Backups are saved only into your own Google Drive, in a visible folder named "NaatBook Backup".</string>
+    <string name="privacy_b_drive_3">The app can access only the files it created itself (Google Drive drive.file permission). It cannot see, read or change any other files in your Drive.</string>
+    <string name="privacy_b_drive_4">Backup copies are transferred directly between the app and your Google Drive. They are not sent to the developer or to any other server.</string>
+    <string name="privacy_b_drive_5">You can disconnect your account at any time from the app\'s Settings, and you can delete the backup files from your Drive at any time.</string>
+    <string name="privacy_h_perms">Permissions</string>
+    <string name="privacy_b_perm_net">Internet — used only for the optional Google Drive backup described above.</string>
+    <string name="privacy_b_perm_mic">Microphone — used only when you record audio inside the app, at your request.</string>
+    <string name="privacy_h_contact">Contact</string>
+    <string name="privacy_p_contact">For any question about this policy, contact the developer at %1$s.</string>
 </resources>
