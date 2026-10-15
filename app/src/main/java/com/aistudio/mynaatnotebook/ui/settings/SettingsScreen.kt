@@ -82,7 +82,9 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
     backupViewModel: BackupViewModel,
     driveViewModel: DriveViewModel,
-    onShowIntro: () -> Unit = {}
+    onShowIntro: () -> Unit = {},
+    onOpenPrivacyPolicy: () -> Unit = {},
+    onOpenContactUs: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
@@ -1068,6 +1070,46 @@ fun SettingsScreen(
                 enabled = true,
                 testTag = "settings_intro_btn",
                 onClick = onShowIntro
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // About group: privacy policy + contact info. The app identity
+        // line below stays its single footer (per the approved design).
+        Text(
+            text = stringResource(R.string.settings_about_group),
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            SettingsActionRow(
+                icon = Icons.Default.Description,
+                title = stringResource(R.string.settings_privacy_row),
+                subtitle = stringResource(R.string.settings_privacy_row_sub),
+                contentDescription = stringResource(R.string.settings_privacy_row),
+                enabled = true,
+                testTag = "about_privacy_row",
+                onClick = onOpenPrivacyPolicy
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 68.dp),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
+            SettingsActionRow(
+                icon = Icons.Default.MailOutline,
+                title = stringResource(R.string.settings_contact_row),
+                subtitle = stringResource(R.string.settings_contact_row_sub),
+                contentDescription = stringResource(R.string.settings_contact_row),
+                enabled = true,
+                testTag = "about_contact_row",
+                onClick = onOpenContactUs
             )
         }
 
