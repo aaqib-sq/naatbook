@@ -243,6 +243,14 @@
     <string name="editor_attached_file">منسلک فائل: %1$s</string>
     <string name="library_delete_message">\"%1$s\" مستقل طور پر حذف ہو جائے گا%2$s</string>
     <string name="library_delete_with_audio"> اس کی منسلک آڈیو سمیت۔</string>
+    <string name="category_name_naat">نعت</string>
+    <string name="category_name_hamd">حمد</string>
+    <string name="category_name_manqabat">منقبت</string>
+    <string name="category_name_salam">سلام</string>
+    <string name="category_name_qasida">قصیدہ</string>
+    <string name="category_name_nasheed">نشید</string>
+    <string name="category_name_my_kalam">میرا کلام</string>
+    <string name="category_name_others">دیگر</string>
     <string name="library_entries_count">%1$d اندراجات</string>
     <string name="status_playback_failed">پلے بیک شروع نہیں ہو سکا</string>
     <string name="settings_import_confirm_title">بیک اپ درآمد کریں؟</string>
