@@ -6,6 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.aistudio.mynaatnotebook.data.LocaleHelper
 import com.aistudio.mynaatnotebook.ui.NaatApp
@@ -35,12 +38,17 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
 
     setContent {
-      NaatApp(
-        viewModel = viewModel,
-        settingsViewModel = settingsViewModel,
-        backupViewModel = backupViewModel,
-        driveViewModel = driveViewModel
-      )
+        // Layout direction is pinned to LTR for the whole app (user decision
+        // 2026-10-15): choosing Urdu changes strings only; the structure
+        // never mirrors. This makes live switch and cold start identical.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            NaatApp(
+                viewModel = viewModel,
+                settingsViewModel = settingsViewModel,
+                backupViewModel = backupViewModel,
+                driveViewModel = driveViewModel
+            )
+        }
     }
   }
 

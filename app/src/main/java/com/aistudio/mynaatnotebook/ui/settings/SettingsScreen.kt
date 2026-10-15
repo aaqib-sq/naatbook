@@ -571,8 +571,9 @@ fun SettingsScreen(
         SettingsGroupCard {
             // Same grouped-row language as the theme card: title, subtitle,
             // check on the selected row. Picking a row stores the choice and
-            // recreates the activity so every string (and the layout
-            // direction, for Urdu) re-resolves at once.
+            // recreates the activity so every string re-resolves at once.
+            // Layout direction stays LTR in every language (user decision
+            // 2026-10-15): choosing Urdu swaps strings only, never mirrors.
             val languageChoices = listOf(
                 Triple(
                     "system",
