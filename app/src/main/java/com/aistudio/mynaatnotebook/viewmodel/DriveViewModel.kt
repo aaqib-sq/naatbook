@@ -5,7 +5,9 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.mynaatnotebook.R
+import com.aistudio.mynaatnotebook.data.DriveSyncInterval
 import com.aistudio.mynaatnotebook.data.SettingsStore
+import com.aistudio.mynaatnotebook.data.shouldAutoSync
 import com.aistudio.mynaatnotebook.data.drive.DriveException
 import com.aistudio.mynaatnotebook.data.drive.DriveSyncManager
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -45,6 +47,9 @@ class DriveViewModel @Inject constructor(
     private val _autoSync = MutableStateFlow(false)
     val autoSync: StateFlow<Boolean> = _autoSync.asStateFlow()
 
+    private val _syncInterval = MutableStateFlow(DriveSyncInterval.WEEKLY)
+    val syncInterval: StateFlow<DriveSyncInterval> = _syncInterval.asStateFlow()
+
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
@@ -65,6 +70,7 @@ class DriveViewModel @Inject constructor(
     init {
         viewModelScope.launch { settingsStore.driveEmail.collect { _connectedEmail.value = it } }
         viewModelScope.launch { settingsStore.driveAutoSync.collect { _autoSync.value = it } }
+        viewModelScope.launch { settingsStore.driveSyncInterval.collect { _syncInterval.value = it } }
         viewModelScope.launch {
             settingsStore.driveLastSyncAt.collect { at ->
                 _lastSyncText.value = if (at > 0L) {
@@ -165,10 +171,17 @@ class DriveViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setDriveAutoSync(enabled) }
     }
 
+    fun setSyncInterval(interval: DriveSyncInterval) {
+        _syncInterval.value = interval
+        viewModelScope.launch { settingsStore.setDriveSyncInterval(interval) }
+    }
+
     /**
      * Auto-sync check, called when the app comes to the foreground: if the
      * feature is on and the library changed since the last sync, upload a
      * fresh backup quietly (only failures and the success receipt surface).
+     * The pure [shouldAutoSync] rule decides whether the chosen interval
+     * has elapsed; manual "Sync now" never passes through it.
      */
     fun maybeAutoSync() {
         if (_isSyncing.value) return
@@ -176,7 +189,15 @@ class DriveViewModel @Inject constructor(
             if (settingsStore.driveEmail.first() == null) return@launch
             if (!settingsStore.driveAutoSync.first()) return@launch
             val current = runCatching { driveManager.contentHash() }.getOrNull() ?: return@launch
-            if (current != settingsStore.driveLastHash.first()) runSync(manual = false)
+            if (shouldAutoSync(
+                    interval = settingsStore.driveSyncInterval.first(),
+                    connected = true,
+                    autoSyncOn = true,
+                    hashChanged = current != settingsStore.driveLastHash.first(),
+                    lastSyncAtMs = settingsStore.driveLastSyncAt.first(),
+                    nowMs = System.currentTimeMillis()
+                )
+            ) runSync(manual = false)
         }
     }
 

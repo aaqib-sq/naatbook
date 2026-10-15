@@ -41,6 +41,7 @@ private val KEY_LAST_PLAYBACK_NAAT_ID = androidx.datastore.preferences.core.intP
 private val KEY_DRIVE_EMAIL = stringPreferencesKey("drive_email")
 private val KEY_DRIVE_LAST_SYNC_AT = androidx.datastore.preferences.core.longPreferencesKey("drive_last_sync_at")
 private val KEY_DRIVE_AUTO_SYNC = androidx.datastore.preferences.core.booleanPreferencesKey("drive_auto_sync")
+private val KEY_DRIVE_SYNC_INTERVAL = stringPreferencesKey("drive_sync_interval")
 private val KEY_DRIVE_LAST_HASH = stringPreferencesKey("drive_last_hash")
 private val KEY_LAST_PLAYBACK_POSITION_MS = androidx.datastore.preferences.core.longPreferencesKey("last_playback_position_ms")
 
@@ -236,12 +237,22 @@ class SettingsStore @Inject constructor(
         context.settingsDataStore.edit { it[KEY_DRIVE_AUTO_SYNC] = enabled }
     }
 
+    /** How often auto-sync may fire; persisted by key, default WEEKLY. */
+    val driveSyncInterval: Flow<DriveSyncInterval> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { DriveSyncInterval.fromKey(it[KEY_DRIVE_SYNC_INTERVAL]) }
+
+    suspend fun setDriveSyncInterval(interval: DriveSyncInterval) {
+        context.settingsDataStore.edit { it[KEY_DRIVE_SYNC_INTERVAL] = interval.key }
+    }
+
     /** Forget the Drive connection entirely (local state only). */
     suspend fun clearDriveState() {
         context.settingsDataStore.edit { prefs ->
             prefs.remove(KEY_DRIVE_EMAIL)
             prefs.remove(KEY_DRIVE_LAST_SYNC_AT)
             prefs.remove(KEY_DRIVE_AUTO_SYNC)
+            prefs.remove(KEY_DRIVE_SYNC_INTERVAL)
             prefs.remove(KEY_DRIVE_LAST_HASH)
         }
     }
