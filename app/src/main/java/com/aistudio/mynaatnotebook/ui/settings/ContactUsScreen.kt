@@ -3,6 +3,7 @@ package com.aistudio.mynaatnotebook.ui.settings
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,18 +55,18 @@ fun ContactUsScreen(onBack: () -> Unit) {
             .show()
     }
 
+    /**
+     * Launch the intent directly. On Android 11+ (API 30), a resolveActivity()
+     * pre-check is unreliable without <queries> manifest declarations — it
+     * returns null even when suitable apps ARE installed, which is exactly
+     * what happened on-device. So we attempt the launch and only fall back
+     * to the toast when the launch fails. The manifest also carries the
+     * proper <queries> declarations so any future resolve query is truthful.
+     */
     fun openIntentSafely(intent: Intent) {
         runCatching {
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-            } else {
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.settings_open_failed),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }.getOrElse {
+            context.startActivity(intent)
+        }.onFailure {
             Toast.makeText(
                 context,
                 context.getString(R.string.settings_open_failed),
@@ -74,7 +75,11 @@ fun ContactUsScreen(onBack: () -> Unit) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
