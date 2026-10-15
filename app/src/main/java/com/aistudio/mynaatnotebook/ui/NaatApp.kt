@@ -47,6 +47,8 @@ import com.aistudio.mynaatnotebook.ui.editor.NonDismissibleEditorSheet
 import com.aistudio.mynaatnotebook.ui.library.LibraryScreen
 import com.aistudio.mynaatnotebook.ui.onboarding.OnboardingScreen
 import com.aistudio.mynaatnotebook.ui.reader.LyricsReaderScreen
+import com.aistudio.mynaatnotebook.ui.settings.ContactUsScreen
+import com.aistudio.mynaatnotebook.ui.settings.PrivacyPolicyScreen
 import com.aistudio.mynaatnotebook.ui.settings.SettingsScreen
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
@@ -58,6 +60,8 @@ import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 private object NaatRoutes {
     const val HOME = "home"
     const val READER = "reader"
+    const val PRIVACY = "privacy_policy"
+    const val CONTACT = "contact_us"
 }
 
 @Composable
@@ -258,7 +262,17 @@ fun NaatApp(
                                         settingsViewModel,
                                         backupViewModel,
                                         driveViewModel,
-                                        onShowIntro = { introRequested = true }
+                                        onShowIntro = { introRequested = true },
+                                        onOpenPrivacyPolicy = {
+                                            navController.navigate(NaatRoutes.PRIVACY) {
+                                                launchSingleTop = true
+                                            }
+                                        },
+                                        onOpenContactUs = {
+                                            navController.navigate(NaatRoutes.CONTACT) {
+                                                launchSingleTop = true
+                                            }
+                                        }
                                     )
                                     else -> LibraryScreen(
                                         viewModel = viewModel,
@@ -271,6 +285,16 @@ fun NaatApp(
                                     )
                                 }
                             }
+                        }
+                        composable(NaatRoutes.PRIVACY) {
+                            PrivacyPolicyScreen(
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(NaatRoutes.CONTACT) {
+                            ContactUsScreen(
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         composable(NaatRoutes.READER) {
                             selectedNaat?.let { naat ->
