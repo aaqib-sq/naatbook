@@ -318,7 +318,7 @@ fun SettingsScreen(
                                     Text(
                                         stringResource(texts.second),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = HighContrastGray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -422,7 +422,7 @@ fun SettingsScreen(
                                 Text(
                                     stringResource(texts.second),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = HighContrastGray
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -702,11 +702,9 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 3. Local Backup & Restore Offline
+        // 3. Local Backup & Restore (offline)
         SettingsGroupHeading(stringResource(R.string.settings_backup_title))
         Spacer(modifier = Modifier.height(8.dp))
-        SettingsGroupDescription(stringResource(R.string.settings_backup_description))
-        Spacer(modifier = Modifier.height(12.dp))
 
         // Grouped rows in one card (approved design) instead of two loose
         // buttons: icon well, title + subtitle, chevron.
@@ -749,7 +747,6 @@ fun SettingsScreen(
                 SettingsActionRow(
                     icon = Icons.Default.Upload,
                     title = stringResource(R.string.settings_import_zip),
-                    subtitle = stringResource(R.string.settings_import_subtitle),
                     contentDescription = stringResource(R.string.settings_import_cd),
                     enabled = !backupWorking,
                     testTag = "import_backup_btn",
@@ -811,8 +808,6 @@ fun SettingsScreen(
         // 4. Google Drive Backup (online, opt-in)
         SettingsGroupHeading(stringResource(R.string.settings_drive_title))
         Spacer(modifier = Modifier.height(8.dp))
-        SettingsGroupDescription(stringResource(R.string.settings_drive_description))
-        Spacer(modifier = Modifier.height(12.dp))
 
         Card(
             modifier = Modifier
@@ -860,7 +855,6 @@ fun SettingsScreen(
                     SettingsActionRow(
                         icon = Icons.Default.CloudUpload,
                         title = stringResource(R.string.settings_drive_sync_now),
-                        subtitle = stringResource(R.string.settings_drive_sync_subtitle),
                         contentDescription = stringResource(R.string.settings_drive_sync_now),
                         enabled = !driveSyncing && !backupWorking,
                         testTag = "drive_sync_btn",
@@ -870,7 +864,6 @@ fun SettingsScreen(
                     SettingsActionRow(
                         icon = Icons.Default.CloudDownload,
                         title = stringResource(R.string.settings_drive_restore),
-                        subtitle = stringResource(R.string.settings_drive_restore_subtitle),
                         contentDescription = stringResource(R.string.settings_drive_restore),
                         enabled = !driveSyncing && !backupWorking,
                         testTag = "drive_restore_btn",
@@ -1037,7 +1030,7 @@ fun SettingsScreen(
             text = stringResource(R.string.settings_about, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
-            color = HighContrastGray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(20.dp))
@@ -1073,16 +1066,6 @@ private fun SettingsGroupHeading(title: String) {
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         letterSpacing = 1.5.sp
-    )
-}
-
-/** Uniform explanatory text under a group heading (backup / drive groups). */
-@Composable
-private fun SettingsGroupDescription(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -1273,7 +1256,7 @@ private fun FontPickerRow(
                 sample,
                 fontFamily = family,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1311,7 +1294,7 @@ private fun FontNameDialog(
                 Text(
                     stringResource(R.string.settings_font_file_label, pending.sourceName),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
@@ -1334,7 +1317,7 @@ private fun FontNameDialog(
                 Text(
                     stringResource(R.string.settings_font_sample_caption),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 6.dp)
                 )
             }
@@ -1357,7 +1340,7 @@ private fun FontNameDialog(
 private fun SettingsActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     contentDescription: String,
     enabled: Boolean,
     testTag: String,
@@ -1394,11 +1377,13 @@ private fun SettingsActionRow(
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (enabled) MaterialTheme.colorScheme.onBackground else HighContrastGray
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         if (trailing != null) {
             trailing()
