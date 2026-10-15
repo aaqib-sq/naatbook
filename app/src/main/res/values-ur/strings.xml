@@ -292,4 +292,37 @@
     <string name="status_drive_no_backup">ڈرائیو میں ابھی کوئی بیک اپ نہیں — پہلے بھیجیں</string>
     <string name="status_drive_disconnected">گوگل اکاؤنٹ الگ کر دیا گیا</string>
     <string name="status_drive_consent_needed">جاری رکھنے کے لیے گوگل کو آپ کی اجازت چاہیے</string>
+    <!-- About section (Settings group, Privacy Policy + Contact Us screens) -->
+    <string name="about_back">پیچھے جائیں</string>
+    <string name="settings_about_group">ایپ کے بارے میں</string>
+    <string name="settings_privacy_row">پرائیویسی پالیسی</string>
+    <string name="settings_privacy_row_sub">آپ کے ڈیٹا کا کیا ہوتا ہے</string>
+    <string name="settings_contact_row">ہم سے رابطہ کریں</string>
+    <string name="settings_contact_row_sub">ای میل اور انسٹاگرام</string>
+    <string name="settings_copied">کلپ بورڈ میں کاپی ہو گیا</string>
+    <string name="settings_open_failed">اسے کھولنے کے لیے کوئی ایپ نہیں ملی</string>
+    <string name="privacy_screen_title">پرائیویسی پالیسی</string>
+    <string name="contact_screen_title">ہم سے رابطہ کریں</string>
+    <string name="contact_email_label">ای میل</string>
+    <string name="contact_email_button">ای میل لکھیں</string>
+    <string name="contact_instagram_label">انسٹاگرام</string>
+    <string name="contact_instagram_button">انسٹاگرام کھولیں</string>
+    <string name="privacy_body_updated">آخری تازہ کاری: 15 اکتوبر 2026</string>
+    <string name="privacy_body_intro">نات بُک ایک ذاتی نوٹ بک ایپ ہے جس میں نعتیں (اشعار، نوٹس اور آڈیو) محفوظ کی جاتی ہیں۔ یہ پالیسی بتاتی ہے کہ ایپ استعمال کرتے وقت آپ کی معلومات کا کیا ہوتا ہے۔</string>
+    <string name="privacy_h_data">آپ کا ڈیٹا آپ ہی کا رہتا ہے</string>
+    <string name="privacy_p_data_1">نات بُک میں آپ جو کچھ بناتے ہیں — اندراجات، متن، فولڈر، ریکارڈنگ اور درآمد کیے گئے فونٹ — سب آپ کے اپنے آلے میں محفوظ رہتا ہے۔</string>
+    <string name="privacy_p_data_2">نات بُک میں کوئی صارف اکاؤنٹ نہیں، کوئی اشتہار نہیں، اور نہ کوئی تجزیات یا ٹریکنگ ہے۔</string>
+    <string name="privacy_p_data_3">ڈیولپر آپ کا مواد یا ذاتی معلومات کبھی وصول، جمع، فروخت یا شیئر نہیں کرتا۔</string>
+    <string name="privacy_h_drive">اختیاری گوگل ڈرائیو بیک اپ</string>
+    <string name="privacy_p_drive_intro">نات بُک ایک اختیاری بیک اپ سہولت دیتی ہے جو آپ کے اپنے گوگل اکاؤنٹ سے کام کرتی ہے:</string>
+    <string name="privacy_b_drive_1">یہ سہولت صرف اس وقت کام کرتی ہے جب آپ خود ایپ کے اندر اپنا گوگل اکاؤنٹ جوڑتے ہیں۔</string>
+    <string name="privacy_b_drive_2">بیک اپ صرف آپ کی اپنی گوگل ڈرائیو میں، "نات بُک بیک اپ" نامی ایک واضح فولڈر میں محفوظ ہوتے ہیں۔</string>
+    <string name="privacy_b_drive_3">ایپ صرف وہی فائلیں دیکھ سکتی ہے جو اس نے خود بنائی ہیں (گوگل ڈرائیو کی drive.file اجازت)۔ وہ آپ کی ڈرائیو کی کسی اور فائل کو دیکھ، پڑھ یا بدل نہیں سکتی۔</string>
+    <string name="privacy_b_drive_4">بیک اپ کی نقول براہِ راست ایپ اور آپ کی گوگل ڈرائیو کے درمیان منتقل ہوتی ہیں۔ وہ ڈیولپر یا کسی اور سرور کو نہیں بھیجی جاتیں۔</string>
+    <string name="privacy_b_drive_5">آپ ایپ کی سیٹنگز سے کسی بھی وقت اپنا اکاؤنٹ الگ کر سکتے ہیں، اور اپنی ڈرائیو سے بیک اپ فائلیں کسی بھی وقت حذف کر سکتے ہیں۔</string>
+    <string name="privacy_h_perms">اجازتیں</string>
+    <string name="privacy_b_perm_net">انٹرنیٹ — صرف اوپر بتائے گئے اختیاری گوگل ڈرائیو بیک اپ کے لیے استعمال ہوتا ہے۔</string>
+    <string name="privacy_b_perm_mic">مائیکروفون — صرف اس وقت استعمال ہوتا ہے جب آپ اپنی مرضی سے ایپ کے اندر آڈیو ریکارڈ کرتے ہیں۔</string>
+    <string name="privacy_h_contact">رابطہ</string>
+    <string name="privacy_p_contact">اس پالیسی کے بارے میں کسی بھی سوال کے لیے ڈیولپر سے اس پتے پر رابطہ کریں: %1$s۔</string>
 </resources>
