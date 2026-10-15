@@ -139,6 +139,10 @@ class NaatDatabaseMigrationTest {
                 )
                 """.trimIndent()
             )
+            // A real v5 database built by the migration chain carries the
+            // updatedAt index (MIGRATION_3_4); Room's post-migration schema
+            // validation fails without it.
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_naats_updatedAt ON naats(updatedAt)")
             listOf("First" to 10L, "Second" to 20L).forEach { (title, updatedAt) ->
                 db.execSQL(
                     "INSERT INTO naats " +
