@@ -37,14 +37,14 @@ class BackupViewModel @Inject constructor(
     private val _progress = MutableStateFlow<Float?>(null)
     val progress: StateFlow<Float?> = _progress.asStateFlow()
 
-    fun backupNotebook(uri: Uri) {
+    fun backupNotebook(uri: Uri, entriesOnly: Boolean = false) {
         if (_isWorking.value) return
         _isWorking.value = true
         _progress.value = 0f
         viewModelScope.launch {
             try {
                 statusReporter.show(R.string.status_exporting)
-                val result = backupManager.exportBackup(uri) { p ->
+                val result = backupManager.exportBackup(uri, entriesOnly) { p ->
                     _progress.value = p.coerceIn(0f, 1f)
                 }
                 result.onSuccess { count ->
@@ -65,14 +65,14 @@ class BackupViewModel @Inject constructor(
     }
 
     /** One-tap export into Download/NaatBook (no picker). */
-    fun backupNotebookToAppFolder(fileName: String) {
+    fun backupNotebookToAppFolder(fileName: String, entriesOnly: Boolean = false) {
         if (_isWorking.value) return
         _isWorking.value = true
         _progress.value = 0f
         viewModelScope.launch {
             try {
                 statusReporter.show(R.string.status_exporting)
-                val result = backupManager.exportBackupToAppFolder(fileName) { p ->
+                val result = backupManager.exportBackupToAppFolder(fileName, entriesOnly) { p ->
                     _progress.value = p.coerceIn(0f, 1f)
                 }
                 result.onSuccess { (count, label) ->

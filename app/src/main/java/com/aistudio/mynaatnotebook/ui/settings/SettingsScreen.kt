@@ -74,6 +74,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import java.io.File
 
+/** Which manual export destination opened the backup-type chooser dialog. */
+private enum class ExportTarget { APP_FOLDER, CHOOSE_PLACE }
+
 @Composable
 fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
@@ -126,17 +129,24 @@ fun SettingsScreen(
     // Export to a user-chosen place (SAF). The intent carries a starting-
     // point hint: Android can't be forced to open a folder, but DocumentsUI
     // honors EXTRA_INITIAL_URI on most devices (incl. Samsung).
+    // The backup type (full vs entries-only) is chosen in the export chooser
+    // dialog and remembered here for the SAF result callback.
+    var pendingExportEntriesOnly by remember { mutableStateOf(false) }
     val exportBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
         onResult = { result ->
             val uri = result.data?.data
             if (result.resultCode == Activity.RESULT_OK && uri != null) {
-                backupViewModel.backupNotebook(uri)
+                backupViewModel.backupNotebook(uri, pendingExportEntriesOnly)
             }
         }
     )
 
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Backup type chooser state: which export row opened it (one-tap into
+    // Download/NaatBook, or the choose-another-place icon).
+    var exportChoiceTarget by remember { mutableStateOf<ExportTarget?>(null) }
 
     // Open zip backup launcher (same starting-point hint as export).
     val importBackupLauncher = rememberLauncherForActivityResult(
@@ -365,6 +375,94 @@ fun SettingsScreen(
                 modifier = Modifier.testTag("import_replace_dialog")
             )
         }
+    }
+
+    // Backup type chooser: shown when a manual export is triggered — either
+    // the one-tap row (Download/NaatBook) or the choose-another-place icon.
+    // The choice travels into the ZIP itself, so the file name is only a
+    // label; "-entries" keeps entries-only files recognizable.
+    exportChoiceTarget?.let { target ->
+        var entriesOnly by remember(target) { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { exportChoiceTarget = null },
+            title = { Text(stringResource(R.string.settings_export_choice_title)) },
+            text = {
+                Column {
+                    listOf(
+                        false to (
+                            R.string.settings_export_choice_full to
+                                R.string.settings_export_choice_full_desc
+                            ),
+                        true to (
+                            R.string.settings_export_choice_entries to
+                                R.string.settings_export_choice_entries_desc
+                            )
+                    ).forEach { (value, texts) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { entriesOnly = value }
+                                .padding(vertical = 4.dp)
+                                .testTag("export_choice_${if (value) "entries_only" else "full"}")
+                        ) {
+                            RadioButton(
+                                selected = entriesOnly == value,
+                                onClick = { entriesOnly = value }
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(texts.first),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    stringResource(texts.second),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = HighContrastGray
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        exportChoiceTarget = null
+                        val fileName = "NaatNotebook_backup" +
+                            (if (entriesOnly) "_entries" else "") +
+                            "_${System.currentTimeMillis()}.zip"
+                        when (target) {
+                            ExportTarget.APP_FOLDER ->
+                                backupViewModel.backupNotebookToAppFolder(fileName, entriesOnly)
+                            ExportTarget.CHOOSE_PLACE -> {
+                                pendingExportEntriesOnly = entriesOnly
+                                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                    addCategory(Intent.CATEGORY_OPENABLE)
+                                    type = "application/zip"
+                                    putExtra(Intent.EXTRA_TITLE, fileName)
+                                    runCatching {
+                                        putExtra(
+                                            android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                                            backupInitialUri(lastExportUri)
+                                        )
+                                    }
+                                }
+                                exportBackupLauncher.launch(intent)
+                            }
+                        }
+                    },
+                    modifier = Modifier.testTag("export_choice_confirm_btn")
+                ) { Text(stringResource(R.string.settings_export_cd)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { exportChoiceTarget = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+            modifier = Modifier.testTag("export_choice_dialog")
+        )
     }
 
     if (driveDisconnectConfirm) {
@@ -668,27 +766,13 @@ fun SettingsScreen(
                     testTag = "export_backup_btn",
                     onClick = {
                         // One-tap export into Download/NaatBook (approved
-                        // design) — no picker for the common case.
-                        val fileName = "NaatNotebook_backup_${System.currentTimeMillis()}.zip"
-                        backupViewModel.backupNotebookToAppFolder(fileName)
+                        // design) — no picker for the common case. The type
+                        // chooser dialog decides full vs entries-only.
+                        exportChoiceTarget = ExportTarget.APP_FOLDER
                     },
                     trailing = {
                         IconButton(
-                            onClick = {
-                                val fileName = "NaatNotebook_backup_${System.currentTimeMillis()}.zip"
-                                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                                    addCategory(Intent.CATEGORY_OPENABLE)
-                                    type = "application/zip"
-                                    putExtra(Intent.EXTRA_TITLE, fileName)
-                                    runCatching {
-                                        putExtra(
-                                            android.provider.DocumentsContract.EXTRA_INITIAL_URI,
-                                            backupInitialUri(lastExportUri)
-                                        )
-                                    }
-                                }
-                                exportBackupLauncher.launch(intent)
-                            },
+                            onClick = { exportChoiceTarget = ExportTarget.CHOOSE_PLACE },
                             enabled = !backupWorking,
                             modifier = Modifier.testTag("export_choose_place_btn")
                         ) {
