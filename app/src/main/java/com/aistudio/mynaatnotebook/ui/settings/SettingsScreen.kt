@@ -500,18 +500,10 @@ fun SettingsScreen(
         )
 
         // 1. Theme Configuration
-        Text(
-            text = stringResource(R.string.settings_theme_title),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium
-        )
+        SettingsGroupHeading(stringResource(R.string.settings_theme_title))
         Spacer(modifier = Modifier.height(8.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
-            shape = RoundedCornerShape(8.dp)
-        ) {
+        SettingsGroupCard {
             // Theme choices as three rows in one card (approved design):
             // a color dot shows the theme, a subtitle says what it means,
             // and the selected row carries a check. (The visual swatch
@@ -540,7 +532,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { settingsViewModel.setThemeMode(mode) }
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 9.dp)
                         .testTag("settings_theme_$mode"),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -555,7 +547,7 @@ fun SettingsScreen(
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     if (selected) {
@@ -563,10 +555,7 @@ fun SettingsScreen(
                     }
                 }
                 if (index < themeChoices.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 58.dp, end = 16.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-                    )
+                    SettingsRowDivider(58.dp)
                 }
             }
         }
@@ -575,18 +564,10 @@ fun SettingsScreen(
 
 
         // 2. App Language
-        Text(
-            text = stringResource(R.string.settings_language_title),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium
-        )
+        SettingsGroupHeading(stringResource(R.string.settings_language_title))
         Spacer(modifier = Modifier.height(8.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
-            shape = RoundedCornerShape(8.dp)
-        ) {
+        SettingsGroupCard {
             // Same grouped-row language as the theme card: title, subtitle,
             // check on the selected row. Picking a row stores the choice and
             // recreates the activity so every string (and the layout
@@ -619,7 +600,7 @@ fun SettingsScreen(
                                 (context as? Activity)?.recreate()
                             }
                         }
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 9.dp)
                         .testTag("settings_language_$mode"),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -632,7 +613,7 @@ fun SettingsScreen(
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     if (selected) {
@@ -640,10 +621,7 @@ fun SettingsScreen(
                     }
                 }
                 if (index < languageChoices.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-                    )
+                    SettingsRowDivider(16.dp)
                 }
             }
         }
@@ -651,20 +629,10 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         // 3. Default Font Sizing adjustment
-        Text(
-            text = stringResource(R.string.settings_typography_title),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium
-        )
+        SettingsGroupHeading(stringResource(R.string.settings_typography_title))
         Spacer(modifier = Modifier.height(8.dp))
 
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
-            shape = RoundedCornerShape(8.dp)
-        ) {
+        SettingsGroupCard {
             Column(modifier = Modifier.padding(16.dp)) {
                 // Drag updates a LOCAL pending value (label & preview follow
                 // live); the DataStore write fires exactly once, on release.
@@ -711,7 +679,7 @@ fun SettingsScreen(
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                SettingsRowDivider(0.dp)
                 // Font choice rows (approved design): current choice as the
                 // subtitle; tapping opens the picker with live samples.
                 FontChoiceRow(
@@ -720,10 +688,7 @@ fun SettingsScreen(
                     testTag = "reader_font_btn",
                     onClick = { fontPickerTarget = "reader" }
                 )
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 60.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-                )
+                SettingsRowDivider(72.dp)
                 FontChoiceRow(
                     title = stringResource(R.string.settings_title_font),
                     choiceLabel = fontChoiceLabel(titleFont, customFonts),
@@ -736,17 +701,9 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         // 3. Local Backup & Restore Offline
-        Text(
-            text = stringResource(R.string.settings_backup_title),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.settings_backup_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = HighContrastGray
-        )
+        SettingsGroupHeading(stringResource(R.string.settings_backup_title))
+        Spacer(modifier = Modifier.height(8.dp))
+        SettingsGroupDescription(stringResource(R.string.settings_backup_description))
         Spacer(modifier = Modifier.height(12.dp))
 
         // Grouped rows in one card (approved design) instead of two loose
@@ -786,10 +743,7 @@ fun SettingsScreen(
                         }
                     }
                 )
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 68.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                )
+                SettingsRowDivider()
                 SettingsActionRow(
                     icon = Icons.Default.Upload,
                     title = stringResource(R.string.settings_import_zip),
@@ -816,14 +770,11 @@ fun SettingsScreen(
                     }
                 )
                 if (lastBackupText != null) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 68.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    )
+                    SettingsRowDivider()
                     Text(
                         text = stringResource(R.string.settings_last_backup, lastBackupText!!),
                         style = MaterialTheme.typography.bodySmall,
-                        color = HighContrastGray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .padding(start = 68.dp, end = 14.dp, top = 10.dp, bottom = 12.dp)
                             .testTag("last_backup_text")
@@ -847,7 +798,7 @@ fun SettingsScreen(
                 Text(
                     text = "${(progress * 100).toInt()}%",
                     style = MaterialTheme.typography.bodySmall,
-                    color = HighContrastGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
@@ -856,17 +807,9 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         // 4. Google Drive Backup (online, opt-in)
-        Text(
-            text = stringResource(R.string.settings_drive_title),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.settings_drive_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = HighContrastGray
-        )
+        SettingsGroupHeading(stringResource(R.string.settings_drive_title))
+        Spacer(modifier = Modifier.height(8.dp))
+        SettingsGroupDescription(stringResource(R.string.settings_drive_description))
         Spacer(modifier = Modifier.height(12.dp))
 
         Card(
@@ -891,7 +834,7 @@ fun SettingsScreen(
                     )
                 } else {
                     Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         Text(
                             text = driveEmail!!,
@@ -907,14 +850,11 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_drive_never_synced)
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = HighContrastGray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.testTag("drive_last_sync_text")
                         )
                     }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 14.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    )
+                    SettingsRowDivider(14.dp)
                     SettingsActionRow(
                         icon = Icons.Default.CloudUpload,
                         title = stringResource(R.string.settings_drive_sync_now),
@@ -924,10 +864,7 @@ fun SettingsScreen(
                         testTag = "drive_sync_btn",
                         onClick = { driveViewModel.syncNow() }
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 68.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    )
+                    SettingsRowDivider()
                     SettingsActionRow(
                         icon = Icons.Default.CloudDownload,
                         title = stringResource(R.string.settings_drive_restore),
@@ -937,10 +874,7 @@ fun SettingsScreen(
                         testTag = "drive_restore_btn",
                         onClick = { driveViewModel.restoreLatest() }
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 68.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    )
+                    SettingsRowDivider()
                     SettingsActionRow(
                         icon = Icons.Default.CloudSync,
                         title = stringResource(R.string.settings_drive_auto),
@@ -957,10 +891,7 @@ fun SettingsScreen(
                             )
                         }
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 68.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    )
+                    SettingsRowDivider()
                     // Auto-sync schedule: shown only while auto-sync is on.
                     // Same grouped-row language as the rest of the card (title
                     // row + a check on the selected interval); monochrome.
@@ -1013,10 +944,7 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 68.dp),
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                        )
+                        SettingsRowDivider()
                     }
                     SettingsActionRow(
                         icon = Icons.Default.CloudOff,
@@ -1046,7 +974,7 @@ fun SettingsScreen(
                 Text(
                     text = "${(progress * 100).toInt()}%",
                     style = MaterialTheme.typography.bodySmall,
-                    color = HighContrastGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
@@ -1077,18 +1005,10 @@ fun SettingsScreen(
 
         // About group: privacy policy + contact info. The app identity
         // line below stays its single footer (per the approved design).
-        Text(
-            text = stringResource(R.string.settings_about_group),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium
-        )
+        SettingsGroupHeading(stringResource(R.string.settings_about_group))
         Spacer(modifier = Modifier.height(8.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
-            shape = RoundedCornerShape(8.dp)
-        ) {
+        SettingsGroupCard {
             SettingsActionRow(
                 icon = Icons.Default.Description,
                 title = stringResource(R.string.settings_privacy_row),
@@ -1098,10 +1018,7 @@ fun SettingsScreen(
                 testTag = "about_privacy_row",
                 onClick = onOpenPrivacyPolicy
             )
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 68.dp),
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-            )
+            SettingsRowDivider()
             SettingsActionRow(
                 icon = Icons.Default.MailOutline,
                 title = stringResource(R.string.settings_contact_row),
@@ -1123,6 +1040,57 @@ fun SettingsScreen(
         )
         Spacer(modifier = Modifier.height(20.dp))
     }
+}
+
+/** Uniform bordered card shared by every settings group (matches the
+ * Drive/Export card treatment: visible border, 12dp corners, transparent
+ * body so the theme background shows through). */
+@Composable
+private fun SettingsGroupCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(content = content)
+    }
+}
+
+/** Uniform small all-caps grey heading above every settings group. The
+ * group's EXISTING title string is uppercased by style; no copy is renamed. */
+@Composable
+private fun SettingsGroupHeading(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        letterSpacing = 1.5.sp
+    )
+}
+
+/** Uniform explanatory text under a group heading (backup / drive groups). */
+@Composable
+private fun SettingsGroupDescription(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+/** Uniform hairline divider between rows inside a group card. */
+@Composable
+private fun SettingsRowDivider(start: Dp = 68.dp) {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = start),
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    )
 }
 
 /** Small color dot previewing a theme mode: half black / half white for system. */
@@ -1173,7 +1141,7 @@ private fun FontChoiceRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp)
+            .padding(vertical = 10.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1184,21 +1152,21 @@ private fun FontChoiceRow(
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            Text("Aa", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Text("Aa", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
         }
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 choiceLabel,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -1398,7 +1366,7 @@ private fun SettingsActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1421,12 +1389,13 @@ private fun SettingsActionRow(
             Text(
                 text = title,
                 fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyMedium,
                 color = if (enabled) MaterialTheme.colorScheme.onBackground else HighContrastGray
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = HighContrastGray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         if (trailing != null) {
@@ -1435,7 +1404,7 @@ private fun SettingsActionRow(
             Icon(
                 imageVector = Icons.Default.KeyboardArrowRight,
                 contentDescription = null,
-                tint = HighContrastGray,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
         }
