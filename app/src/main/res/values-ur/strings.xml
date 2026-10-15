@@ -268,7 +268,11 @@
     <string name="settings_drive_restore">ڈرائیو سے واپس لائیں</string>
     <string name="settings_drive_restore_subtitle">ڈرائیو کا تازہ ترین بیک اپ اُتار کر یہاں بحال کریں</string>
     <string name="settings_drive_auto">خودکار بھیجنا</string>
-    <string name="settings_drive_auto_subtitle">ایپ کھلنے پر، تبدیلی ہو تو خود بھیج دیا جائے گا</string>
+    <string name="settings_drive_auto_subtitle">تبدیلی ہو تو آپ کی منتخب ترتیب پر خود بھیج دیا جائے گا</string>
+    <string name="settings_drive_interval_title">خودکار بھیجنے کا شیڈول</string>
+    <string name="settings_drive_interval_open">ایپ کھلنے پر ہر بار</string>
+    <string name="settings_drive_interval_daily">دن میں ایک بار</string>
+    <string name="settings_drive_interval_weekly">ہفتے میں ایک بار</string>
     <string name="settings_drive_disconnect">اکاؤنٹ الگ کریں</string>
     <string name="settings_drive_disconnect_subtitle">ڈرائیو میں موجود بیک اپ وہیں رہیں گے</string>
     <string name="settings_drive_disconnect_title">گوگل اکاؤنٹ الگ کریں؟</string>
