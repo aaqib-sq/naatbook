@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [NaatEntity::class], version = 5, exportSchema = true)
+@Database(entities = [NaatEntity::class], version = 6, exportSchema = true)
 abstract class NaatDatabase : RoomDatabase() {
 
     abstract fun naatDao(): NaatDao
@@ -58,6 +58,15 @@ abstract class NaatDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE naats ADD COLUMN audioDisplayName TEXT")
                 db.execSQL("ALTER TABLE naats ADD COLUMN secondaryAudioDisplayName TEXT")
+            }
+        }
+
+        /** v5 -> v6: Reader-open timestamp for a truthful "recently opened" strip.
+         *  Nullable by design: pre-existing rows get NULL (COALESCE falls back to
+         *  updatedAt), so untouched libraries keep their current order. */
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE naats ADD COLUMN lastOpenedAt INTEGER")
             }
         }
     }
