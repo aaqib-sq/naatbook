@@ -86,6 +86,7 @@ import androidx.compose.ui.res.stringResource
 import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.audio.RecordingState
 import com.aistudio.mynaatnotebook.data.NaatCategories
+import com.aistudio.mynaatnotebook.ui.components.CategoryDisplay
 import com.aistudio.mynaatnotebook.ui.components.AudioAttachmentPreview
 import com.aistudio.mynaatnotebook.ui.components.RecordingVuMeter
 import com.aistudio.mynaatnotebook.ui.components.formatTime
@@ -218,7 +219,7 @@ private fun EditorMetadataSection(viewModel: NaatViewModel) {
             ) {
                 items(NaatCategories.ALL) { category ->
                     FolderChip(
-                        label = category,
+                        label = stringResource(CategoryDisplay.displayNameRes(category)),
                         selected = metadata.category == category,
                         enabled = !isSaving,
                         onClick = { viewModel.updateDraft { it.copy(category = category) } }

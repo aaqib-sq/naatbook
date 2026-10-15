@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.audio.RecordingState
 import com.aistudio.mynaatnotebook.data.NaatCategories
+import com.aistudio.mynaatnotebook.ui.components.CategoryDisplay
 import com.aistudio.mynaatnotebook.data.NaatSummary
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
@@ -633,14 +634,14 @@ fun FolderSleekCard(
             ) {
                 Icon(
                     painter = iconPainter,
-                    contentDescription = folder,
+                    contentDescription = stringResource(CategoryDisplay.displayNameRes(folder)),
                     tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(22.dp)
                 )
             }
             Column {
                 Text(
-                    text = folder,
+                    text = stringResource(CategoryDisplay.displayNameRes(folder)),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
@@ -717,7 +718,8 @@ fun RecentNaatCard(
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = naat.category.uppercase(java.util.Locale.ROOT),
+                    text = stringResource(CategoryDisplay.displayNameRes(naat.category))
+                        .uppercase(java.util.Locale.ROOT),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
