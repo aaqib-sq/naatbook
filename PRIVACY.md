@@ -27,4 +27,4 @@ NaatBook offers an optional backup feature that uses your own Google account:
 
 ## Contact
 
-For any question about this policy, contact the developer at saleem.mohd2000eut@gmail.com.
+For any question about this policy, contact the developer at aaqibaqsq@gmail.com.
