@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,7 +41,8 @@ class NaatDatabaseMigrationTest {
                 NaatDatabase.MIGRATION_1_2,
                 NaatDatabase.MIGRATION_2_3,
                 NaatDatabase.MIGRATION_3_4,
-                NaatDatabase.MIGRATION_4_5
+                NaatDatabase.MIGRATION_4_5,
+                NaatDatabase.MIGRATION_5_6
             )
             .allowMainThreadQueries()
             .build()
@@ -76,6 +78,78 @@ class NaatDatabaseMigrationTest {
             ),
             migrated
         )
+    }
+
+    @Test
+    fun `migration 5 to 6 adds nullable lastOpenedAt preserving rows`() {
+        createVersionFiveDatabase()
+
+        database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
+            .addMigrations(NaatDatabase.MIGRATION_5_6)
+            .allowMainThreadQueries()
+            .build()
+
+        val columns = mutableListOf<String>()
+        database!!.openHelper.writableDatabase
+            .query("PRAGMA table_info(naats)")
+            .use { cursor ->
+                while (cursor.moveToNext()) {
+                    columns.add(cursor.getString(cursor.getColumnIndexOrThrow("name")))
+                }
+            }
+        assertTrue(columns.contains("lastOpenedAt"))
+
+        val rows = linkedMapOf<String, String?>()
+        database!!.openHelper.writableDatabase
+            .query("SELECT title, updatedAt, lastOpenedAt FROM naats ORDER BY id")
+            .use { cursor ->
+                while (cursor.moveToNext()) {
+                    rows[cursor.getString(0)] =
+                        "${cursor.getLong(1)}:${if (cursor.isNull(2)) "null" else cursor.getLong(2)}"
+                }
+            }
+        // Rows and their edit times survive; the new column arrives NULL.
+        assertEquals(
+            linkedMapOf("First" to "10:null", "Second" to "20:null"),
+            rows
+        )
+    }
+
+    private fun createVersionFiveDatabase() {
+        val file = context.getDatabasePath(TEST_DATABASE)
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS naats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    title TEXT NOT NULL,
+                    poet TEXT,
+                    category TEXT NOT NULL,
+                    lyrics TEXT,
+                    audioType TEXT NOT NULL,
+                    audioPath TEXT,
+                    isFavorite INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    secondaryAudioType TEXT NOT NULL,
+                    secondaryAudioPath TEXT,
+                    audioDisplayName TEXT,
+                    secondaryAudioDisplayName TEXT
+                )
+                """.trimIndent()
+            )
+            listOf("First" to 10L, "Second" to 20L).forEach { (title, updatedAt) ->
+                db.execSQL(
+                    "INSERT INTO naats " +
+                        "(title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt, " +
+                        "updatedAt, secondaryAudioType) " +
+                        "VALUES (?, NULL, 'Naat', NULL, 'none', NULL, 0, ?, ?, 'none')",
+                    arrayOf(title, updatedAt, updatedAt)
+                )
+            }
+            db.version = 5
+        }
     }
 
     private fun createVersionOneDatabase() {
