@@ -84,7 +84,12 @@ class BackupManager @Inject constructor(
         val entries: JSONArray,
         val audioByArchivePath: Map<String, File>,
         val fontsByArchivePath: Map<String, File> = emptyMap(),
-        val fontMeta: List<Pair<String, String>> = emptyList()
+        val fontMeta: List<Pair<String, String>> = emptyList(),
+        // Set by entries-only exports: audio references in the manifest may
+        // legitimately have no payload in the archive — import drops those
+        // references instead of failing. Full backups keep the strict
+        // "missing audio payload" failure.
+        val entriesOnly: Boolean = false
     )
     private data class PlannedAudio(val staged: File, val destination: File, val digest: String)
     private data class PlannedEntry(
@@ -112,10 +117,16 @@ class BackupManager @Inject constructor(
      * Builds the complete, fsynced backup zip into [stagedZip] and returns
      * the entry count. Shared by the SAF export and the app-folder export
      * so both produce byte-identical archives.
+     *
+     * When [entriesOnly] is true, the manifest keeps the audio references
+     * (so the JSON stays self-consistent) but the audio payloads are left
+     * out, producing a small file; import then drops those dangling
+     * references instead of failing (see [StagedArchive.entriesOnly]).
      */
     private suspend fun writeBackupZip(
         stagedZip: File,
-        onProgress: (Float) -> Unit
+        onProgress: (Float) -> Unit,
+        entriesOnly: Boolean = false
     ): Int {
         onProgress(0.05f)
         val naats = repository.allNaats.first()
@@ -160,6 +171,7 @@ class BackupManager @Inject constructor(
         }
         val root = JSONObject().apply {
             put("formatVersion", FORMAT_VERSION)
+            if (entriesOnly) put("entriesOnly", true)
             put("entries", entries)
             put("customFonts", fontsJson)
         }
@@ -172,7 +184,7 @@ class BackupManager @Inject constructor(
                 zip.putNextEntry(ZipEntry(DATA_ENTRY))
                 zip.write(root.toString(4).toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
-                val audioList = audioIndex.uniqueFiles.toList()
+                val audioList = if (entriesOnly) emptyList() else audioIndex.uniqueFiles.toList()
                 audioList.forEachIndexed { index, packed ->
                     zip.putNextEntry(ZipEntry(packed.relativePath))
                     FileInputStream(packed.source).use { it.copyTo(zip, BUFFER_SIZE) }
@@ -202,6 +214,7 @@ class BackupManager @Inject constructor(
      */
     suspend fun exportBackup(
         outputUri: Uri,
+        entriesOnly: Boolean = false,
         onProgress: (Float) -> Unit = {}
     ): Result<Int> = withContext(Dispatchers.IO) {
         audioFiles.exclusive {
@@ -210,7 +223,7 @@ class BackupManager @Inject constructor(
             // only from then on can a failure leave a partial file behind.
             var destinationTouched = false
         runCatching {
-            val entryCount = writeBackupZip(stagedZip, onProgress)
+            val entryCount = writeBackupZip(stagedZip, onProgress, entriesOnly)
 
             val descriptor = context.contentResolver.openFileDescriptor(outputUri, "w")
                 ?: throw IOException("Could not open output stream")
@@ -253,13 +266,14 @@ class BackupManager @Inject constructor(
      */
     suspend fun exportBackupToAppFolder(
         fileName: String,
+        entriesOnly: Boolean = false,
         onProgress: (Float) -> Unit = {}
     ): Result<Pair<Int, String>> = withContext(Dispatchers.IO) {
         audioFiles.exclusive {
             val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
             var pendingUri: Uri? = null
             runCatching {
-                val entryCount = writeBackupZip(stagedZip, onProgress)
+                val entryCount = writeBackupZip(stagedZip, onProgress, entriesOnly)
                 check(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     "The NaatBook folder needs Android 10 or newer — please use Choose another place"
                 }
@@ -297,16 +311,19 @@ class BackupManager @Inject constructor(
     /**
      * Build the same archive as the other exports into a plain [target]
      * file. Google Drive sync stages the backup here, then uploads the file
-     * itself (and deletes it afterwards).
+     * itself (and deletes it afterwards). Drive sync always uses a FULL
+     * backup — the entries-only choice is manual-export only, so this keeps
+     * the default (entriesOnly = false).
      */
     suspend fun exportBackupToFile(
         target: File,
+        entriesOnly: Boolean = false,
         onProgress: (Float) -> Unit = {}
     ): Result<Int> = withContext(Dispatchers.IO) {
         audioFiles.exclusive {
             val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
             runCatching {
-                val entryCount = writeBackupZip(stagedZip, onProgress)
+                val entryCount = writeBackupZip(stagedZip, onProgress, entriesOnly)
                 target.parentFile?.mkdirs()
                 FileInputStream(stagedZip).use { input ->
                     FileOutputStream(target).use { output ->
@@ -582,6 +599,9 @@ class BackupManager @Inject constructor(
 
         val document = jsonContent ?: throw IOException("Invalid backup file: $DATA_ENTRY not found")
         val (version, entries) = parseBackupDocument(document)
+        val entriesOnly = if (version == FORMAT_VERSION) {
+            JSONObject(document).optBoolean("entriesOnly", false)
+        } else false
         if (version == FORMAT_VERSION) {
             audio.forEach { (archivePath, file) ->
                 val expected = V2_AUDIO_NAME.matchEntire(archivePath)?.groupValues?.get(1)
@@ -612,7 +632,7 @@ class BackupManager @Inject constructor(
                 }
             }
         } else emptyList()
-        return StagedArchive(version, entries, audio, fonts, fontMeta)
+        return StagedArchive(version, entries, audio, fonts, fontMeta, entriesOnly)
     }
 
     private fun buildRestorePlan(staged: StagedArchive): RestorePlan {
@@ -629,7 +649,15 @@ class BackupManager @Inject constructor(
                 else -> null
             }
             val source = archivePath?.let(staged.audioByArchivePath::get)
-            if (staged.formatVersion == FORMAT_VERSION && archivePath != null && source == null) {
+            // An entries-only backup keeps the audio references in the
+            // manifest but carries no payload: drop the reference (the entry
+            // imports with no audio) instead of failing. Full backups stay
+            // strict — a missing payload there is corruption, and still
+            // fails loudly. Present-but-corrupt payloads are rejected earlier
+            // by checksum, regardless of the entriesOnly marker.
+            if (!staged.entriesOnly && staged.formatVersion == FORMAT_VERSION &&
+                archivePath != null && source == null
+            ) {
                 throw IOException("Missing audio payload for entry $entryNumber")
             }
             val planned = if (source == null || archivePath == null) null else {
