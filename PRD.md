@@ -11,7 +11,8 @@ for writing, reading, recording, and organizing **Naat, Hamd, and other devotion
 - **Platform:** Android only (minSdk 24, targetSdk/compileSdk 36)
 - **Language/stack:** Kotlin, Jetpack Compose, Hilt (DI), Room (persistence),
   Preferences DataStore (settings), Media3 (audio playback)
-- **Package:** `com.aistudio.mynaatnotebook.ptwyv` (applicationId — Play Store identity; do not change)
+- **Package:** `com.aaqib.naatbook` (applicationId — Play Store identity; renamed from
+  `com.aistudio.mynaatnotebook.ptwyv` on 2026-10-15 at the owner's order)
 
 ## 2. Goals
 

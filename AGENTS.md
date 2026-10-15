@@ -21,7 +21,9 @@ Kotlin · Jetpack Compose (Material3) · Hilt (DI) · Room (DB, schema v4) ·
 Preferences DataStore (settings) · Media3 (playback) · Coroutines/Flow ·
 Robolectric + JUnit (tests) · Gradle Kotlin DSL · AGP, compileSdk/targetSdk 36, minSdk 24.
 
-- **applicationId:** `com.aistudio.mynaatnotebook.ptwyv` — the Play Store identity. **Do not change.**
+- **applicationId:** `com.aaqib.naatbook` — the Play Store identity (renamed from
+  `com.aistudio.mynaatnotebook.ptwyv` on 2026-10-15 at the owner's order; the old
+  `aistudio` fragment was an AI Studio scaffold artifact).
 - **Kotlin namespace:** `com.aistudio.mynaatnotebook` (renamed from the `com.example`
   template leftover on 2026-10-08).
 
