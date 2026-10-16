@@ -90,7 +90,9 @@ class NaatDatabaseMigrationTest {
         createVersionFiveDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
-            .addMigrations(NaatDatabase.MIGRATION_5_6)
+            // The annotation now targets v7, so Room needs the full 5->7 path;
+            // the assertions below still verify exactly the 5->6 step.
+            .addMigrations(NaatDatabase.MIGRATION_5_6, NaatDatabase.MIGRATION_6_7)
             .allowMainThreadQueries()
             .build()
 
