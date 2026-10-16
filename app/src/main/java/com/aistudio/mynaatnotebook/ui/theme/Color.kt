@@ -18,4 +18,9 @@ val DarkBorder = Color(0xFF1F1F1F)
 
 // Favorite tint and highlight
 val HighContrastRed = Color(0xFFFF3B30)
+
+// Secondary text: theme-aware. The single dark value (#8E8E93) passed on
+// black but failed AA on white, so light theme gets a darker step while
+// dark keeps the original. Use secondaryTextColor() at call sites.
 val HighContrastGray = Color(0xFF8E8E93)
+val HighContrastGrayLight = Color(0xFF636366)

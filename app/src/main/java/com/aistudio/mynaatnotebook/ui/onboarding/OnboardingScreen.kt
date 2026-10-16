@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.ui.reader.ThinSeekBar
-import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
+import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import kotlinx.coroutines.launch
 
@@ -166,7 +166,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
             ) {
                 Text(
                     text = stringResource(R.string.onboarding_skip),
-                    color = HighContrastGray,
+                    color = secondaryTextColor(),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp
                 )
@@ -297,7 +297,7 @@ private fun PageTitleBody(title: Int, body: Int) {
     Text(
         text = stringResource(body),
         style = MaterialTheme.typography.bodyLarge,
-        color = HighContrastGray,
+        color = secondaryTextColor(),
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(horizontal = 6.dp)
     )
@@ -318,7 +318,7 @@ private fun EditorScene() {
         Text(
             text = stringResource(R.string.onboarding_scene_poet_hint),
             style = MaterialTheme.typography.bodySmall,
-            color = HighContrastGray
+            color = secondaryTextColor()
         )
         HorizontalDivider(
             modifier = Modifier.padding(vertical = 13.dp),
@@ -371,7 +371,7 @@ private fun ReaderScene() {
             Text(
                 text = "1:24",
                 style = MaterialTheme.typography.labelSmall,
-                color = HighContrastGray
+                color = secondaryTextColor()
             )
             ThinSeekBar(
                 fraction = 0.34f,
@@ -383,7 +383,7 @@ private fun ReaderScene() {
             Text(
                 text = "4:10",
                 style = MaterialTheme.typography.labelSmall,
-                color = HighContrastGray
+                color = secondaryTextColor()
             )
         }
         Row(
@@ -437,7 +437,7 @@ private fun ReaderScene() {
                 Icon(
                     imageVector = Icons.Default.Bedtime,
                     contentDescription = null,
-                    tint = HighContrastGray,
+                    tint = secondaryTextColor(),
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
@@ -445,7 +445,7 @@ private fun ReaderScene() {
                     text = "15",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = HighContrastGray
+                    color = secondaryTextColor()
                 )
             }
         }
@@ -481,19 +481,19 @@ private fun BackupScene() {
                 Text(
                     text = stringResource(R.string.onboarding_scene_export_sub),
                     style = MaterialTheme.typography.bodySmall,
-                    color = HighContrastGray
+                    color = secondaryTextColor()
                 )
             }
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = HighContrastGray
+                tint = secondaryTextColor()
             )
         }
         Text(
             text = stringResource(R.string.onboarding_scene_last_backup),
             style = MaterialTheme.typography.bodySmall,
-            color = HighContrastGray,
+            color = secondaryTextColor(),
             modifier = Modifier.padding(start = 55.dp, top = 10.dp)
         )
         Box(
@@ -552,7 +552,7 @@ private fun SceneChip(text: String, selected: Boolean) {
             text = text,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = if (selected) MaterialTheme.colorScheme.background else HighContrastGray
+            color = if (selected) MaterialTheme.colorScheme.background else secondaryTextColor()
         )
     }
 }
@@ -585,7 +585,7 @@ private fun SlimSceneButton(label: String, primary: Boolean, modifier: Modifier 
             text = label,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
-            color = if (primary) fg else HighContrastGray
+            color = if (primary) fg else secondaryTextColor()
         )
     }
 }
@@ -605,7 +605,7 @@ private fun ScenePill(text: String) {
             text = text,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = HighContrastGray
+            color = secondaryTextColor()
         )
     }
 }

@@ -37,7 +37,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.mynaatnotebook.R
-import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
+import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 
 /**
  * Two contact cards: the support email and the Instagram handle. The only
@@ -171,7 +171,7 @@ private fun ContactCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = HighContrastGray
+                color = secondaryTextColor()
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
