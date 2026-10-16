@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stage-2 UX audit: audio sharing. Scoped ONLY to the app's audio
+     directories (recordings/, linked/, audio/) under filesDir — nothing else
+     in private storage is ever exposed through the share sheet. -->
+<paths>
+    <files-path name="recordings" path="recordings/" />
+    <files-path name="linked" path="linked/" />
+    <files-path name="audio" path="audio/" />
+</paths>
