@@ -32,5 +32,10 @@ data class NaatEntity(
      * SettingsStore.readerFont (a FontChoices key, or "custom:<id>").
      * Null means "follow the global Settings reader font".
      */
-    val readerFontOverride: String? = null
+    val readerFontOverride: String? = null,
+    /**
+     * Per-entry TITLE-font override, same encoding as readerFontOverride.
+     * Null means "follow the global Settings title font".
+     */
+    val titleFontOverride: String? = null
 )

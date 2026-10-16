@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [NaatEntity::class], version = 7, exportSchema = true)
+@Database(entities = [NaatEntity::class], version = 8, exportSchema = true)
 abstract class NaatDatabase : RoomDatabase() {
 
     abstract fun naatDao(): NaatDao
@@ -74,6 +74,17 @@ abstract class NaatDatabase : RoomDatabase() {
         internal val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE naats ADD COLUMN readerFontOverride TEXT")
+            }
+        }
+
+        /** v7 -> v8: per-entry title-font override. The backfill copies any set
+         *  reader override into it, because under v7 that choice visibly drove
+         *  the entry's title too — a silent revert would be a regression.
+         *  Null = follow the global Settings title font. */
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE naats ADD COLUMN titleFontOverride TEXT")
+                db.execSQL("UPDATE naats SET titleFontOverride = readerFontOverride WHERE readerFontOverride IS NOT NULL")
             }
         }
     }
