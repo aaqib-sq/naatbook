@@ -167,6 +167,55 @@ class BackupAtomicityTest {
         assertNoImportStaging()
     }
 
+    /**
+     * Audit fix (stage 1): two entries with the same duplicate signature
+     * inside ONE archive must not both land in MERGE — first occurrence wins
+     * and the in-archive duplicate is counted in skipped.
+     */
+    @Test
+    fun `duplicate entries inside one archive commit only once in merge`() = runBlocking {
+        val entries = JSONArray()
+            .put(entry("Twice"))
+            .put(entry("Twice"))
+        val archive = archive(JSONObject().put("formatVersion", 2).put("entries", entries))
+
+        val result = manager.importBackup(Uri.fromFile(archive), ImportMode.MERGE).getOrThrow()
+
+        assertEquals(1, result.imported)
+        assertEquals(1, result.skipped)
+        assertEquals(1, repository.allNaats.first().size)
+        assertNoImportStaging()
+    }
+
+    /**
+     * Audit fix (stage 1): REPLACE now runs the new-row inserts and the
+     * old-row deletes inside one Room transaction. The happy-path contract:
+     * the old library is fully gone, the new one fully present.
+     * (A true mid-delete fault-injection proof isn't possible on the JVM —
+     * the guarantee is structural via NaatDao.replaceLibrary's @Transaction.)
+     */
+    @Test
+    fun `replace swaps the whole library and counts removals`() = runBlocking {
+        repository.insertAll(
+            listOf(
+                NaatEntity(
+                    title = "Old", poet = null, category = NaatCategories.NAAT,
+                    lyrics = null, audioType = "none", audioPath = null, isFavorite = false
+                )
+            )
+        )
+        val entries = JSONArray().put(entry("New"))
+        val archive = archive(JSONObject().put("formatVersion", 2).put("entries", entries))
+
+        val result = manager.importBackup(Uri.fromFile(archive), ImportMode.REPLACE).getOrThrow()
+
+        assertEquals(1, result.imported)
+        assertEquals(0, result.skipped)
+        assertEquals(1, result.removedExisting)
+        assertEquals(listOf("New"), repository.allNaats.first().map { it.title })
+        assertNoImportStaging()
+    }
+
     private fun entry(title: String) = JSONObject()
         .put("title", title)
         .put("poet", JSONObject.NULL)
