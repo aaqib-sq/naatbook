@@ -78,6 +78,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.withFrameNanos
+import com.aistudio.mynaatnotebook.viewmodel.clampedRestoreOffset
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -133,6 +135,23 @@ fun LyricsReaderScreen(
     val context = LocalContext.current
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
+
+    // Audit TOP 2: reader scroll memory — reopen where the user stopped.
+    // Saved when the reader closes (one write, not per-pixel); restored after
+    // the first layout pass, clamped so a shortened entry never overshoots.
+    DisposableEffect(naat.id) {
+        onDispose {
+            settingsViewModel.saveReaderScrollOffset(naat.id, scrollState.value)
+        }
+    }
+    LaunchedEffect(naat.id) {
+        val saved = settingsViewModel.getReaderScrollOffset(naat.id)
+        if (saved > 0) {
+            withFrameNanos { }
+            val target = clampedRestoreOffset(saved, scrollState.maxValue)
+            if (target > 0) scrollState.scrollTo(target)
+        }
+    }
 
     // Keep the screen on while reciting — the reader must never dim mid-performance.
     DisposableEffect(Unit) {

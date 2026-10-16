@@ -13,6 +13,7 @@ import com.aistudio.mynaatnotebook.data.LocaleHelper
 import com.aistudio.mynaatnotebook.data.SettingsStore
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -165,6 +166,19 @@ class SettingsViewModel @Inject constructor(
     fun setTitleFont(choice: String) {
         _titleFont.value = choice
         viewModelScope.launch { settingsStore.setTitleFont(choice) }
+    }
+
+    /**
+     * Reader scroll memory (audit TOP 2): where the user stopped reading each
+     * entry, in pixels. Saved when the reader closes, restored on open.
+     */
+    fun readerScrollOffset(naatId: Int): Flow<Int> = settingsStore.readerScrollOffset(naatId)
+
+    suspend fun getReaderScrollOffset(naatId: Int): Int =
+        settingsStore.getReaderScrollOffset(naatId)
+
+    fun saveReaderScrollOffset(naatId: Int, offsetPx: Int) {
+        viewModelScope.launch { settingsStore.setReaderScrollOffset(naatId, offsetPx) }
     }
 
     /** Phase 1 of font import: validate the picked file, then await a name. */
