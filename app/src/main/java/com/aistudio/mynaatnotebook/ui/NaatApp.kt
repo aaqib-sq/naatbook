@@ -220,7 +220,8 @@ fun NaatApp(
                             Column {
                                 GlobalMiniPlayer(
                                     viewModel = viewModel,
-                                    titleFontFamily = titleFontFamily,
+                                    titleFontChoice = titleFontChoice,
+                                    customFamilies = customFamilies,
                                     onOpen = {
                                         viewModel.openNowPlayingEntry { found ->
                                             if (found && !showAddModal && navigationDebouncePassed()) {
