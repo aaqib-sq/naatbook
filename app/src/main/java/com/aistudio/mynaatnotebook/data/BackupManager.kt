@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -136,7 +137,7 @@ class BackupManager @Inject constructor(
         val audioIndex = buildAudioIndex(naats) { p -> onProgress(0.15f + p * 0.15f) }
         val entries = JSONArray()
         naats.forEach { naat ->
-            ensureActive()
+            currentCoroutineContext().ensureActive()
             entries.put(JSONObject().apply {
                 put("id", naat.id)
                 put("title", naat.title)
@@ -194,14 +195,14 @@ class BackupManager @Inject constructor(
                 zip.closeEntry()
                 val audioList = if (entriesOnly) emptyList() else audioIndex.uniqueFiles.toList()
                 audioList.forEachIndexed { index, packed ->
-                    ensureActive()
+                    currentCoroutineContext().ensureActive()
                     zip.putNextEntry(ZipEntry(packed.relativePath))
                     FileInputStream(packed.source).use { it.copyToCancellable(zip) }
                     zip.closeEntry()
                     onProgress(0.35f + (index + 1f) / audioList.size.coerceAtLeast(1) * 0.45f)
                 }
                 customFonts.forEach { (font, file) ->
-                    ensureActive()
+                    currentCoroutineContext().ensureActive()
                     zip.putNextEntry(ZipEntry("$V2_FONTS_PREFIX${font.fileName}"))
                     FileInputStream(file).use { it.copyToCancellable(zip) }
                     zip.closeEntry()
@@ -394,7 +395,7 @@ class BackupManager @Inject constructor(
         }
 
         naats.forEachIndexed { index, naat ->
-            ensureActive()
+            currentCoroutineContext().ensureActive()
             pack(naat.audioPath)?.let { primary[naat.id] = it }
             pack(naat.secondaryAudioPath)?.let { secondary[naat.id] = it }
             onProgress((index + 1f) / naats.size.coerceAtLeast(1))
@@ -548,7 +549,7 @@ class BackupManager @Inject constructor(
         onProgress: (Float) -> Unit = {}
     ): Set<String> {
         return existing.mapIndexed { index, entry ->
-            ensureActive()
+            currentCoroutineContext().ensureActive()
             entrySignature(
                 entry.title,
                 entry.poet,
@@ -581,7 +582,7 @@ class BackupManager @Inject constructor(
 
         ZipInputStream(BufferedInputStream(input)).use { zip ->
             while (true) {
-                ensureActive()
+                currentCoroutineContext().ensureActive()
                 val entry = zip.nextEntry ?: break
                 if (++entryCount > MAX_ENTRIES) {
                     throw IOException("Backup archive has too many entries (>$MAX_ENTRIES)")
@@ -772,7 +773,7 @@ class BackupManager @Inject constructor(
         try {
             val audioList = audio.toList()
             audioList.forEachIndexed { index, planned ->
-                ensureActive()
+                currentCoroutineContext().ensureActive()
                 val destination = planned.destination
                 destination.parentFile?.mkdirs()
                 if (destination.exists()) {
@@ -826,14 +827,17 @@ class BackupManager @Inject constructor(
      * chunk, so the Cancel button actually stops the work instead of waiting
      * for a multi-hundred-megabyte copy to finish.
      */
-    private suspend fun InputStream.copyToCancellable(out: OutputStream) {
+    private suspend fun InputStream.copyToCancellable(out: OutputStream): Long {
         val buffer = ByteArray(BUFFER_SIZE)
+        var copied = 0L
         while (true) {
-            ensureActive()
+            currentCoroutineContext().ensureActive()
             val count = read(buffer)
             if (count < 0) break
             out.write(buffer, 0, count)
+            copied += count
         }
+        return copied
     }
 
     private suspend fun copyEntry(
@@ -845,7 +849,7 @@ class BackupManager @Inject constructor(
         val buffer = ByteArray(BUFFER_SIZE)
         var entryBytes = 0L
         while (true) {
-            ensureActive()
+            currentCoroutineContext().ensureActive()
             val count = zip.read(buffer)
             if (count < 0) break
             budget.add(count)
