@@ -160,6 +160,64 @@ class EntriesOnlyExportTest {
         assertTrue(repository.allNaats.first().isEmpty())
     }
 
+    @Test
+    fun `per-entry reader font override round-trips through backup`() = runBlocking {
+        repository.insert(
+            NaatEntity(
+                title = "Fonted",
+                poet = null,
+                category = NaatCategories.NAAT,
+                lyrics = "line",
+                audioType = "none",
+                audioPath = null,
+                isFavorite = false,
+                readerFontOverride = "custom:font-1"
+            )
+        )
+        repository.insert(
+            NaatEntity(
+                title = "Plain",
+                poet = null,
+                category = NaatCategories.NAAT,
+                lyrics = "line",
+                audioType = "none",
+                audioPath = null,
+                isFavorite = false,
+                readerFontOverride = null
+            )
+        )
+        val target = temporary.newFile("fonts.zip")
+
+        assertEquals(2, manager.exportBackupToFile(target, entriesOnly = true).getOrThrow())
+        // The field travels in the format-v2 export JSON.
+        val manifest = zipJson(target).getJSONArray("entries")
+        val exported = (0 until manifest.length())
+            .map { manifest.getJSONObject(it) }
+            .associateBy { it.getString("title") }
+        assertEquals("custom:font-1", exported.getValue("Fonted").getString("readerFontOverride"))
+        assertTrue(exported.getValue("Plain").isNull("readerFontOverride"))
+
+        val result = manager.importBackup(Uri.fromFile(target), ImportMode.REPLACE)
+        assertEquals(2, result.getOrThrow().imported)
+        val restored = repository.allNaats.first().associateBy { it.title }
+        assertEquals("custom:font-1", restored.getValue("Fonted").readerFontOverride)
+        assertNull(restored.getValue("Plain").readerFontOverride)
+    }
+
+    @Test
+    fun `old backup without the field imports with null override`() = runBlocking {
+        // A real v2 entries-only backup carries a content-addressed audio
+        // reference ("audio/<sha256>.<ext>") with no payload; a malformed
+        // reference would be rejected by the validity guard instead.
+        val validV2Reference = "audio/${"a".repeat(64)}.m4a"
+        val archive = archive(entriesOnlyDocument(validV2Reference))
+
+        val result = manager.importBackup(Uri.fromFile(archive), ImportMode.MERGE)
+
+        assertEquals(1, result.getOrThrow().imported)
+        assertNull(repository.allNaats.first().single().readerFontOverride)
+    }
+
     private suspend fun insertEntryWithAudio(title: String, payload: ByteArray) {
         val dir = File(context.filesDir, "audio").also { it.mkdirs() }
         val source = File(dir, "orig.m4a").also { it.writeBytes(payload) }
