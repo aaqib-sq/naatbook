@@ -150,6 +150,9 @@ class BackupManager @Inject constructor(
                 put("isFavorite", naat.isFavorite)
                 put("createdAt", naat.createdAt)
                 put("updatedAt", naat.updatedAt)
+                // Reader-open moment travels with the backup so a restore on a
+                // new phone keeps the recents strip truthful; absence = NULL.
+                put("lastOpenedAt", naat.lastOpenedAt ?: JSONObject.NULL)
                 put("audioDisplayName", naat.audioDisplayName ?: JSONObject.NULL)
                 put("secondaryAudioDisplayName", naat.secondaryAudioDisplayName ?: JSONObject.NULL)
                 put("readerFontOverride", naat.readerFontOverride ?: JSONObject.NULL)
@@ -692,6 +695,9 @@ class BackupManager @Inject constructor(
                 val createdAt = obj.optLong("createdAt", System.currentTimeMillis())
                 // v2 backups predate updatedAt; creation time is their truthful fallback.
                 val updatedAt = obj.optLong("updatedAt", createdAt)
+                // Older backups have no lastOpenedAt; NULL keeps the recents
+                // fallback (COALESCE -> updatedAt) behaving exactly as before.
+                val lastOpenedAt = obj.optLong("lastOpenedAt", 0L).takeIf { it > 0L }
                 val entity = NaatEntity(
                     title = title,
                     poet = poet,
@@ -702,6 +708,7 @@ class BackupManager @Inject constructor(
                     isFavorite = obj.optBoolean("isFavorite", false),
                     createdAt = createdAt,
                     updatedAt = updatedAt,
+                    lastOpenedAt = lastOpenedAt,
                     secondaryAudioType = if (secondary == null) "none"
                         else obj.optString("secondaryAudioType", "none"),
                     secondaryAudioPath = secondary?.destination?.absolutePath,
