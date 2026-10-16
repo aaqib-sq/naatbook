@@ -1,7 +1,11 @@
 package com.aistudio.mynaatnotebook.ui.reader
 
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.view.WindowManager
+import android.webkit.MimeTypeMap
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -99,6 +103,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -115,6 +120,7 @@ import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import java.io.File
 
 private val ReaderBottomBreathingRoom = 24.dp
 
@@ -396,8 +402,8 @@ private fun ReaderTopBar(
             }
             // Audit #9: the kalaam text used to be trapped in the app — no
             // copy, no share. Both live here now, next to Edit.
+            val readerContext = LocalContext.current
             if (!naat.lyrics.isNullOrBlank()) {
-                val context = LocalContext.current
                 val clipboard = LocalClipboardManager.current
                 val shareText = buildString {
                     append(naat.title)
@@ -408,7 +414,7 @@ private fun ReaderTopBar(
                     onClick = {
                         clipboard.setText(AnnotatedString(shareText))
                         Toast.makeText(
-                            context, context.getString(R.string.reader_copied), Toast.LENGTH_SHORT
+                            readerContext, readerContext.getString(R.string.reader_copied), Toast.LENGTH_SHORT
                         ).show()
                     },
                     modifier = Modifier.testTag("reader_copy_btn")
@@ -425,8 +431,8 @@ private fun ReaderTopBar(
                             type = "text/plain"
                             putExtra(Intent.EXTRA_TEXT, shareText)
                         }
-                        context.startActivity(
-                            Intent.createChooser(send, context.getString(R.string.reader_share_cd))
+                        readerContext.startActivity(
+                            Intent.createChooser(send, readerContext.getString(R.string.reader_share_cd))
                         )
                     },
                     modifier = Modifier.testTag("reader_share_btn")
@@ -434,6 +440,22 @@ private fun ReaderTopBar(
                     Icon(
                         imageVector = Icons.Default.Share,
                         contentDescription = stringResource(R.string.reader_share_cd),
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            }
+            // Stage-2 UX audit: the recorded/linked audio was trapped too.
+            // The button sits next to the text share and only appears when a
+            // real audio file exists on disk (primary first, else secondary).
+            val audioShareFile = shareableAudioFile(naat)
+            if (audioShareFile != null) {
+                IconButton(
+                    onClick = { shareAudioFile(readerContext, audioShareFile) },
+                    modifier = Modifier.testTag("reader_share_audio_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = stringResource(R.string.reader_share_audio_cd),
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
@@ -1088,4 +1110,43 @@ private fun Modifier.toggleReaderChromeOnIntentionalTap(
             }
         }
     }
+}
+
+/**
+ * Stage-2 UX audit: share-audio support. Returns the entry's primary audio
+ * file when it exists on disk, else the secondary one, else null.
+ */
+private fun shareableAudioFile(naat: NaatEntity): File? {
+    naat.audioPath?.let { File(it) }?.takeIf { it.isFile }?.let { return it }
+    return naat.secondaryAudioPath?.let { File(it) }?.takeIf { it.isFile }
+}
+
+/** Best-effort audio MIME from the file extension; never null. */
+private fun audioMimeType(file: File): String =
+    MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase())
+        ?: "audio/*"
+
+/**
+ * Shares an entry's audio file through a FileProvider scoped to the app's
+ * audio directories (see audio_file_paths.xml). A file that vanished between
+ * the button showing and the tap shows a toast instead of crashing — and a
+ * file outside the provider's roots is refused by getUriForFile the same way.
+ */
+private fun shareAudioFile(context: Context, file: File) {
+    val uri = try {
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    } catch (_: IllegalArgumentException) {
+        Toast.makeText(
+            context, context.getString(R.string.reader_audio_missing), Toast.LENGTH_SHORT
+        ).show()
+        return
+    }
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = audioMimeType(file)
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(
+        Intent.createChooser(send, context.getString(R.string.reader_share_audio_cd))
+    )
 }
