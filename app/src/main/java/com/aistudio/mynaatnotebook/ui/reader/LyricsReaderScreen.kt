@@ -19,10 +19,10 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -53,11 +54,8 @@ import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,6 +64,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -113,7 +112,7 @@ import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.data.NaatEntity
 import com.aistudio.mynaatnotebook.ui.components.formatTime
 import com.aistudio.mynaatnotebook.ui.components.usesArabicScript
-import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
+import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
@@ -302,7 +301,9 @@ fun LyricsReaderScreen(
         )
 
         if (readerChromeVisible) {
-            Column(
+            // The top chrome is the bar alone now — the permanent font
+            // strip was removed; its controls live in the bar's "Aa" panel.
+            Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
@@ -318,9 +319,7 @@ fun LyricsReaderScreen(
                     onEdit = { onEdit(naat) },
                     onEnterImmersive = ::enterImmersive,
                     onExitImmersive = ::exitImmersive,
-                    titleFontFamily = perEntryTitleFamily
-                )
-                ReaderControls(
+                    titleFontFamily = perEntryTitleFamily,
                     fontSize = localFontSize,
                     onFontSizeChange = { localFontSize = it },
                     autoScrollActive = autoScrollActive,
@@ -372,7 +371,13 @@ private fun ReaderTopBar(
     onEdit: () -> Unit,
     onEnterImmersive: () -> Unit,
     onExitImmersive: () -> Unit,
-    titleFontFamily: FontFamily
+    titleFontFamily: FontFamily,
+    fontSize: Float,
+    onFontSizeChange: (Float) -> Unit,
+    autoScrollActive: Boolean,
+    onAutoScrollToggle: () -> Unit,
+    scrollSpeed: Float,
+    onScrollSpeedChange: (Float) -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -398,91 +403,180 @@ private fun ReaderTopBar(
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1
             )
-            Text(
-                text = if (!naat.poet.isNullOrBlank()) stringResource(R.string.reader_poet, naat.poet) else stringResource(R.string.reader_unknown_poet),
-                style = MaterialTheme.typography.bodySmall,
-                color = HighContrastGray,
-                maxLines = 1
-            )
+            // The poet line exists only when the entry has a poet — a blank
+            // poet no longer renders a noisy "Unknown" placeholder.
+            if (!naat.poet.isNullOrBlank()) {
+                Text(
+                    text = stringResource(R.string.reader_poet, naat.poet),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = secondaryTextColor(),
+                    maxLines = 1
+                )
+            }
         }
 
+        // The bar's only job now: back, the title, and two compact controls.
+        // Everything the old crowded bar carried (favorite, copy, share,
+        // share-audio, edit) lives in the overflow menu, one labeled tap away.
+        val readerContext = LocalContext.current
+        val hasLyrics = !naat.lyrics.isNullOrBlank()
+        val clipboard = LocalClipboardManager.current
+        val shareText = if (hasLyrics) buildString {
+            append(naat.title)
+            if (!naat.poet.isNullOrBlank()) append("\n— ").append(naat.poet)
+            append("\n\n").append(naat.lyrics)
+        } else ""
+        val audioShareFile = shareableAudioFile(naat)
+
         if (!immersive) {
-            IconButton(
-                onClick = onToggleFavorite,
-                modifier = Modifier.testTag("reader_favorite_toggle")
-            ) {
-                Icon(
-                    imageVector = if (naat.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = stringResource(R.string.reader_favorite_cd),
-                    tint = if (naat.isFavorite) HighContrastRed else MaterialTheme.colorScheme.onBackground
-                )
-            }
-            // Audit #9: the kalaam text used to be trapped in the app — no
-            // copy, no share. Both live here now, next to Edit.
-            val readerContext = LocalContext.current
-            if (!naat.lyrics.isNullOrBlank()) {
-                val clipboard = LocalClipboardManager.current
-                val shareText = buildString {
-                    append(naat.title)
-                    if (!naat.poet.isNullOrBlank()) append("\n— ").append(naat.poet)
-                    append("\n\n").append(naat.lyrics)
-                }
+            // "Aa" text-size panel: the permanent font strip is gone. Text
+            // size, auto-scroll and its speed live here, one tap away.
+            var textSizePanelOpen by remember { mutableStateOf(false) }
+            Box {
                 IconButton(
-                    onClick = {
-                        clipboard.setText(AnnotatedString(shareText))
-                        Toast.makeText(
-                            readerContext, readerContext.getString(R.string.reader_copied), Toast.LENGTH_SHORT
-                        ).show()
-                    },
-                    modifier = Modifier.testTag("reader_copy_btn")
+                    onClick = { textSizePanelOpen = true },
+                    modifier = Modifier.testTag("reader_text_size_btn")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = stringResource(R.string.reader_copy_cd),
-                        tint = MaterialTheme.colorScheme.onBackground
+                    Text(
+                        text = "Aa",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
-                IconButton(
-                    onClick = {
-                        val send = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
-                        }
-                        readerContext.startActivity(
-                            Intent.createChooser(send, readerContext.getString(R.string.reader_share_cd))
+                DropdownMenu(
+                    expanded = textSizePanelOpen,
+                    onDismissRequest = { textSizePanelOpen = false }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                            .widthIn(min = 240.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.reader_text_size_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = secondaryTextColor()
                         )
-                    },
-                    modifier = Modifier.testTag("reader_share_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = stringResource(R.string.reader_share_cd),
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
+                        ThinSeekBar(
+                            fraction = (fontSize - 12f) / 24f,
+                            onFractionChange = { f ->
+                                val raw = 12f + f * 24f
+                                onFontSizeChange((raw * 2f).roundToInt() / 2f)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 48.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.reader_autoscroll_label),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = autoScrollActive,
+                                onCheckedChange = { onAutoScrollToggle() },
+                                modifier = Modifier.testTag("auto_scroll_toggle")
+                            )
+                        }
+                        if (autoScrollActive) {
+                            Text(
+                                text = stringResource(R.string.reader_scroll_speed_label),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = secondaryTextColor()
+                            )
+                            ThinSeekBar(
+                                fraction = (scrollSpeed - 1f) / 1f,
+                                onFractionChange = { f ->
+                                    onScrollSpeedChange(((1f + f * 1f) * 2f).roundToInt() / 2f)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
                 }
             }
-            // Stage-2 UX audit: the recorded/linked audio was trapped too.
-            // The button sits next to the text share and only appears when a
-            // real audio file exists on disk (primary first, else secondary).
-            val audioShareFile = shareableAudioFile(naat)
-            if (audioShareFile != null) {
+
+            // Overflow menu: favorite, copy, share, share-audio, edit.
+            var overflowOpen by remember { mutableStateOf(false) }
+            Box {
                 IconButton(
-                    onClick = { shareAudioFile(readerContext, audioShareFile) },
-                    modifier = Modifier.testTag("reader_share_audio_btn")
+                    onClick = { overflowOpen = true },
+                    modifier = Modifier.testTag("reader_overflow_btn")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = stringResource(R.string.reader_share_audio_cd),
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.player_more_cd),
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
-            }
-            IconButton(onClick = onEdit, modifier = Modifier.testTag("reader_edit_btn")) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.common_edit_entry),
-                    tint = MaterialTheme.colorScheme.onBackground
-                )
+                DropdownMenu(
+                    expanded = overflowOpen,
+                    onDismissRequest = { overflowOpen = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.reader_favorite_cd)) },
+                        leadingIcon = {
+                            Icon(
+                                if (naat.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (naat.isFavorite) HighContrastRed else MaterialTheme.colorScheme.onBackground
+                            )
+                        },
+                        onClick = { overflowOpen = false; onToggleFavorite() },
+                        modifier = Modifier.testTag("reader_favorite_toggle")
+                    )
+                    if (hasLyrics) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.reader_copy_cd)) },
+                            leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                            onClick = {
+                                overflowOpen = false
+                                clipboard.setText(AnnotatedString(shareText))
+                                Toast.makeText(
+                                    readerContext, readerContext.getString(R.string.reader_copied), Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier.testTag("reader_copy_btn")
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.reader_share_cd)) },
+                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                            onClick = {
+                                overflowOpen = false
+                                val send = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                readerContext.startActivity(
+                                    Intent.createChooser(send, readerContext.getString(R.string.reader_share_cd))
+                                )
+                            },
+                            modifier = Modifier.testTag("reader_share_btn")
+                        )
+                        // Share-audio keeps PR #63's exact condition (primary
+                        // file first, else secondary) — only the placement
+                        // changed, from a confusing top-bar icon to a label.
+                        if (audioShareFile != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.reader_share_audio_cd)) },
+                                leadingIcon = { Icon(Icons.Default.MusicNote, contentDescription = null) },
+                                onClick = { overflowOpen = false; shareAudioFile(readerContext, audioShareFile) },
+                                modifier = Modifier.testTag("reader_share_audio_btn")
+                            )
+                        }
+                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.common_edit_entry)) },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                        onClick = { overflowOpen = false; onEdit() },
+                        modifier = Modifier.testTag("reader_edit_btn")
+                    )
+                }
             }
         }
 
@@ -505,8 +599,8 @@ private fun ReaderTopBar(
  * Slim seek bar in the app's monochrome identity: a 3dp line (played part in
  * onBackground, remainder at 25% alpha) with a small 12dp round thumb. The
  * stock Material slider's thick track and tall stick thumb looked bulky in
- * both the player and the font row, so both use this instead. The touch
- * height stays 24dp so the thin line remains easy to grab.
+ * both the player and the text-size panel, so both use this instead. The
+ * touch height is a full 48dp so the thin line stays easy to grab.
  */
 @Composable
 fun ThinSeekBar(
@@ -519,7 +613,7 @@ fun ThinSeekBar(
     val active = MaterialTheme.colorScheme.onBackground
     Box(
         modifier = modifier
-            .height(24.dp)
+            .height(48.dp)
             .onSizeChanged { widthPx = it.width }
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -554,106 +648,6 @@ fun ThinSeekBar(
                 .size(12.dp)
                 .background(active, CircleShape)
         )
-    }
-}
-
-@Composable
-private fun ReaderControls(
-    fontSize: Float,
-    onFontSizeChange: (Float) -> Unit,
-    autoScrollActive: Boolean,
-    onAutoScrollToggle: () -> Unit,
-    scrollSpeed: Float,
-    onScrollSpeedChange: (Float) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f), MaterialTheme.shapes.medium)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .testTag("reader_controls"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1.2f)
-        ) {
-            Icon(
-                Icons.Default.Settings,
-                contentDescription = stringResource(R.string.reader_font_size_cd),
-                modifier = Modifier.size(16.dp),
-                tint = HighContrastGray
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(stringResource(R.string.reader_font_label), style = MaterialTheme.typography.bodySmall, color = HighContrastGray)
-            // Same thin line as the player seek, but only ~60% of the slot
-            // width so the font row takes visibly less room (user request).
-            Box(modifier = Modifier.weight(1f)) {
-                ThinSeekBar(
-                    fraction = (fontSize - 12f) / 24f,
-                    onFractionChange = { f ->
-                        val raw = 12f + f * 24f
-                        onFontSizeChange((raw * 2f).roundToInt() / 2f)
-                    },
-                    modifier = Modifier.fillMaxWidth(0.6f)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Button(
-                onClick = onAutoScrollToggle,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (autoScrollActive) {
-                        MaterialTheme.colorScheme.onBackground
-                    } else {
-                        HighContrastGray
-                    }
-                ),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                modifier = Modifier
-                    .height(32.dp)
-                    .testTag("auto_scroll_toggle")
-            ) {
-                Text(
-                    text = if (autoScrollActive) stringResource(R.string.reader_autoscroll_on) else stringResource(R.string.reader_autoscroll_off),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            if (autoScrollActive) {
-                Spacer(modifier = Modifier.width(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    listOf(1f, 1.5f, 2f).forEach { speed ->
-                        TextButton(
-                            onClick = { onScrollSpeedChange(speed) },
-                            contentPadding = PaddingValues(horizontal = 2.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(
-                                text = (if (speed % 1f == 0f) speed.toInt().toString() else speed.toString()) + "x",
-                                fontSize = 11.sp,
-                                fontWeight = if (scrollSpeed == speed) FontWeight.Bold else FontWeight.Normal,
-                                color = if (scrollSpeed == speed) {
-                                    MaterialTheme.colorScheme.onBackground
-                                } else {
-                                    HighContrastGray
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -704,7 +698,7 @@ private fun ReaderLyricsViewport(
                 text = stringResource(R.string.reader_no_lyrics),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium,
-                color = HighContrastGray
+                color = secondaryTextColor()
             )
         }
         return
@@ -825,14 +819,14 @@ private fun ReaderAudioControls(
             modifier = Modifier.align(Alignment.CenterHorizontally),
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
-            color = HighContrastGray
+            color = secondaryTextColor()
         )
         // Line 1: seek — current time, full-width thin line, total time
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 formatTime(position),
                 style = MaterialTheme.typography.bodySmall,
-                color = HighContrastGray
+                color = secondaryTextColor()
             )
             ThinSeekBar(
                 fraction = if (duration > 0) position.toFloat() / duration.toFloat() else 0f,
@@ -844,7 +838,7 @@ private fun ReaderAudioControls(
             Text(
                 formatTime(duration),
                 style = MaterialTheme.typography.bodySmall,
-                color = HighContrastGray
+                color = secondaryTextColor()
             )
         }
         // Line 2: transport — speed chip, skip back, big play/pause, skip
@@ -949,7 +943,7 @@ private fun PlayerTransportControls(
                 Text(
                     text = sleepLabel,
                     style = MaterialTheme.typography.bodySmall,
-                    color = HighContrastGray
+                    color = secondaryTextColor()
                 )
                 Spacer(Modifier.width(2.dp))
             }
@@ -993,7 +987,7 @@ private fun PlayerTransportControls(
                                 Text(stringResource(R.string.player_sleep_timer_title))
                                 if (sleepLabel != null) {
                                     Spacer(Modifier.width(8.dp))
-                                    Text(sleepLabel, color = HighContrastGray)
+                                    Text(sleepLabel, color = secondaryTextColor())
                                 }
                             }
                         },
@@ -1038,7 +1032,7 @@ private fun SleepTimerDialog(
             Column {
                 options.forEach { minutes ->
                     val label = if (minutes == 0) stringResource(R.string.player_sleep_timer_off)
-                                else "$minutes min"
+                                else stringResource(R.string.player_sleep_timer_minutes, minutes)
                     TextButton(
                         onClick = { onSelect(minutes) },
                         modifier = Modifier.fillMaxWidth()
@@ -1052,9 +1046,12 @@ private fun SleepTimerDialog(
                 }
                 if (currentRemainingMs != null) {
                     Text(
-                        text = "Active: ${currentRemainingMs / 60_000L}m remaining",
+                        text = stringResource(
+                            R.string.player_sleep_timer_active,
+                            (currentRemainingMs / 60_000L).toInt()
+                        ),
                         style = MaterialTheme.typography.bodySmall,
-                        color = HighContrastGray,
+                        color = secondaryTextColor(),
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
