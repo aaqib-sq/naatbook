@@ -1,6 +1,7 @@
 package com.aistudio.mynaatnotebook.data
 
-/** Lightweight Library projection; large lyrics stay in Room until Reader/Editor opens. */
+/** Lightweight Library projection; large lyrics stay in Room until Reader/Editor opens.
+ *  The recent feed is the one exception: it carries lyrics for the one-line preview. */
 data class NaatSummary(
     val id: Int,
     val title: String,
@@ -11,7 +12,8 @@ data class NaatSummary(
     val isFavorite: Boolean,
     val createdAt: Long,
     val secondaryAudioType: String,
-    val secondaryAudioPath: String?
+    val secondaryAudioPath: String?,
+    val lyrics: String? = null
 )
 
 data class CategoryCount(

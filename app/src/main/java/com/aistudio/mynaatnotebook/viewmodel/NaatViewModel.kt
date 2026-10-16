@@ -1116,6 +1116,21 @@ class NaatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Stamps lastOpenedAt when an entry is actually shown in the Reader.
+     * Kept separate from [loadNaat] because the editor loads entries through
+     * the same path and an editor open is not a Reader open.
+     */
+    fun recordEntryOpened(id: Int) {
+        viewModelScope.launch {
+            try {
+                repository.markOpened(id)
+            } catch (error: Exception) {
+                Log.e("NaatViewModel", "Failed to stamp lastOpenedAt", error)
+            }
+        }
+    }
+
     fun deleteNaat(id: Int, onSuccess: () -> Unit = {}) = deleteNaatInternal(id, onSuccess)
 
     fun deleteNaat(naat: NaatEntity, onSuccess: () -> Unit = {}) =

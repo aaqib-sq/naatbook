@@ -15,12 +15,13 @@ interface NaatDao {
     """)
     fun getAllSummaries(): Flow<List<NaatSummary>>
 
-    /** Strict bounded recent feed; edits rise to the top without loading all summaries. */
+    /** Truthful "recently opened" feed: entries rise by their last Reader open,
+     *  falling back to edit time for entries never opened since this field existed. */
     @Query("""
-        SELECT id, title, poet, category, audioType, audioPath, isFavorite, createdAt,
+        SELECT id, title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt,
                secondaryAudioType, secondaryAudioPath
         FROM naats
-        ORDER BY updatedAt DESC
+        ORDER BY COALESCE(lastOpenedAt, updatedAt) DESC
         LIMIT 10
     """)
     fun getRecentSummaries(): Flow<List<NaatSummary>>
@@ -64,6 +65,10 @@ interface NaatDao {
     /** Toggles from the value currently stored in Room, never from a stale UI snapshot. */
     @Query("UPDATE naats SET isFavorite = NOT isFavorite WHERE id = :id")
     suspend fun toggleFavorite(id: Int): Int
+
+    /** Stamps the Reader-open moment; deliberately does NOT touch updatedAt (edit time). */
+    @Query("UPDATE naats SET lastOpenedAt = :at WHERE id = :id")
+    suspend fun markOpened(id: Int, at: Long): Int
 
     @Delete
     suspend fun deleteNaat(naat: NaatEntity)

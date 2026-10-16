@@ -44,29 +44,99 @@ class NaatDaoCorrectnessTest {
     }
 
     @Test
-    fun `recent query is Room bounded to ten and ordered by latest edit`() = runBlocking {
-        val dao = database.naatDao()
-        repeat(12) { index ->
-            dao.insertNaat(
-                NaatEntity(
-                    title = "Recent $index",
-                    poet = null,
-                    category = NaatCategories.NAAT,
-                    lyrics = null,
-                    audioType = "none",
-                    audioPath = null,
-                    isFavorite = false,
-                    createdAt = 1L,
-                    updatedAt = index.toLong()
+    fun `recent query stays bounded to ten and falls back to edit order when never opened`() =
+        runBlocking {
+            val dao = database.naatDao()
+            repeat(12) { index ->
+                dao.insertNaat(
+                    NaatEntity(
+                        title = "Recent $index",
+                        poet = null,
+                        category = NaatCategories.NAAT,
+                        lyrics = null,
+                        audioType = "none",
+                        audioPath = null,
+                        isFavorite = false,
+                        createdAt = 1L,
+                        updatedAt = index.toLong()
+                    )
                 )
-            )
+            }
+
+            val recent = dao.getRecentSummaries().first()
+
+            assertTrue(recent.size == 10)
+            assertTrue(recent.first().title == "Recent 11")
+            assertTrue(recent.last().title == "Recent 2")
         }
 
-        val recent = dao.getRecentSummaries().first()
+    @Test
+    fun `recent query orders by last opened and editing alone no longer reorders`() = runBlocking {
+        val dao = database.naatDao()
+        val oldId = dao.insertNaat(
+            NaatEntity(
+                title = "Old entry",
+                poet = null,
+                category = NaatCategories.NAAT,
+                lyrics = "first line\nsecond line",
+                audioType = "none",
+                audioPath = null,
+                isFavorite = false,
+                createdAt = 1L,
+                updatedAt = 1L
+            )
+        ).toInt()
+        dao.insertNaat(
+            NaatEntity(
+                title = "Newer entry",
+                poet = null,
+                category = NaatCategories.NAAT,
+                lyrics = null,
+                audioType = "none",
+                audioPath = null,
+                isFavorite = false,
+                createdAt = 1L,
+                updatedAt = 100L
+            )
+        )
 
-        assertTrue(recent.size == 10)
-        assertTrue(recent.first().title == "Recent 11")
-        assertTrue(recent.last().title == "Recent 2")
+        // Before any open, the newer edit leads (unchanged fallback behavior).
+        assertTrue(dao.getRecentSummaries().first().first().title == "Newer entry")
+
+        dao.markOpened(oldId, 10_000L)
+
+        val recent = dao.getRecentSummaries().first()
+        // The opened entry now leads...
+        assertTrue(recent.first().title == "Old entry")
+        // ...and the stamp did not rewrite edit time.
+        assertTrue(dao.getNaatById(oldId)!!.updatedAt == 1L)
+        // The recents summary carries lyrics for the first-line preview.
+        assertTrue(recent.first().lyrics == "first line\nsecond line")
+    }
+
+    @Test
+    fun `markOpened only touches its own column`() = runBlocking {
+        val dao = database.naatDao()
+        val id = dao.insertNaat(
+            NaatEntity(
+                title = "Stamp check",
+                poet = null,
+                category = NaatCategories.NAAT,
+                lyrics = null,
+                audioType = "none",
+                audioPath = null,
+                isFavorite = false,
+                createdAt = 5L,
+                updatedAt = 7L
+            )
+        ).toInt()
+
+        assertTrue(dao.markOpened(id, 9L) == 1)
+
+        val row = dao.getNaatById(id)!!
+        assertTrue(row.lastOpenedAt == 9L)
+        assertTrue(row.updatedAt == 7L)
+        assertTrue(row.createdAt == 5L)
     }
 
     @Test
