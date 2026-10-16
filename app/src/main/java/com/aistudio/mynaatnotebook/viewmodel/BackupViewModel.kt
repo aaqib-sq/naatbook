@@ -15,6 +15,8 @@ import com.aistudio.mynaatnotebook.data.SettingsStore
 import com.aistudio.mynaatnotebook.data.drive.DriveSyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -42,11 +44,24 @@ class BackupViewModel @Inject constructor(
     private val _progress = MutableStateFlow<Float?>(null)
     val progress: StateFlow<Float?> = _progress.asStateFlow()
 
+    /** The in-flight backup/restore coroutine, so the UI can cancel it. */
+    private var backupJob: Job? = null
+
+    /** Audit TOP 4: stop an in-progress export/import. Cancellation is
+     * cooperative — the backup manager checks in per chunk/entry, cleans
+     * staging, and commits nothing; the failure branch below reports it as
+     * "Cancelled", not an error. */
+    fun cancelBackupWork() {
+        backupJob?.cancel()
+    }
+
+    private fun isCancelled(error: Throwable) = error is CancellationException
+
     fun backupNotebook(uri: Uri, entriesOnly: Boolean = false) {
         if (_isWorking.value) return
         _isWorking.value = true
         _progress.value = 0f
-        viewModelScope.launch {
+        backupJob = viewModelScope.launch {
             try {
                 statusReporter.show(R.string.status_exporting)
                 val result = backupManager.exportBackup(uri, entriesOnly) { p ->
@@ -60,11 +75,18 @@ class BackupViewModel @Inject constructor(
                     )
                     settingsStore.setLastExportUri(uri.toString())
                 }.onFailure {
-                    statusReporter.show(R.string.status_export_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                    if (isCancelled(it)) {
+                        // The partial destination document is already removed
+                        // by the manager's destinationTouched cleanup.
+                        statusReporter.show(R.string.status_cancelled)
+                    } else {
+                        statusReporter.show(R.string.status_export_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                    }
                 }
             } finally {
                 _progress.value = null
                 _isWorking.value = false
+                backupJob = null
             }
         }
     }
@@ -74,7 +96,7 @@ class BackupViewModel @Inject constructor(
         if (_isWorking.value) return
         _isWorking.value = true
         _progress.value = 0f
-        viewModelScope.launch {
+        backupJob = viewModelScope.launch {
             try {
                 statusReporter.show(R.string.status_exporting)
                 val result = backupManager.exportBackupToAppFolder(fileName, entriesOnly) { p ->
@@ -84,11 +106,18 @@ class BackupViewModel @Inject constructor(
                     statusReporter.show(R.string.status_export_success, count)
                     settingsStore.recordBackup(System.currentTimeMillis(), label)
                 }.onFailure {
-                    statusReporter.show(R.string.status_export_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                    if (isCancelled(it)) {
+                        // The pending MediaStore row is already deleted by the
+                        // manager's pendingUri cleanup.
+                        statusReporter.show(R.string.status_cancelled)
+                    } else {
+                        statusReporter.show(R.string.status_export_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                    }
                 }
             } finally {
                 _progress.value = null
                 _isWorking.value = false
+                backupJob = null
             }
         }
     }
@@ -101,7 +130,7 @@ class BackupViewModel @Inject constructor(
         // files) — if an entry was playing, its mini player used to linger as
         // a ghost over the new library. Stop playback up front instead.
         if (mode == ImportMode.REPLACE) playbackController.stop()
-        viewModelScope.launch {
+        backupJob = viewModelScope.launch {
             settingsStore.setLastImportUri(uri.toString())
             try {
                 statusReporter.show(R.string.status_importing)
@@ -138,11 +167,19 @@ class BackupViewModel @Inject constructor(
                         }
                     }
                 }.onFailure {
-                    statusReporter.show(R.string.status_import_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                    if (isCancelled(it)) {
+                        // Staging is deleted by the manager; nothing was
+                        // committed (cancel during staging never reaches the
+                        // commit phase), so plainly report the cancellation.
+                        statusReporter.show(R.string.status_cancelled)
+                    } else {
+                        statusReporter.show(R.string.status_import_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                    }
                 }
             } finally {
                 _progress.value = null
                 _isWorking.value = false
+                backupJob = null
                 // Audit fix (stage 1): a Drive restore staged the backup as
                 // drive-restore.zip in the private cache. importBackup has
                 // already consumed it into its own staging area (or failed

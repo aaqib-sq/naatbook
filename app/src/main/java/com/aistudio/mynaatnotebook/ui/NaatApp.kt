@@ -8,13 +8,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +63,18 @@ import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
+
+/**
+ * Audit TOP 3: which editor-open request is waiting on the parked-draft
+ * resume question. A transient question, never data.
+ */
+sealed interface KeptDraftPrompt {
+    /** The + button was tapped while a draft was parked for later. */
+    data object NewEntry : KeptDraftPrompt
+
+    /** Editing [naat] was requested while a draft for another entry was parked. */
+    data class EditEntry(val naat: NaatEntity) : KeptDraftPrompt
+}
 
 private object NaatRoutes {
     const val HOME = "home"
@@ -99,6 +118,9 @@ fun NaatApp(
     val isAttaching by viewModel.isAttachingFile.collectAsStateWithLifecycle()
 
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
+    // Audit TOP 3: which parked-draft resume prompt is showing, if any. Not
+    // saveable on purpose — it is a transient question, never data.
+    var keptDraftPrompt by remember { mutableStateOf<KeptDraftPrompt?>(null) }
     // Navigation debounce: time-based, can never get stuck. The old boolean
     // guard (detailNavigationPending) could stick at true and silently kill all
     // taps. A timestamp simply expires — no reset logic to fail.
@@ -169,6 +191,13 @@ fun NaatApp(
     fun openEditorEntry(naat: NaatEntity) {
         if (showAddModal) return
         if (!navigationDebouncePassed()) return
+        // Audit TOP 3: a parked "keep for later" draft for a DIFFERENT entry
+        // would be destroyed by startEditNaat — offer the resume instead.
+        // (The same entry resumes silently inside startEditNaat already.)
+        if (viewModel.keptDraftPending && viewModel.editorDraft.value.editingId != naat.id) {
+            keptDraftPrompt = KeptDraftPrompt.EditEntry(naat)
+            return
+        }
         viewModel.startEditNaat(naat)
     }
 
@@ -185,6 +214,12 @@ fun NaatApp(
     fun openAdd() {
         if (showAddModal || currentRoute != NaatRoutes.HOME) return
         if (!navigationDebouncePassed()) return
+        // Audit TOP 3: the FAB always meant "deliberately fresh", but a
+        // parked "keep for later" draft must not die silently — ask first.
+        if (viewModel.keptDraftPending) {
+            keptDraftPrompt = KeptDraftPrompt.NewEntry
+            return
+        }
         // A FAB press always represents a deliberately fresh new entry, never a
         // dormant edit draft. startAddDraft handles recorder/file cleanup off-main.
         viewModel.startAddDraft(forceFresh = true)
@@ -205,6 +240,27 @@ fun NaatApp(
     MyApplicationTheme(darkTheme = darkThemeEnabled) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Box(Modifier.fillMaxSize()) {
+                // Audit TOP 1: the undo-delete snackbar host. The toast bus
+                // (StatusReporter) cannot carry actions, so delete undo offers
+                // travel on their own one-shot flow and are shown here.
+                val snackbarHostState = remember { SnackbarHostState() }
+                val undoDeletedMessage = stringResource(R.string.status_entry_deleted)
+                val undoActionLabel = stringResource(R.string.common_undo)
+                // A stale token (window already expired) is a no-op inside
+                // the viewmodel, so a late tap can never resurrect a
+                // finalized deletion.
+                LaunchedEffect(Unit) {
+                    viewModel.undoDeleteOffers.collect { offer ->
+                        val result = snackbarHostState.showSnackbar(
+                            message = undoDeletedMessage,
+                            actionLabel = undoActionLabel,
+                            duration = SnackbarDuration.Long
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.undoDelete(offer.token)
+                        }
+                    }
+                }
                 // The non-draggable editor sheet owns the full available height below
                 // the status bar, while its LazyColumn remains the only inner scroller.
                 val atHome = currentRoute == null || currentRoute == NaatRoutes.HOME
@@ -212,6 +268,7 @@ fun NaatApp(
                 Scaffold(
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground,
+                    snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
                     bottomBar = {
                         // Mini-player is home-only. The reader has its own audio controls,
                         // and the anti-bleed rule stops playback when switching entries,
@@ -333,9 +390,22 @@ fun NaatApp(
                         onDismissRequest = { showDiscardConfirmation = false },
                         title = { Text(stringResource(R.string.discard_title)) },
                         text = {
-                            Text(
-                                stringResource(R.string.discard_message)
-                            )
+                            Column {
+                                Text(
+                                    stringResource(R.string.discard_message)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                // Audit TOP 3: park the draft instead of
+                                // destroying it — text, fonts, recording and
+                                // attachment stay on disk for later.
+                                TextButton(
+                                    onClick = {
+                                        showDiscardConfirmation = false
+                                        viewModel.keepEditorDraftForLater()
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text(stringResource(R.string.editor_keep_draft)) }
+                            }
                         },
                         confirmButton = {
                             TextButton(
@@ -348,6 +418,46 @@ fun NaatApp(
                         dismissButton = {
                             TextButton(onClick = { showDiscardConfirmation = false }) {
                                 Text(stringResource(R.string.discard_keep_editing))
+                            }
+                        }
+                    )
+                }
+
+                // Audit TOP 3: a parked "keep for later" draft must not die
+                // silently when the user taps + or edits a different entry.
+                keptDraftPrompt?.let { prompt ->
+                    AlertDialog(
+                        onDismissRequest = { keptDraftPrompt = null },
+                        title = { Text(stringResource(R.string.editor_kept_draft_title)) },
+                        text = { Text(stringResource(R.string.editor_kept_draft_message)) },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    keptDraftPrompt = null
+                                    viewModel.resumeKeptDraft()
+                                }
+                            ) { Text(stringResource(R.string.editor_kept_draft_continue)) }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    keptDraftPrompt = null
+                                    when (prompt) {
+                                        is KeptDraftPrompt.NewEntry ->
+                                            viewModel.startAddDraft(forceFresh = true)
+                                        is KeptDraftPrompt.EditEntry ->
+                                            viewModel.startEditNaat(prompt.naat)
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    stringResource(
+                                        if (prompt is KeptDraftPrompt.NewEntry)
+                                            R.string.editor_kept_draft_fresh
+                                        else
+                                            R.string.editor_kept_draft_edit_anyway
+                                    )
+                                )
                             }
                         }
                     )
