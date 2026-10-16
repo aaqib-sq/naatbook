@@ -26,6 +26,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         existingSecondaryAudioDisplayName = handle[EXISTING_SECONDARY_AUDIO_DISPLAY_NAME],
         existingFavorite = handle[EXISTING_FAVORITE] ?: false,
         existingCreatedAt = handle[EXISTING_CREATED_AT] ?: 0L,
+        readerFontOverride = handle[READER_FONT_OVERRIDE],
         newAttachmentPath = handle[NEW_ATTACHMENT_PATH],
         newAttachmentName = handle[NEW_ATTACHMENT_NAME],
         finishedRecordingPath = handle[FINISHED_RECORDING_PATH]
@@ -50,6 +51,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         handle[EXISTING_SECONDARY_AUDIO_DISPLAY_NAME] = draft.existingSecondaryAudioDisplayName
         handle[EXISTING_FAVORITE] = draft.existingFavorite
         handle[EXISTING_CREATED_AT] = draft.existingCreatedAt
+        handle[READER_FONT_OVERRIDE] = draft.readerFontOverride
         handle[NEW_ATTACHMENT_PATH] = draft.newAttachmentPath
         handle[NEW_ATTACHMENT_NAME] = draft.newAttachmentName
         handle[FINISHED_RECORDING_PATH] = draft.finishedRecordingPath
@@ -72,6 +74,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         const val EXISTING_SECONDARY_AUDIO_DISPLAY_NAME = "draft.existingSecondaryAudioDisplayName"
         const val EXISTING_FAVORITE = "draft.existingFavorite"
         const val EXISTING_CREATED_AT = "draft.existingCreatedAt"
+        const val READER_FONT_OVERRIDE = "draft.readerFontOverride"
         const val NEW_ATTACHMENT_PATH = "draft.newAttachmentPath"
         const val NEW_ATTACHMENT_NAME = "draft.newAttachmentName"
         const val FINISHED_RECORDING_PATH = "draft.finishedRecordingPath"
