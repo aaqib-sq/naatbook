@@ -143,4 +143,26 @@ class FontChoicesOverrideTest {
             )
         )
     }
+
+    @Test
+    fun `mini player title follows the same per-entry rule`() {
+        // The player shows the playing entry's own override when set, else
+        // the global title font; AUTO is script-aware on that title.
+        assertSame(
+            NastaliqFamily,
+            FontChoices.resolveTitle(
+                FontChoices.effectiveTitleChoice(FontChoices.NASTALIQ, FontChoices.SERIF),
+                urduScript = false,
+                customFamilies = emptyMap()
+            )
+        )
+        assertSame(
+            NastaliqFamily,
+            FontChoices.resolveTitle(
+                FontChoices.effectiveTitleChoice(null, FontChoices.AUTO),
+                urduScript = true,
+                customFamilies = emptyMap()
+            )
+        )
+    }
 }
