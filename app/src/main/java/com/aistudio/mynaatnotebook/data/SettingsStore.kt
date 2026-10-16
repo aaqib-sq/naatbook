@@ -38,6 +38,7 @@ private val KEY_LAST_IMPORT_URI = stringPreferencesKey("last_import_uri")
 private val KEY_LAST_EXPORT_URI = stringPreferencesKey("last_export_uri")
 private val KEY_ONBOARDING_SEEN = androidx.datastore.preferences.core.booleanPreferencesKey("onboarding_seen")
 private val KEY_LAST_PLAYBACK_NAAT_ID = androidx.datastore.preferences.core.intPreferencesKey("last_playback_naat_id")
+private val KEY_PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
 private val KEY_DRIVE_EMAIL = stringPreferencesKey("drive_email")
 private val KEY_DRIVE_LAST_SYNC_AT = androidx.datastore.preferences.core.longPreferencesKey("drive_last_sync_at")
 private val KEY_DRIVE_AUTO_SYNC = androidx.datastore.preferences.core.booleanPreferencesKey("drive_auto_sync")
@@ -198,6 +199,15 @@ class SettingsStore @Inject constructor(
             it.remove(KEY_LAST_PLAYBACK_NAAT_ID)
             it.remove(KEY_LAST_PLAYBACK_POSITION_MS)
         }
+    }
+
+    /** Persisted playback speed: the reader's speed choice survives app restarts. */
+    val playbackSpeed: Flow<Float> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_PLAYBACK_SPEED] ?: 1.0f }
+
+    suspend fun setPlaybackSpeed(speed: Float) {
+        context.settingsDataStore.edit { it[KEY_PLAYBACK_SPEED] = speed.coerceIn(0.5f, 2.0f) }
     }
 
     // --- Google Drive sync state ---

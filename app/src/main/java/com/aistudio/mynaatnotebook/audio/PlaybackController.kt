@@ -14,6 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -62,6 +63,14 @@ class PlaybackController @Inject constructor(
         // silently reverted, so the play tap looked dead.
         engine.onPlaybackError = {
             statusReporter.show(R.string.status_playback_failed)
+        }
+        // Restore the persisted playback speed (if any) onto the fresh player.
+        // The engine is process-lifetime, so in-process track changes keep the
+        // speed; only a restart rebuilds the player at 1.0x.
+        timerScope.launch {
+            val stored = settingsStore.playbackSpeed.first().coerceIn(0.5f, 2.0f)
+            _playbackSpeed.value = stored
+            engine.setPlaybackSpeed(stored)
         }
     }
 
@@ -190,6 +199,8 @@ class PlaybackController @Inject constructor(
         val clamped = speed.coerceIn(0.5f, 2.0f)
         _playbackSpeed.value = clamped
         engine.setPlaybackSpeed(clamped)
+        // Persist the choice so it survives app restarts (stage-2 UX audit).
+        timerScope.launch { settingsStore.setPlaybackSpeed(clamped) }
     }
 
     fun cyclePlaybackSpeed() {
