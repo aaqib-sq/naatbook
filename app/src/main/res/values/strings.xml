@@ -122,6 +122,8 @@
     <string name="reader_copy_cd">Copy lyrics</string>
     <string name="reader_share_cd">Share lyrics</string>
     <string name="reader_copied">Lyrics copied</string>
+    <string name="reader_share_audio_cd">Share audio</string>
+    <string name="reader_audio_missing">Audio file is missing</string>
     <string name="reader_poet">Poet: %1$s</string>
     <string name="reader_unknown_poet">Unknown Poet</string>
     <string name="reader_favorite_cd">Toggle favorite</string>

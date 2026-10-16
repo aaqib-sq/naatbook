@@ -237,7 +237,9 @@ class NaatViewModel @Inject constructor(
         .flatMapLatest { (query, folder, favoritesOnly) ->
             // Room executes title/poet/lyrics matching on its query executor and returns only
             // summary columns, avoiding full-lyrics scans and allocations on the UI thread.
+            // Stage-2 UX audit: rank the matches (title > poet > lyrics-only) on the way out.
             repository.filteredSummaries(query, folder, favoritesOnly)
+                .map { rankSearchResults(it, query) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
