@@ -276,7 +276,7 @@ fun LibraryScreen(
                                 // AUTO is script-aware on this title's script.
                                 titleFontFamily = FontChoices.resolveTitle(
                                     FontChoices.effectiveTitleChoice(
-                                        naat.readerFontOverride, titleFontChoice
+                                        naat.titleFontOverride, titleFontChoice
                                     ),
                                     usesArabicScript(naat.title),
                                     customFamilies

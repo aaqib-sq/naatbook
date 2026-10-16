@@ -202,7 +202,7 @@ fun GlobalMiniPlayer(
     // Per-entry title: the playing entry's own override wins, else the global
     // title font; AUTO is script-aware on this title's script.
     val playerTitleFamily = FontChoices.resolveTitle(
-        FontChoices.effectiveTitleChoice(current.readerFontOverride, titleFontChoice),
+        FontChoices.effectiveTitleChoice(current.titleFontOverride, titleFontChoice),
         usesArabicScript(current.title),
         customFamilies
     )

@@ -27,6 +27,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         existingFavorite = handle[EXISTING_FAVORITE] ?: false,
         existingCreatedAt = handle[EXISTING_CREATED_AT] ?: 0L,
         readerFontOverride = handle[READER_FONT_OVERRIDE],
+        titleFontOverride = handle[TITLE_FONT_OVERRIDE],
         newAttachmentPath = handle[NEW_ATTACHMENT_PATH],
         newAttachmentName = handle[NEW_ATTACHMENT_NAME],
         finishedRecordingPath = handle[FINISHED_RECORDING_PATH]
@@ -52,6 +53,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         handle[EXISTING_FAVORITE] = draft.existingFavorite
         handle[EXISTING_CREATED_AT] = draft.existingCreatedAt
         handle[READER_FONT_OVERRIDE] = draft.readerFontOverride
+        handle[TITLE_FONT_OVERRIDE] = draft.titleFontOverride
         handle[NEW_ATTACHMENT_PATH] = draft.newAttachmentPath
         handle[NEW_ATTACHMENT_NAME] = draft.newAttachmentName
         handle[FINISHED_RECORDING_PATH] = draft.finishedRecordingPath
@@ -75,6 +77,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
         const val EXISTING_FAVORITE = "draft.existingFavorite"
         const val EXISTING_CREATED_AT = "draft.existingCreatedAt"
         const val READER_FONT_OVERRIDE = "draft.readerFontOverride"
+        const val TITLE_FONT_OVERRIDE = "draft.titleFontOverride"
         const val NEW_ATTACHMENT_PATH = "draft.newAttachmentPath"
         const val NEW_ATTACHMENT_NAME = "draft.newAttachmentName"
         const val FINISHED_RECORDING_PATH = "draft.finishedRecordingPath"

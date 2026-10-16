@@ -237,8 +237,9 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
             }
         }
 
-        // Per-entry reader font (approved design): null follows the global
-        // Settings reader font; any choice applies to this entry's lyrics only.
+        // Per-entry fonts (approved design): two independent rows — lyrics
+        // font and title font; null on either follows the corresponding
+        // global Settings font.
         EntryFontSection(viewModel, settingsViewModel)
 
         // Lyrics in their own card (approved design).
@@ -280,26 +281,49 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
 }
 
 /**
- * Per-entry reader-font picker row. A null override means "follow the global
- * Settings reader font"; any other choice applies to this entry's lyrics
- * only (built-in or imported font).
+ * Per-entry font picker block: two independent rows — one for the lyrics,
+ * one for the title (the title is a display element and can carry a different
+ * font than the body text). A null override on either means "follow the
+ * corresponding global Settings font"; any other choice applies to this
+ * entry's respective surface only (built-in or imported font).
  */
+private enum class EntryFontRow { LYRICS, TITLE }
+
 @Composable
 private fun EntryFontSection(viewModel: NaatViewModel, settingsViewModel: SettingsViewModel) {
+    EntryFontRowView(viewModel, settingsViewModel, EntryFontRow.LYRICS)
+    Spacer(modifier = Modifier.height(12.dp))
+    EntryFontRowView(viewModel, settingsViewModel, EntryFontRow.TITLE)
+}
+
+@Composable
+private fun EntryFontRowView(
+    viewModel: NaatViewModel,
+    settingsViewModel: SettingsViewModel,
+    row: EntryFontRow
+) {
     val metadata by viewModel.editorMetadata.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val globalReaderFont by settingsViewModel.readerFont.collectAsStateWithLifecycle()
+    val globalTitleFont by settingsViewModel.titleFont.collectAsStateWithLifecycle()
     val customFonts by settingsViewModel.customFonts.collectAsStateWithLifecycle()
     val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
     var showPicker by remember { mutableStateOf(false) }
 
-    val override = metadata.readerFontOverride
+    val isLyrics = row == EntryFontRow.LYRICS
+    val override = if (isLyrics) metadata.readerFontOverride else metadata.titleFontOverride
+    val globalFont = if (isLyrics) globalReaderFont else globalTitleFont
+    val builtinKeys = if (isLyrics) FontChoices.READER_KEYS else FontChoices.TITLE_KEYS
+    val labelRes = if (isLyrics) R.string.editor_lyrics_font_label
+                   else R.string.editor_title_font_label
+    val testTag = if (isLyrics) "entry_lyrics_font_btn" else "entry_title_font_btn"
+
     val currentLabel = override?.let { fontChoiceLabel(it, customFonts) }
         ?: stringResource(R.string.editor_font_follow_settings)
 
     Column {
         Text(
-            text = stringResource(R.string.editor_font_label),
+            text = stringResource(labelRes),
             style = MaterialTheme.typography.bodyMedium,
             color = HighContrastGray,
             modifier = Modifier.padding(start = 4.dp)
@@ -310,7 +334,7 @@ private fun EntryFontSection(viewModel: NaatViewModel, settingsViewModel: Settin
                 .fillMaxWidth()
                 .clickable(enabled = !isSaving) { showPicker = true }
                 .padding(vertical = 10.dp)
-                .testTag("entry_font_btn"),
+                .testTag(testTag),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -344,14 +368,16 @@ private fun EntryFontSection(viewModel: NaatViewModel, settingsViewModel: Settin
 
     if (showPicker) {
         FontPickerDialog(
-            title = stringResource(R.string.editor_font_dialog_title),
-            builtinKeys = FontChoices.READER_KEYS,
+            title = stringResource(labelRes),
+            builtinKeys = builtinKeys,
             currentChoice = override ?: FONT_FOLLOW_SETTINGS,
             customFonts = customFonts,
             customFamilies = customFamilies,
             onPick = { choice ->
+                val chosen = if (choice == FONT_FOLLOW_SETTINGS) null else choice
                 viewModel.updateDraft {
-                    it.copy(readerFontOverride = if (choice == FONT_FOLLOW_SETTINGS) null else choice)
+                    if (isLyrics) it.copy(readerFontOverride = chosen)
+                    else it.copy(titleFontOverride = chosen)
                 }
                 showPicker = false
             },
@@ -360,7 +386,7 @@ private fun EntryFontSection(viewModel: NaatViewModel, settingsViewModel: Settin
                 FontPickerLeadChoice(
                     choiceKey = FONT_FOLLOW_SETTINGS,
                     label = stringResource(R.string.editor_font_follow_settings),
-                    sample = fontChoiceLabel(globalReaderFont, customFonts),
+                    sample = fontChoiceLabel(globalFont, customFonts),
                     testTag = "font_picker_row_follow_settings"
                 )
             )

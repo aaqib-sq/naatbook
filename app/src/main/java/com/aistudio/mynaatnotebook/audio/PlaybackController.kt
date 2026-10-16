@@ -24,7 +24,7 @@ data class NowPlaying(
     val title: String,
     val poet: String?,
     val audioPath: String,
-    val readerFontOverride: String? = null
+    val titleFontOverride: String? = null
 )
 
 /** Process-wide ownership boundary around the shared Media3 player. */
@@ -98,7 +98,7 @@ class PlaybackController @Inject constructor(
         // The service creates MediaSession before replacing the current item. Keeping an
         // existing service alive avoids a stop/start race between consecutive entry requests.
         _previewPath.value = null
-        _nowPlaying.value = NowPlaying(naat.id, naat.title, naat.poet, path, naat.readerFontOverride)
+        _nowPlaying.value = NowPlaying(naat.id, naat.title, naat.poet, path, naat.titleFontOverride)
         // Audit #21: the new entry becomes the resume point from position 0;
         // the saver below then keeps it current while it plays.
         lastSavedPositionMs = 0L
@@ -129,7 +129,7 @@ class PlaybackController @Inject constructor(
         val path = naat.audioPath ?: return
         cancelPendingServiceShutdown()
         _previewPath.value = null
-        _nowPlaying.value = NowPlaying(naat.id, naat.title, naat.poet, path, naat.readerFontOverride)
+        _nowPlaying.value = NowPlaying(naat.id, naat.title, naat.poet, path, naat.titleFontOverride)
         lastSavedPositionMs = positionMs
         val requestToken = playbackRequests.register(
             PlaybackRequest(

@@ -11,7 +11,9 @@ data class EditorMetadataDraft(
     val category: String,
     val lyrics: String,
     /** Null = follow the global Settings reader font. */
-    val readerFontOverride: String? = null
+    val readerFontOverride: String? = null,
+    /** Null = follow the global Settings title font. */
+    val titleFontOverride: String? = null
 )
 
 data class EditorAttachmentDraft(
@@ -46,6 +48,7 @@ data class EditorDraft(
     val existingFavorite: Boolean = false,
     val existingCreatedAt: Long = 0L,
     val readerFontOverride: String? = null,
+    val titleFontOverride: String? = null,
     val newAttachmentPath: String? = null,
     val newAttachmentName: String? = null,
     val finishedRecordingPath: String? = null
@@ -61,6 +64,7 @@ internal fun EditorDraft.hasUnsavedChanges(original: NaatEntity?): Boolean {
             lyrics.isNotBlank() ||
             category != NaatCategories.DEFAULT ||
             readerFontOverride != null ||
+            titleFontOverride != null ||
             newAttachmentPath != null ||
             finishedRecordingPath != null
     }
@@ -74,6 +78,7 @@ internal fun EditorDraft.hasUnsavedChanges(original: NaatEntity?): Boolean {
         NaatCategories.normalize(category) != NaatCategories.normalize(original.category) ||
         lyrics != original.lyrics.orEmpty() ||
         readerFontOverride != original.readerFontOverride ||
+        titleFontOverride != original.titleFontOverride ||
         existingAudioRemoved ||
         existingSecondaryAudioRemoved ||
         newAttachmentPath != null ||

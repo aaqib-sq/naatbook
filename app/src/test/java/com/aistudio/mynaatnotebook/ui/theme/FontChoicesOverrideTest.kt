@@ -2,6 +2,7 @@ package com.aistudio.mynaatnotebook.ui.theme
 
 import androidx.compose.ui.text.font.FontFamily
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -141,6 +142,26 @@ class FontChoicesOverrideTest {
                 urduScript = true,
                 customFamilies = emptyMap()
             )
+        )
+    }
+
+    @Test
+    fun `title override is independent from the lyrics override`() {
+        // The two per-entry choices travel as separate fields; the title
+        // path reads only the title override. A set lyrics override must
+        // never bleed into the title.
+        val lyricsOverride: String? = FontChoices.SANS
+        assertEquals(
+            FontChoices.SERIF,
+            FontChoices.effectiveTitleChoice(null, FontChoices.SERIF)
+        )
+        assertEquals(
+            FontChoices.NASTALIQ,
+            FontChoices.effectiveTitleChoice(FontChoices.NASTALIQ, FontChoices.SERIF)
+        )
+        assertNotEquals(
+            lyricsOverride,
+            FontChoices.effectiveTitleChoice(null, FontChoices.SERIF)
         )
     }
 
