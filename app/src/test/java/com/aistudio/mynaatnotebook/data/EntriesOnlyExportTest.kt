@@ -171,7 +171,8 @@ class EntriesOnlyExportTest {
                 audioType = "none",
                 audioPath = null,
                 isFavorite = false,
-                readerFontOverride = "custom:font-1"
+                readerFontOverride = "custom:font-1",
+                titleFontOverride = "custom:font-2"
             )
         )
         repository.insert(
@@ -183,7 +184,8 @@ class EntriesOnlyExportTest {
                 audioType = "none",
                 audioPath = null,
                 isFavorite = false,
-                readerFontOverride = null
+                readerFontOverride = null,
+                titleFontOverride = null
             )
         )
         val target = temporary.newFile("fonts.zip")
@@ -196,12 +198,16 @@ class EntriesOnlyExportTest {
             .associateBy { it.getString("title") }
         assertEquals("custom:font-1", exported.getValue("Fonted").getString("readerFontOverride"))
         assertTrue(exported.getValue("Plain").isNull("readerFontOverride"))
+        assertEquals("custom:font-2", exported.getValue("Fonted").getString("titleFontOverride"))
+        assertTrue(exported.getValue("Plain").isNull("titleFontOverride"))
 
         val result = manager.importBackup(Uri.fromFile(target), ImportMode.REPLACE)
         assertEquals(2, result.getOrThrow().imported)
         val restored = repository.allNaats.first().associateBy { it.title }
         assertEquals("custom:font-1", restored.getValue("Fonted").readerFontOverride)
         assertNull(restored.getValue("Plain").readerFontOverride)
+        assertEquals("custom:font-2", restored.getValue("Fonted").titleFontOverride)
+        assertNull(restored.getValue("Plain").titleFontOverride)
     }
 
     @Test
@@ -216,6 +222,7 @@ class EntriesOnlyExportTest {
 
         assertEquals(1, result.getOrThrow().imported)
         assertNull(repository.allNaats.first().single().readerFontOverride)
+        assertNull(repository.allNaats.first().single().titleFontOverride)
     }
 
     private suspend fun insertEntryWithAudio(title: String, payload: ByteArray) {

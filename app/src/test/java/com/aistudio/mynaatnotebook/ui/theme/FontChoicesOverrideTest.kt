@@ -145,6 +145,26 @@ class FontChoicesOverrideTest {
     }
 
     @Test
+    fun `title override is independent from the lyrics override`() {
+        // The two per-entry choices travel as separate fields; the title
+        // path reads only the title override. A set lyrics override must
+        // never bleed into the title.
+        val lyricsOverride: String? = FontChoices.SANS
+        assertEquals(
+            FontChoices.SERIF,
+            FontChoices.effectiveTitleChoice(null, FontChoices.SERIF)
+        )
+        assertEquals(
+            FontChoices.NASTALIQ,
+            FontChoices.effectiveTitleChoice(FontChoices.NASTALIQ, FontChoices.SERIF)
+        )
+        assertNotEquals(
+            lyricsOverride,
+            FontChoices.effectiveTitleChoice(null, FontChoices.SERIF)
+        )
+    }
+
+    @Test
     fun `mini player title follows the same per-entry rule`() {
         // The player shows the playing entry's own override when set, else
         // the global title font; AUTO is script-aware on that title.
