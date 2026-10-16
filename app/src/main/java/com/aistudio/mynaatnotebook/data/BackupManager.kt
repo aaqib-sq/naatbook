@@ -156,6 +156,7 @@ class BackupManager @Inject constructor(
                 put("audioDisplayName", naat.audioDisplayName ?: JSONObject.NULL)
                 put("secondaryAudioDisplayName", naat.secondaryAudioDisplayName ?: JSONObject.NULL)
                 put("readerFontOverride", naat.readerFontOverride ?: JSONObject.NULL)
+                put("titleFontOverride", naat.titleFontOverride ?: JSONObject.NULL)
             })
         }
         // Imported fonts travel with the backup (approved design), so a
@@ -716,7 +717,9 @@ class BackupManager @Inject constructor(
                     audioDisplayName = obj.nullableString("audioDisplayName"),
                     secondaryAudioDisplayName = obj.nullableString("secondaryAudioDisplayName"),
                     // Same for the per-entry reader-font override.
-                    readerFontOverride = obj.nullableString("readerFontOverride")
+                    readerFontOverride = obj.nullableString("readerFontOverride"),
+                    // Newer backups carry the per-entry title-font override too.
+                    titleFontOverride = obj.nullableString("titleFontOverride")
                 )
                 val signature = entrySignature(
                     title, poet, category, lyrics,
