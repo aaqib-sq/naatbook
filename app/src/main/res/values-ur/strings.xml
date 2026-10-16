@@ -25,6 +25,7 @@
     <string name="common_delete">حذف کریں</string>
     <string name="common_cancel">منسوخ</string>
     <string name="common_discard">رد کریں</string>
+    <string name="common_undo">واپس لیں</string>
     <string name="common_edit_entry">اندراج میں ترمیم کریں</string>
     <string name="common_database_error">ڈیٹا بیس کی خرابی</string>
 
@@ -218,6 +219,13 @@
     <string name="discard_title">غیر محفوظ اندراج رد کریں؟</string>
     <string name="discard_message">آپ کا غیر محفوظ متن اور نئی ریکارڈ یا منسلک کردہ آڈیو رد ہو جائے گی۔</string>
     <string name="discard_keep_editing">ترمیم جاری رکھیں</string>
+    <string name="editor_keep_draft">ڈرافٹ بعد کے لیے محفوظ کریں</string>
+    <string name="editor_draft_kept">ڈرافٹ بعد کے لیے محفوظ ہو گیا</string>
+    <string name="editor_kept_draft_title">محفوظ شدہ ڈرافٹ</string>
+    <string name="editor_kept_draft_message">آپ کا ایک ڈرافٹ بعد کے لیے محفوظ ہے۔ کیا اس پر کام جاری رکھیں؟</string>
+    <string name="editor_kept_draft_continue">ڈرافٹ جاری رکھیں</string>
+    <string name="editor_kept_draft_fresh">نیا شروع کریں</string>
+    <string name="editor_kept_draft_edit_anyway">بہر حال ترمیم کریں</string>
 
     <!-- Status / toast messages -->
     <string name="status_recording_start_failed">ریکارڈنگ شروع نہیں ہو سکی</string>
@@ -226,6 +234,8 @@
     <string name="status_entry_updated">اندراج تازہ ہو گیا!</string>
     <string name="status_save_failed">محفوظ کرنا ناکام: %1$s</string>
     <string name="status_entry_deleted">اندراج حذف ہو گیا</string>
+    <string name="status_entry_restored">اندراج بحال ہو گیا</string>
+    <string name="status_cancelled">منسوخ کر دیا گیا</string>
     <string name="status_entry_missing">اندراج اب موجود نہیں</string>
     <string name="status_delete_failed">حذف کرنا ناکام: %1$s</string>
     <string name="status_favorite_failed">پسندیدہ تازہ نہیں ہو سکا</string>

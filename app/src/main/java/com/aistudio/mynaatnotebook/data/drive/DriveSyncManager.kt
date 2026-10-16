@@ -13,6 +13,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -279,7 +281,7 @@ class DriveSyncManager @Inject constructor(
      * one chunk, and the server-acknowledged Range header re-syncs the
      * offset if a chunk was only partly received.
      */
-    private fun uploadBackup(
+    private suspend fun uploadBackup(
         token: String,
         folderId: String,
         file: File,
@@ -305,6 +307,9 @@ class DriveSyncManager @Inject constructor(
         RandomAccessFile(file, "r").use { raf ->
             val buffer = ByteArray(CHUNK_SIZE)
             while (offset < total) {
+                // Audit TOP 4: cooperative cancellation — a cancelled sync
+                // stops between chunks instead of finishing the upload.
+                currentCoroutineContext().ensureActive()
                 raf.seek(offset)
                 val want = minOf(CHUNK_SIZE.toLong(), total - offset).toInt()
                 var read = 0
@@ -349,7 +354,7 @@ class DriveSyncManager @Inject constructor(
         throw DriveException("Upload did not complete")
     }
 
-    private fun downloadFile(
+    private suspend fun downloadFile(
         token: String,
         fileId: String,
         target: File,
@@ -364,6 +369,9 @@ class DriveSyncManager @Inject constructor(
                 val buffer = ByteArray(BUFFER_SIZE)
                 var copied = 0L
                 while (true) {
+                    // Audit TOP 4: cooperative cancellation — a cancelled
+                    // restore download stops between chunks.
+                    currentCoroutineContext().ensureActive()
                     val n = input.read(buffer)
                     if (n < 0) break
                     output.write(buffer, 0, n)

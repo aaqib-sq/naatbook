@@ -5,6 +5,8 @@ import android.net.Uri
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -16,6 +18,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.UUID
@@ -134,6 +137,7 @@ class BackupManager @Inject constructor(
         val audioIndex = buildAudioIndex(naats) { p -> onProgress(0.15f + p * 0.15f) }
         val entries = JSONArray()
         naats.forEach { naat ->
+            currentCoroutineContext().ensureActive()
             entries.put(JSONObject().apply {
                 put("id", naat.id)
                 put("title", naat.title)
@@ -191,14 +195,16 @@ class BackupManager @Inject constructor(
                 zip.closeEntry()
                 val audioList = if (entriesOnly) emptyList() else audioIndex.uniqueFiles.toList()
                 audioList.forEachIndexed { index, packed ->
+                    currentCoroutineContext().ensureActive()
                     zip.putNextEntry(ZipEntry(packed.relativePath))
-                    FileInputStream(packed.source).use { it.copyTo(zip, BUFFER_SIZE) }
+                    FileInputStream(packed.source).use { it.copyToCancellable(zip) }
                     zip.closeEntry()
                     onProgress(0.35f + (index + 1f) / audioList.size.coerceAtLeast(1) * 0.45f)
                 }
                 customFonts.forEach { (font, file) ->
+                    currentCoroutineContext().ensureActive()
                     zip.putNextEntry(ZipEntry("$V2_FONTS_PREFIX${font.fileName}"))
-                    FileInputStream(file).use { it.copyTo(zip, BUFFER_SIZE) }
+                    FileInputStream(file).use { it.copyToCancellable(zip) }
                     zip.closeEntry()
                 }
                 zip.finish()
@@ -236,7 +242,7 @@ class BackupManager @Inject constructor(
             descriptor.use { pfd ->
                 FileInputStream(stagedZip).use { input ->
                     FileOutputStream(pfd.fileDescriptor).use { output ->
-                        input.copyTo(output, BUFFER_SIZE)
+                        input.copyToCancellable(output)
                         output.fd.sync()
                     }
                 }
@@ -294,7 +300,7 @@ class BackupManager @Inject constructor(
                 ) ?: throw IOException("Could not create the backup file in Downloads")
                 pendingUri = uri
                 val written = resolver.openOutputStream(uri)?.use { output ->
-                    FileInputStream(stagedZip).use { input -> input.copyTo(output, BUFFER_SIZE) }
+                    FileInputStream(stagedZip).use { input -> input.copyToCancellable(output) }
                 } ?: throw IOException("Could not write the backup file")
                 check(written > 0) { "Could not write the backup file" }
                 val publish = android.content.ContentValues().apply {
@@ -332,7 +338,7 @@ class BackupManager @Inject constructor(
                 target.parentFile?.mkdirs()
                 FileInputStream(stagedZip).use { input ->
                     FileOutputStream(target).use { output ->
-                        input.copyTo(output, BUFFER_SIZE)
+                        input.copyToCancellable(output)
                         output.fd.sync()
                     }
                 }
@@ -365,7 +371,7 @@ class BackupManager @Inject constructor(
         }
     }
 
-    private fun buildAudioIndex(
+    private suspend fun buildAudioIndex(
         naats: List<NaatEntity>,
         onProgress: (Float) -> Unit = {}
     ): ExportAudioIndex {
@@ -389,6 +395,7 @@ class BackupManager @Inject constructor(
         }
 
         naats.forEachIndexed { index, naat ->
+            currentCoroutineContext().ensureActive()
             pack(naat.audioPath)?.let { primary[naat.id] = it }
             pack(naat.secondaryAudioPath)?.let { secondary[naat.id] = it }
             onProgress((index + 1f) / naats.size.coerceAtLeast(1))
@@ -542,6 +549,7 @@ class BackupManager @Inject constructor(
         onProgress: (Float) -> Unit = {}
     ): Set<String> {
         return existing.mapIndexed { index, entry ->
+            currentCoroutineContext().ensureActive()
             entrySignature(
                 entry.title,
                 entry.poet,
@@ -559,7 +567,7 @@ class BackupManager @Inject constructor(
         }.toSet()
     }
 
-    private fun extractAndValidateArchive(
+    private suspend fun extractAndValidateArchive(
         inputUri: Uri,
         stagingDir: File,
         onProgress: (Float) -> Unit = {}
@@ -574,6 +582,7 @@ class BackupManager @Inject constructor(
 
         ZipInputStream(BufferedInputStream(input)).use { zip ->
             while (true) {
+                currentCoroutineContext().ensureActive()
                 val entry = zip.nextEntry ?: break
                 if (++entryCount > MAX_ENTRIES) {
                     throw IOException("Backup archive has too many entries (>$MAX_ENTRIES)")
@@ -764,6 +773,7 @@ class BackupManager @Inject constructor(
         try {
             val audioList = audio.toList()
             audioList.forEachIndexed { index, planned ->
+                currentCoroutineContext().ensureActive()
                 val destination = planned.destination
                 destination.parentFile?.mkdirs()
                 if (destination.exists()) {
@@ -775,7 +785,7 @@ class BackupManager @Inject constructor(
                     try {
                         FileInputStream(planned.staged).use { input ->
                             FileOutputStream(temporary).use { output ->
-                                input.copyTo(output, BUFFER_SIZE)
+                                input.copyToCancellable(output)
                                 output.fd.sync()
                             }
                         }
@@ -803,7 +813,7 @@ class BackupManager @Inject constructor(
         name.startsWith(V2_AUDIO_PREFIX) || name.startsWith(LEGACY_RECORDINGS_PREFIX) ||
             name.startsWith(LEGACY_LINKED_PREFIX)
 
-    private fun readJsonEntry(zip: ZipInputStream, budget: ExtractionBudget): String {
+    private suspend fun readJsonEntry(zip: ZipInputStream, budget: ExtractionBudget): String {
         val output = ByteArrayOutputStream()
         copyEntry(zip, output, budget) { bytesRead ->
             if (bytesRead > MAX_JSON_BYTES) throw IOException("Backup metadata exceeds maximum allowed size")
@@ -811,7 +821,26 @@ class BackupManager @Inject constructor(
         return output.toString(Charsets.UTF_8.name())
     }
 
-    private fun copyEntry(
+    /**
+     * Chunked copy that observes coroutine cancellation (audit TOP 4): every
+     * long file movement in export/import goes through here, checking in per
+     * chunk, so the Cancel button actually stops the work instead of waiting
+     * for a multi-hundred-megabyte copy to finish.
+     */
+    private suspend fun InputStream.copyToCancellable(out: OutputStream): Long {
+        val buffer = ByteArray(BUFFER_SIZE)
+        var copied = 0L
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val count = read(buffer)
+            if (count < 0) break
+            out.write(buffer, 0, count)
+            copied += count
+        }
+        return copied
+    }
+
+    private suspend fun copyEntry(
         zip: ZipInputStream,
         output: OutputStream?,
         budget: ExtractionBudget,
@@ -820,6 +849,7 @@ class BackupManager @Inject constructor(
         val buffer = ByteArray(BUFFER_SIZE)
         var entryBytes = 0L
         while (true) {
+            currentCoroutineContext().ensureActive()
             val count = zip.read(buffer)
             if (count < 0) break
             budget.add(count)

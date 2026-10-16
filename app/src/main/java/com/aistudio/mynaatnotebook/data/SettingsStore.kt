@@ -5,12 +5,14 @@ import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 import javax.inject.Inject
@@ -208,6 +210,33 @@ class SettingsStore @Inject constructor(
 
     suspend fun setPlaybackSpeed(speed: Float) {
         context.settingsDataStore.edit { it[KEY_PLAYBACK_SPEED] = speed.coerceIn(0.5f, 2.0f) }
+    }
+
+    /**
+     * Per-entry reader scroll memory (audit TOP 2): where the user stopped
+     * reading, in pixels. Stored as one key per entry id — never in the DB,
+     * so it can't disturb updatedAt/lastOpenedAt semantics, and old backups
+     * simply don't carry it. Deleted entries' keys are dropped when the
+     * delete finalizes (see NaatViewModel.finalizePendingDelete).
+     */
+    private fun readerScrollKey(naatId: Int) = intPreferencesKey("reader_scroll_$naatId")
+
+    fun readerScrollOffset(naatId: Int): Flow<Int> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[readerScrollKey(naatId)] ?: 0 }
+
+    suspend fun getReaderScrollOffset(naatId: Int): Int =
+        context.settingsDataStore.data
+            .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+            .map { it[readerScrollKey(naatId)] ?: 0 }
+            .first()
+
+    suspend fun setReaderScrollOffset(naatId: Int, offsetPx: Int) {
+        context.settingsDataStore.edit { it[readerScrollKey(naatId)] = offsetPx.coerceAtLeast(0) }
+    }
+
+    suspend fun clearReaderScrollOffset(naatId: Int) {
+        context.settingsDataStore.edit { it.remove(readerScrollKey(naatId)) }
     }
 
     // --- Google Drive sync state ---

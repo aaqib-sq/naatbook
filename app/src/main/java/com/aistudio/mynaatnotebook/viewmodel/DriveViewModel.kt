@@ -13,6 +13,8 @@ import com.aistudio.mynaatnotebook.data.drive.DriveSyncManager
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,6 +69,16 @@ class DriveViewModel @Inject constructor(
     private enum class PendingAction { NONE, SYNC, DOWNLOAD }
     private var pendingAction = PendingAction.NONE
 
+    /** The in-flight Drive sync/download coroutine, so the UI can cancel it. */
+    private var driveJob: Job? = null
+
+    /** Audit TOP 4: stop an in-progress Drive sync or restore download. The
+     * manager checks in per 1 MiB chunk; a partially uploaded backup simply
+     * never completes (the resumable session is abandoned). */
+    fun cancelDriveWork() {
+        driveJob?.cancel()
+    }
+
     init {
         viewModelScope.launch { settingsStore.driveEmail.collect { _connectedEmail.value = it } }
         viewModelScope.launch { settingsStore.driveAutoSync.collect { _autoSync.value = it } }
@@ -114,17 +126,24 @@ class DriveViewModel @Inject constructor(
         if (_isSyncing.value) return
         _isSyncing.value = true
         _progress.value = 0f
-        viewModelScope.launch {
+        driveJob = viewModelScope.launch {
             try {
                 if (manual) statusReporter.show(R.string.status_drive_syncing)
                 driveManager.syncNow { p -> _progress.value = p.coerceIn(0f, 1f) }
                     .onSuccess { count ->
                         statusReporter.show(R.string.status_drive_sync_success, count)
                     }
-                    .onFailure { error -> handleDriveError(error, PendingAction.SYNC) }
+                    .onFailure { error ->
+                        if (error is CancellationException) {
+                            statusReporter.show(R.string.status_cancelled)
+                        } else {
+                            handleDriveError(error, PendingAction.SYNC)
+                        }
+                    }
             } finally {
                 _progress.value = null
                 _isSyncing.value = false
+                driveJob = null
             }
         }
     }
@@ -134,15 +153,22 @@ class DriveViewModel @Inject constructor(
         if (_isSyncing.value) return
         _isSyncing.value = true
         _progress.value = 0f
-        viewModelScope.launch {
+        driveJob = viewModelScope.launch {
             try {
                 statusReporter.show(R.string.status_drive_downloading)
                 driveManager.downloadLatest { p -> _progress.value = p.coerceIn(0f, 1f) }
                     .onSuccess { file -> _pendingRestoreUri.value = Uri.fromFile(file) }
-                    .onFailure { error -> handleDriveError(error, PendingAction.DOWNLOAD) }
+                    .onFailure { error ->
+                        if (error is CancellationException) {
+                            statusReporter.show(R.string.status_cancelled)
+                        } else {
+                            handleDriveError(error, PendingAction.DOWNLOAD)
+                        }
+                    }
             } finally {
                 _progress.value = null
                 _isSyncing.value = false
+                driveJob = null
             }
         }
     }
