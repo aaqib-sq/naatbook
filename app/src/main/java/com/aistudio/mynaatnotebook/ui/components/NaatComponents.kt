@@ -55,7 +55,7 @@ import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
-import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
+import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
@@ -170,8 +170,7 @@ private fun BottomBarTab(
             text = label,
             fontSize = 10.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) foreground else foreground.copy(alpha = 0.55f),
-            letterSpacing = 0.5.sp
+            color = if (selected) foreground else foreground.copy(alpha = 0.55f)
         )
     }
 }
@@ -251,7 +250,7 @@ fun GlobalMiniPlayer(
                     Text(
                         text = current.poet,
                         style = MaterialTheme.typography.bodySmall,
-                        color = HighContrastGray,
+                        color = secondaryTextColor(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -390,7 +389,7 @@ fun AudioAttachmentPreview(
                 stringResource(R.string.player_preview_label)
             },
             style = MaterialTheme.typography.bodySmall,
-            color = HighContrastGray
+            color = secondaryTextColor()
         )
     }
 }

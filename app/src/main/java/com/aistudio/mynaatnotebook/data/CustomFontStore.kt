@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Typeface
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.annotation.StringRes
 import androidx.compose.ui.text.font.FontFamily
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -16,12 +17,23 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import com.aistudio.mynaatnotebook.R
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /** One user-imported font: registry entry + its private file. */
 data class CustomFont(val id: String, val name: String, val fileName: String)
+
+/**
+ * A font-import failure the UI can render in the user's language. Carries a
+ * string resource id (plus format args) instead of a hardcoded English
+ * message, so the error dialog shows localized copy.
+ */
+class FontImportException(
+    @StringRes val resId: Int,
+    val args: List<Any> = emptyList()
+) : IOException()
 
 /** A validated font file waiting in cache for its name-and-save step. */
 data class PendingFontImport(
@@ -180,7 +192,7 @@ class CustomFontStore @Inject constructor(
     suspend fun beginImport(uri: Uri): PendingFontImport = withContext(Dispatchers.IO) {
         val current = fonts.first()
         if (current.size >= MAX_FONTS) {
-            throw IOException("Font limit reached ($MAX_FONTS). Delete one first.")
+            throw FontImportException(R.string.settings_font_error_limit, listOf(MAX_FONTS))
         }
         val sourceName = queryDisplayName(uri) ?: "font"
         val ext = sourceName.substringAfterLast('.', "").lowercase()
@@ -200,7 +212,7 @@ class CustomFontStore @Inject constructor(
                         if (count < 0) break
                         total += count
                         if (total > MAX_FONT_BYTES) {
-                            throw IOException("Font file is too large (max 15 MB).")
+                            throw FontImportException(R.string.settings_font_error_too_large)
                         }
                         output.write(buffer, 0, count)
                     }
@@ -208,13 +220,13 @@ class CustomFontStore @Inject constructor(
                 }
             }
             if (!validateFontFile(temp)) {
-                throw IOException("That file is not a valid font.")
+                throw FontImportException(R.string.settings_font_error_invalid)
             }
             if (isDuplicate(temp, current)) {
-                throw IOException("This font is already added.")
+                throw FontImportException(R.string.settings_font_error_duplicate)
             }
             val family = loadFamily(temp)
-                ?: throw IOException("That file is not a valid font.")
+                ?: throw FontImportException(R.string.settings_font_error_invalid)
             PendingFontImport(
                 tempFile = temp,
                 sourceName = sourceName,
@@ -233,11 +245,11 @@ class CustomFontStore @Inject constructor(
         withContext(Dispatchers.IO) {
             val current = fonts.first()
             if (current.size >= MAX_FONTS) {
-                throw IOException("Font limit reached ($MAX_FONTS). Delete one first.")
+                throw FontImportException(R.string.settings_font_error_limit, listOf(MAX_FONTS))
             }
             if (isDuplicate(pending.tempFile, current)) {
                 pending.tempFile.delete()
-                throw IOException("This font is already added.")
+                throw FontImportException(R.string.settings_font_error_duplicate)
             }
             val id = UUID.randomUUID().toString()
             val ext = pending.tempFile.extension.lowercase()
