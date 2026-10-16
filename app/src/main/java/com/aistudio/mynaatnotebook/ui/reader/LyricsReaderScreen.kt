@@ -166,7 +166,7 @@ fun LyricsReaderScreen(
     // Reader top-bar title: the entry's own font override wins, else the
     // global title font; AUTO is script-aware on this title's script.
     val perEntryTitleFamily = FontChoices.resolveTitle(
-        FontChoices.effectiveTitleChoice(naat.readerFontOverride, titleFontChoice),
+        FontChoices.effectiveTitleChoice(naat.titleFontOverride, titleFontChoice),
         usesArabicScript(naat.title),
         customFamilies
     )
