@@ -31,6 +31,22 @@ import javax.inject.Inject
 
 private const val DRAFT_PERSIST_DEBOUNCE_MS = 150L
 
+/**
+ * Undo-delete window: how long a deleted entry can be brought back.
+ * Matches the Material3 long snackbar the offer is shown in.
+ */
+private const val UNDO_DELETE_WINDOW_MS = 10_000L
+
+/**
+ * Builds the parked filename for an audio file staged during the undo window.
+ * Pure (testable): the id + index keep collisions impossible even when two
+ * entries carried identically-named files; the tail is sanitized for safety.
+ */
+internal fun pendingDeleteFileName(entryId: Int, index: Int, originalName: String): String {
+    val safe = originalName.replace(Regex("[^A-Za-z0-9._-]"), "_").takeLast(40)
+    return "entry${entryId}_${index}_$safe"
+}
+
 @HiltViewModel
 class NaatViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -144,6 +160,10 @@ class NaatViewModel @Inject constructor(
         // classify an attachment created by a concurrent editor operation as orphaned.
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // The undo window is session-scoped: anything parked by a
+                // deletion that never got its undo (process death) completes
+                // now instead of lingering as unreferenced files.
+                sweepPendingDeletes()
                 audioFiles.exclusive {
                     val referenced = buildSet {
                         repository.allNaats.first().forEach { naat ->
@@ -383,11 +403,16 @@ class NaatViewModel @Inject constructor(
         persistDraft(transform(_editorDraft.value))
     }
 
-    private fun clearDraft() = persistDraft(EditorDraft(), immediate = true)
+    private fun clearDraft() {
+        keptDraftPending = false
+        persistDraft(EditorDraft(), immediate = true)
+    }
 
     fun startAddDraft(forceFresh: Boolean = false) {
         if (_editorDraft.value.active && !forceFresh) return
         if (forceFresh) {
+            // A parked "keep for later" draft is deliberately abandoned here.
+            keptDraftPending = false
             // Detach ownership immediately for responsive navigation. Native capture
             // stops now; all file cleanup is serialized and runs on IO afterwards.
             val old = _editorDraft.value
@@ -437,6 +462,77 @@ class NaatViewModel @Inject constructor(
         _editingNaat.value = null
         clearDraft()
         _showAddModal.value = false
+    }
+
+    /**
+     * True while a draft the user deliberately parked with "Save draft for
+     * later" is dormant (editor closed, draft + files intact on disk). The
+     * FAB / edit-entry open paths consult it to offer a resume instead of
+     * silently destroying the parked work. Cleared by [clearDraft] (save or
+     * discard), by resume, and by any open path that replaces the draft.
+     * Main-thread only.
+     */
+    internal var keptDraftPending = false
+
+    /**
+     * Audit TOP 3: close the editor WITHOUT discarding. The draft (text, font
+     * choices, finished recording, new attachment) stays persisted exactly as
+     * the crash-safe autosave left it; an in-progress recording is finalized
+     * into the draft instead of wiped. Nothing is deleted.
+     */
+    fun keepEditorDraftForLater() {
+        if (_isSaving.value) return
+        viewModelScope.launch {
+            try {
+                // An in-progress attach is cancelled like the discard path —
+                // a half-copied file must never be referenced by a kept draft.
+                if (_isAttachingFile.value) cancelAttach()
+                // Finalize an in-progress take so the draft keeps a playable
+                // file (same finalize the normal stop button performs).
+                if (_recordingState.value != RecordingState.IDLE) {
+                    audioFiles.exclusive { finalizeRecordingLocked() }
+                }
+                playbackController.stopPreview()
+                _activeRecordingFile.value = null
+                _editingNaat.value = null
+                keptDraftPending = true
+                persistDraft(_editorDraft.value.copy(active = true), immediate = true)
+                _showAddModal.value = false
+                withContext(Dispatchers.Main.immediate) {
+                    statusReporter.show(R.string.editor_draft_kept)
+                }
+            } catch (error: Exception) {
+                Log.e("NaatViewModel", "Keep draft failed", error)
+                keptDraftPending = false
+            }
+        }
+    }
+
+    /**
+     * Reopens the parked draft: the editor shows exactly the kept state
+     * (startAddDraft/startEditNaat would otherwise destroy it).
+     */
+    fun resumeKeptDraft() {
+        val draft = _editorDraft.value
+        if (!draft.active) {
+            keptDraftPending = false
+            return
+        }
+        keptDraftPending = false
+        val editingId = draft.editingId
+        if (editingId != null) {
+            viewModelScope.launch {
+                _editingNaat.value = try {
+                    repository.getNaatById(editingId)
+                } catch (error: Exception) {
+                    Log.w("NaatViewModel", "Kept-draft original missing", error)
+                    null
+                }
+                _showAddModal.value = true
+            }
+        } else {
+            _showAddModal.value = true
+        }
     }
 
     fun selectNaat(naat: NaatEntity?) {
@@ -720,6 +816,9 @@ class NaatViewModel @Inject constructor(
         }
         _editingNaat.value = naat
         _showAddModal.value = true
+        // The draft is live in the editor now (resumed or freshly built) —
+        // a parked-draft prompt must not fire again for it.
+        keptDraftPending = false
     }
 
     /** The picker's original file name, for display only (never a storage path). */
@@ -1149,32 +1248,44 @@ class NaatViewModel @Inject constructor(
         _isDeleting.value = true
         viewModelScope.launch {
             try {
-                val deleted = audioFiles.exclusive {
+                val (deleted, undoToken) = audioFiles.exclusive {
                     // Resolve the row inside the lifecycle lock so a concurrent save
                     // cannot make cleanup decisions from stale attachment paths.
-                    val current = repository.getNaatById(id) ?: return@exclusive null
+                    val current = repository.getNaatById(id) ?: return@exclusive null to -1L
+                    // A second delete during an open undo window supersedes the
+                    // first: the earlier deletion finalizes (its files die) now.
+                    finalizePendingDelete()
                     repository.delete(current)
                     withContext(Dispatchers.Main.immediate) {
                         if (playbackController.nowPlaying.value?.naatId == current.id) {
                             playbackController.stop()
                         }
                     }
-                    setOfNotNull(current.audioPath, current.secondaryAudioPath)
-                        .forEach { path ->
-                            try {
-                                deleteAudioIfUnreferencedLocked(path)
-                            } catch (error: Exception) {
-                                Log.w("NaatViewModel", "Deleted row, but audio cleanup failed", error)
-                            }
+                    // The row is gone instantly (the library updates at once),
+                    // but the audio files are PARKED, not destroyed, until the
+                    // undo window closes — undo only needs to move them back.
+                    val token = ++undoTokenCounter
+                    val staged = listOfNotNull(current.audioPath, current.secondaryAudioPath)
+                        .mapIndexedNotNull { index, path ->
+                            runCatching {
+                                stageAudioForPendingDeleteLocked(path, current.id, index)
+                            }.getOrNull()
                         }
-                    current
+                    pendingDelete = PendingDelete(current, staged, token)
+                    pendingDeleteExpiryJob = viewModelScope.launch {
+                        delay(UNDO_DELETE_WINDOW_MS)
+                        finalizePendingDelete()
+                    }
+                    current to token
                 }
                 withContext(Dispatchers.Main.immediate) {
                     if (deleted == null) {
                         statusReporter.show(R.string.status_entry_missing)
                     } else {
                         if (_selectedNaat.value?.id == deleted.id) _selectedNaat.value = null
-                        statusReporter.show(R.string.status_entry_deleted)
+                        // The old "Entry deleted" toast is replaced by the undo
+                        // snackbar (collected from undoDeleteOffers in NaatApp).
+                        _undoDeleteOffers.emit(UndoDeleteOffer(undoToken))
                         onSuccess()
                     }
                 }
@@ -1184,6 +1295,131 @@ class NaatViewModel @Inject constructor(
             } finally {
                 _isDeleting.value = false
                 deleteGate.finish()
+            }
+        }
+    }
+
+    /**
+     * Brings back the entry deleted in this undo window: the row is re-inserted
+     * with its original id (so recents/favorites/order survive) and the parked
+     * audio files are moved back to their exact original paths.
+     */
+    fun undoDelete(token: Long) {
+        val pending = pendingDelete
+        if (pending == null || pending.token != token) return
+        pendingDelete = null
+        pendingDeleteExpiryJob?.cancel()
+        pendingDeleteExpiryJob = null
+        viewModelScope.launch {
+            audioFiles.exclusive {
+                try {
+                    pending.parkedFiles.forEach { (originalPath, stagedPath) ->
+                        val staged = File(stagedPath)
+                        if (staged.isFile) {
+                            File(originalPath).parentFile?.mkdirs()
+                            if (!staged.renameTo(File(originalPath))) {
+                                Log.w("NaatViewModel", "Undo: could not move audio back")
+                            }
+                        }
+                    }
+                    repository.insert(pending.entity)
+                    withContext(Dispatchers.Main.immediate) {
+                        statusReporter.show(R.string.status_entry_restored)
+                    }
+                } catch (error: Exception) {
+                    Log.e("NaatViewModel", "Undo delete failed", error)
+                    withContext(Dispatchers.Main.immediate) {
+                        statusReporter.show(
+                            R.string.status_delete_failed,
+                            error.localizedMessage ?: StatusMessage.Res(R.string.status_error_database)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** One-shot undo offer: the row is already gone, the files are parked. */
+    data class UndoDeleteOffer(val token: Long)
+
+    /**
+     * A deletion inside its undo window: the DB row is gone, the audio files
+     * are parked under [parkedFiles] (original absolute path -> parked path).
+     */
+    private data class PendingDelete(
+        val entity: NaatEntity,
+        val parkedFiles: List<Pair<String, String>>,
+        val token: Long
+    )
+
+    private var pendingDelete: PendingDelete? = null
+    private var pendingDeleteExpiryJob: Job? = null
+    private var undoTokenCounter = 0L
+    private val _undoDeleteOffers = MutableSharedFlow<UndoDeleteOffer>(extraBufferCapacity = 1)
+    val undoDeleteOffers: SharedFlow<UndoDeleteOffer> = _undoDeleteOffers.asSharedFlow()
+
+    private fun pendingDeleteDir(): File = File(context.filesDir, "pending_delete").apply { mkdirs() }
+
+    /**
+     * Parks an otherwise-unreferenced audio file for the undo window instead of
+     * deleting it. Keeps the refcount guard: a file another entry still uses is
+     * left exactly where it is. Must run while [audioFiles] is held.
+     */
+    private suspend fun stageAudioForPendingDeleteLocked(
+        path: String,
+        entryId: Int,
+        index: Int
+    ): Pair<String, String>? {
+        if (repository.countByAudioPath(path) > 0) return null
+        val file = withContext(Dispatchers.IO) {
+            val candidate = File(path).canonicalFile
+            val basePath = context.filesDir.canonicalPath + File.separator
+            if (candidate.path.startsWith(basePath) && candidate.isFile) candidate else null
+        } ?: return null
+        val staged = File(pendingDeleteDir(), pendingDeleteFileName(entryId, index, file.name))
+        return withContext(Dispatchers.IO) {
+            val parked = if (file.renameTo(staged)) {
+                true
+            } else {
+                // Cross-filesystem fallback: copy, then remove the original.
+                runCatching {
+                    file.inputStream().use { input ->
+                        staged.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    file.delete()
+                }.getOrDefault(false) && staged.isFile
+            }
+            if (parked) file.absolutePath to staged.absolutePath else null
+        }
+    }
+
+    /**
+     * Completes the pending deletion: parked files are destroyed for good and
+     * the saved reading position (Feature 2) goes with the entry. Safe to call
+     * when nothing is pending. The undo window is session-scoped by design —
+     * on relaunch, [sweepPendingDeletes] completes anything still parked.
+     */
+    private suspend fun finalizePendingDelete() {
+        val pending = pendingDelete ?: return
+        pendingDelete = null
+        pendingDeleteExpiryJob?.cancel()
+        pendingDeleteExpiryJob = null
+        withContext(Dispatchers.IO) {
+            pending.parkedFiles.forEach { (_, stagedPath) ->
+                runCatching { File(stagedPath).takeIf { it.isFile }?.delete() }
+            }
+            runCatching { settingsStore.clearReaderScrollOffset(pending.entity.id) }
+        }
+    }
+
+    /**
+     * Session-scoped undo by design: a process death during the window must
+     * never resurrect half-deleted state, so relaunch completes the deletion.
+     */
+    private fun sweepPendingDeletes() {
+        runCatching {
+            pendingDeleteDir().listFiles()?.forEach { file ->
+                if (file.isFile) file.delete()
             }
         }
     }
