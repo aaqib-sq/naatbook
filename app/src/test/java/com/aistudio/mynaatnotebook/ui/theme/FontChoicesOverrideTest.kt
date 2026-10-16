@@ -77,4 +77,70 @@ class FontChoicesOverrideTest {
             )
         )
     }
+
+    @Test
+    fun `override beats the global title font`() {
+        assertEquals(
+            FontChoices.NASTALIQ,
+            FontChoices.effectiveTitleChoice(FontChoices.NASTALIQ, FontChoices.SANS)
+        )
+    }
+
+    @Test
+    fun `null override falls back to the global title font`() {
+        assertEquals(
+            FontChoices.SERIF,
+            FontChoices.effectiveTitleChoice(null, FontChoices.SERIF)
+        )
+    }
+
+    @Test
+    fun `auto title is Nastaliq for Urdu script`() {
+        assertSame(
+            NastaliqFamily,
+            FontChoices.resolveTitle(
+                FontChoices.effectiveTitleChoice(FontChoices.AUTO, FontChoices.SANS),
+                urduScript = true,
+                customFamilies = emptyMap()
+            )
+        )
+    }
+
+    @Test
+    fun `auto title is plain sans for Latin script`() {
+        assertSame(
+            FontFamily.SansSerif,
+            FontChoices.resolveTitle(
+                FontChoices.effectiveTitleChoice(FontChoices.AUTO, FontChoices.SANS),
+                urduScript = false,
+                customFamilies = emptyMap()
+            )
+        )
+    }
+
+    @Test
+    fun `explicit title override beats the global title font`() {
+        // Nastaliq override on a Latin title still wins: an explicit choice
+        // is never re-judged by script — only AUTO is script-aware.
+        assertSame(
+            NastaliqFamily,
+            FontChoices.resolveTitle(
+                FontChoices.effectiveTitleChoice(FontChoices.NASTALIQ, FontChoices.SANS),
+                urduScript = false,
+                customFamilies = emptyMap()
+            )
+        )
+    }
+
+    @Test
+    fun `dangling custom title override falls back to the plain sans`() {
+        assertSame(
+            FontFamily.SansSerif,
+            FontChoices.resolveTitle(
+                FontChoices.customKey("gone-font-id"),
+                urduScript = true,
+                customFamilies = emptyMap()
+            )
+        )
+    }
 }
