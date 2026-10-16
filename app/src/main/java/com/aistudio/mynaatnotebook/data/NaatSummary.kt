@@ -13,7 +13,10 @@ data class NaatSummary(
     val createdAt: Long,
     val secondaryAudioType: String,
     val secondaryAudioPath: String?,
-    val lyrics: String? = null
+    val lyrics: String? = null,
+    /** Per-entry font override (null = follow global Settings); carried here
+     *  only where the feed needs per-entry title resolution (recents). */
+    val readerFontOverride: String? = null
 )
 
 data class CategoryCount(
