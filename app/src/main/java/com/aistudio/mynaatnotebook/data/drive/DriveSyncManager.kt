@@ -62,6 +62,12 @@ class DriveSyncManager @Inject constructor(
 ) {
     companion object {
         const val FOLDER_NAME = "NaatBook Backup"
+        /**
+         * Audit fix (stage 1): a Drive restore downloads the newest backup
+         * here in app-private cache; [com.aistudio.mynaatnotebook.viewmodel.BackupViewModel]
+         * deletes it once the import no longer needs it (success or failure).
+         */
+        const val RESTORE_ZIP_NAME = "drive-restore.zip"
         const val BACKUP_FILE_PREFIX = "naatbook-backup-"
         private const val DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
         private const val TOKEN_SCOPE = "oauth2:$DRIVE_FILE_SCOPE"
@@ -132,7 +138,7 @@ class DriveSyncManager @Inject constructor(
                         ?: throw DriveException("No backup found in Drive", noBackup = true)
                     val newest = listBackups(token, folderId).firstOrNull()
                         ?: throw DriveException("No backup found in Drive", noBackup = true)
-                    val target = File(context.cacheDir, "drive-restore.zip")
+                    val target = File(context.cacheDir, RESTORE_ZIP_NAME)
                     downloadFile(token, newest.fileId, target, onProgress)
                     target
                 }
