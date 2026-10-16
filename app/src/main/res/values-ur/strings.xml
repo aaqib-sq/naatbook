@@ -122,6 +122,8 @@
     <string name="reader_copy_cd">اشعار نقل کریں</string>
     <string name="reader_share_cd">اشعار بانٹیں</string>
     <string name="reader_copied">اشعار نقل ہو گئے</string>
+    <string name="reader_share_audio_cd">آڈیو بانٹیں</string>
+    <string name="reader_audio_missing">آڈیو فائل نہیں ملی</string>
     <string name="reader_poet">شاعر: %1$s</string>
     <string name="reader_unknown_poet">نامعلوم شاعر</string>
     <string name="reader_favorite_cd">پسندیدہ بنائیں یا ہٹائیں</string>
