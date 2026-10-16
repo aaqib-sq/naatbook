@@ -17,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.resume
+import kotlinx.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -312,13 +314,14 @@ class DriveSyncManager @Inject constructor(
         cont.invokeOnCancellation { conn.disconnect() }
         thread(name = "drive-http", isDaemon = true) {
             try {
-                val result = block(conn)
-                if (cont.isActive) cont.resume(result) else conn.disconnect()
-            } catch (e: Throwable) {
+                cont.resume(block(conn))
+            } catch (t: Throwable) {
                 // If the continuation was already cancelled, invokeOnCancellation
                 // tore the socket down; the worker's socket error must not mask
-                // the CancellationException the caller is about to receive.
-                if (cont.isActive) cont.resumeWithException(e)
+                // the CancellationException the caller is about to receive
+                // (resume/resumeWithException on a cancelled continuation drop
+                // the result instead of delivering it).
+                cont.resumeWithException(t)
             }
         }
     }
