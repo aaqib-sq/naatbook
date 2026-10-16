@@ -12,9 +12,12 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -30,6 +33,7 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.concurrent.thread
 
 /**
  * A Drive sync failure with enough structure for the UI to react:
@@ -115,15 +119,30 @@ class DriveSyncManager @Inject constructor(
                     }.getOrThrow()
                     val name = BACKUP_FILE_PREFIX +
                         SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".zip"
-                    uploadBackup(token, folderId, staged, name) { p ->
-                        onProgress(0.3f + p * 0.7f)
+                    var uploadedId: String? = null
+                    try {
+                        uploadedId = uploadBackup(token, folderId, staged, name) { p ->
+                            onProgress(0.3f + p * 0.7f)
+                        }
+                        // Rotation: keep only the newest backups.
+                        listBackups(token, folderId).drop(KEEP_BACKUPS).forEach { old ->
+                            currentCoroutineContext().ensureActive()
+                            runCatching { deleteFile(token, old.fileId) }
+                        }
+                        settingsStore.recordDriveSync(System.currentTimeMillis(), hash)
+                        count
+                    } catch (e: CancellationException) {
+                        // The cancel raced a completed upload: remove the orphan so
+                        // Drive keeps only acknowledged syncs, and don't record a
+                        // sync the user stopped. Best-effort and non-cancellable;
+                        // the cancellation itself surfaces unchanged.
+                        uploadedId?.let { id ->
+                            runCatching {
+                                withContext(NonCancellable) { deleteFile(token, id) }
+                            }
+                        }
+                        throw e
                     }
-                    // Rotation: keep only the newest backups.
-                    listBackups(token, folderId).drop(KEEP_BACKUPS).forEach { old ->
-                        runCatching { deleteFile(token, old.fileId) }
-                    }
-                    settingsStore.recordDriveSync(System.currentTimeMillis(), hash)
-                    count
                 } finally {
                     staged.delete()
                 }
@@ -277,6 +296,35 @@ class DriveSyncManager @Inject constructor(
     }
 
     /**
+     * Runs a blocking [HttpURLConnection] exchange (socket writes/reads) on a
+     * short-lived daemon worker thread, so coroutine cancellation tears the
+     * socket down promptly: [invokeOnCancellation] calls
+     * [HttpURLConnection.disconnect], the blocked worker wakes with an
+     * [IOException], and the cancellation — not the socket error — is what the
+     * caller sees. [HttpURLConnection] otherwise ignores coroutine
+     * cancellation and thread interrupts, so a Cancel tap mid-transfer would
+     * have no effect without this.
+     */
+    private suspend fun <T> cancellableExchange(
+        conn: HttpURLConnection,
+        block: (HttpURLConnection) -> T
+    ): T = suspendCancellableCoroutine { cont ->
+        cont.invokeOnCancellation { conn.disconnect() }
+        thread(name = "drive-http", isDaemon = true) {
+            try {
+                cont.resumeWith(Result.success(block(conn)))
+            } catch (t: Throwable) {
+                // If the continuation was already cancelled, invokeOnCancellation
+                // tore the socket down; the worker's socket error must not mask
+                // the CancellationException the caller is about to receive
+                // (resume/resumeWithException on a cancelled continuation drop
+                // the result instead of delivering it).
+                cont.resumeWith(Result.failure(t))
+            }
+        }
+    }
+
+    /**
      * Resumable upload in 1 MiB chunks: a dropped connection loses at most
      * one chunk, and the server-acknowledged Range header re-syncs the
      * offset if a chunk was only partly received.
@@ -296,8 +344,11 @@ class DriveSyncManager @Inject constructor(
         val meta = JSONObject()
             .put("name", fileName)
             .put("parents", JSONArray().put(folderId))
-        init.outputStream.use { it.write(meta.toString().toByteArray(Charsets.UTF_8)) }
-        val initCode = init.responseCode
+        val initCode = cancellableExchange(init) { c ->
+            c.outputStream.use { it.write(meta.toString().toByteArray(Charsets.UTF_8)) }
+            c.responseCode
+        }
+        currentCoroutineContext().ensureActive()
         if (initCode !in 200..299) throw DriveHttpException(initCode, errorMessage(init))
         val sessionUri = init.getHeaderField("Location")
             ?: throw DriveException("Drive did not start the upload")
@@ -325,8 +376,12 @@ class DriveSyncManager @Inject constructor(
                 conn.setRequestProperty(
                     "Content-Range", "bytes $offset-${offset + read - 1}/$total"
                 )
-                conn.outputStream.use { it.write(buffer, 0, read) }
-                when (val code = conn.responseCode) {
+                val code = cancellableExchange(conn) { c ->
+                    c.outputStream.use { it.write(buffer, 0, read) }
+                    c.responseCode
+                }
+                currentCoroutineContext().ensureActive()
+                when (code) {
                     200, 201 -> {
                         onProgress(1f)
                         return JSONObject(checkedBody(conn)).getString("id")
@@ -346,7 +401,8 @@ class DriveSyncManager @Inject constructor(
         status.doOutput = true
         status.setRequestProperty("Content-Length", "0")
         status.setRequestProperty("Content-Range", "bytes */$total")
-        val statusCode = status.responseCode
+        val statusCode = cancellableExchange(status) { c -> c.responseCode }
+        currentCoroutineContext().ensureActive()
         if (statusCode == 200 || statusCode == 201) {
             onProgress(1f)
             return JSONObject(checkedBody(status)).getString("id")
@@ -361,25 +417,30 @@ class DriveSyncManager @Inject constructor(
         onProgress: (Float) -> Unit
     ) {
         val conn = openConnection("$FILES_URL/$fileId?alt=media", token, "GET")
-        val code = conn.responseCode
+        val code = cancellableExchange(conn) { c -> c.responseCode }
         if (code !in 200..299) throw DriveHttpException(code, errorMessage(conn))
         val total = conn.contentLengthLong
-        FileOutputStream(target).use { output ->
-            conn.inputStream.use { input ->
-                val buffer = ByteArray(BUFFER_SIZE)
-                var copied = 0L
-                while (true) {
-                    // Audit TOP 4: cooperative cancellation — a cancelled
-                    // restore download stops between chunks.
-                    currentCoroutineContext().ensureActive()
-                    val n = input.read(buffer)
-                    if (n < 0) break
-                    output.write(buffer, 0, n)
-                    copied += n
-                    if (total > 0) onProgress(copied.toFloat() / total)
+        try {
+            FileOutputStream(target).use { output ->
+                cancellableExchange(conn) { c ->
+                    c.inputStream.use { input ->
+                        val buffer = ByteArray(BUFFER_SIZE)
+                        var copied = 0L
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            output.write(buffer, 0, n)
+                            copied += n
+                            if (total > 0) onProgress(copied.toFloat() / total)
+                        }
+                    }
                 }
                 output.fd.sync()
             }
+        } catch (e: CancellationException) {
+            // Don't leave a half-downloaded restore file behind.
+            runCatching { target.delete() }
+            throw e
         }
         onProgress(1f)
     }
