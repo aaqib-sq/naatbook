@@ -13,6 +13,8 @@
     <string name="player_skip_forward_cd">دس سیکنڈ آگے</string>
     <string name="player_sleep_timer_title">نیند کا ٹائمر</string>
     <string name="player_sleep_timer_off">بند</string>
+    <string name="player_sleep_timer_minutes">%1$d منٹ</string>
+    <string name="player_sleep_timer_active">ٹائمر چالو ہے: %1$d منٹ باقی</string>
     <string name="library_now_playing">چل رہا ہے</string>
     <string name="empty_guide_title">ابھی یہاں کچھ نہیں</string>
     <string name="empty_guide_add">پہلا اندراج شامل کریں</string>
@@ -61,6 +63,11 @@
     <string name="settings_font_delete_message">“%1$s” ایپ سے ہٹا دیا جائے گا۔</string>
     <string name="settings_font_delete_in_use">“%1$s” اس وقت استعمال میں ہے۔ یہ ہٹا دیا جائے گا اور اس کی جگہ طے شدہ فونٹ آ جائے گا۔</string>
     <string name="settings_font_error_title">فونٹ درآمد نہیں ہوا</string>
+    <string name="settings_font_error_invalid">یہ فائل درست فونٹ نہیں ہے۔</string>
+    <string name="settings_font_error_duplicate">یہ فونٹ پہلے سے شامل ہے۔</string>
+    <string name="settings_font_error_too_large">فونٹ فائل بہت بڑی ہے (زیادہ سے زیادہ 15 ایم بی)۔</string>
+    <string name="settings_font_error_limit">فونٹ کی حد مکمل ہو گئی (%1$d)۔ پہلے کوئی ایک حذف کریں۔</string>
+    <string name="settings_font_error_unknown">یہ فونٹ درآمد نہیں ہو سکا۔</string>
     <string name="settings_font_new_title">نیا فونٹ</string>
     <string name="settings_font_file_label">فائل: %1$s</string>
     <string name="settings_font_name_label">فونٹ کا نام</string>
@@ -134,6 +141,9 @@
     <string name="reader_font_label">فونٹ:</string>
     <string name="reader_autoscroll_on">سکرول ہو رہا ہے</string>
     <string name="reader_autoscroll_off">خودکار سکرول</string>
+    <string name="reader_text_size_label">حروف کا سائز</string>
+    <string name="reader_autoscroll_label">خودکار سکرول</string>
+    <string name="reader_scroll_speed_label">اسکرول کی رفتار</string>
     <string name="reader_tap_label">ریڈر کے کنٹرول دکھائیں یا چھپائیں</string>
     <string name="reader_no_lyrics">کوئی تحریری اشعار فراہم نہیں کیے گئے۔\nمنسلک آڈیو کے ساتھ پڑھنے کے لیے تیار!</string>
     <string name="reader_voice_note">آواز کا نوٹ</string>
@@ -245,6 +255,10 @@
     <string name="status_export_success">لائبریری کا بیک اپ کامیابی سے برآمد ہو گیا! %1$d اندراجات۔</string>
     <string name="status_export_failed">برآمد ناکام: %1$s</string>
     <string name="status_importing">بیک اپ درآمد ہو رہا ہے، براہ کرم انتظار کریں...</string>
+    <string name="settings_progress_exporting">بیک اپ بن رہا ہے</string>
+    <string name="settings_progress_importing">بیک اپ لایا جا رہا ہے</string>
+    <string name="settings_progress_syncing">ڈرائیو سے سنک ہو رہا ہے</string>
+    <string name="settings_progress_downloading">ڈرائیو سے ڈاؤن لوڈ ہو رہا ہے</string>
     <string name="status_import_success">لائبریری کامیابی سے بحال ہو گئی! %1$d اندراجات شامل ہو گئے۔</string>
     <string name="status_import_fonts_restored">بیک اپ سے %1$d درآمد شدہ فونٹ بھی بحال ہو گئے</string>
     <string name="status_import_fonts_failed">بیک اپ کے %1$d فونٹ بحال نہیں ہو سکے</string>

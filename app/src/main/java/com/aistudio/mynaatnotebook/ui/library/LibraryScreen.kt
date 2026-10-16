@@ -59,7 +59,7 @@ import com.aistudio.mynaatnotebook.data.NaatSummary
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
-import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
+import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
@@ -139,7 +139,7 @@ fun LibraryScreen(
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = stringResource(R.string.library_search_cd),
-                tint = HighContrastGray,
+                tint = secondaryTextColor(),
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -153,7 +153,12 @@ fun LibraryScreen(
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     color = MaterialTheme.colorScheme.onBackground,
-                    lineHeight = 20.sp
+                    lineHeight = 20.sp,
+                    // The field's own font: Arabic-script input resolves to
+                    // the app's Nastaliq family like everywhere else; the
+                    // shared body style's tracking would break its joining.
+                    fontFamily = if (usesArabicScript(searchQuery)) NastaliqFamily else FontFamily.Default,
+                    letterSpacing = 0.sp
                 ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
                 modifier = Modifier
@@ -166,9 +171,13 @@ fun LibraryScreen(
                         if (searchQuery.isEmpty()) {
                             Text(
                                 text = stringResource(R.string.library_search_hint),
-                                color = HighContrastGray,
+                                color = secondaryTextColor(),
                                 style = MaterialTheme.typography.bodyLarge.copy(
-                                    lineHeight = 20.sp
+                                    lineHeight = 20.sp,
+                                    // The hint is always Urdu — always
+                                    // Nastaliq, and never letter-tracked.
+                                    fontFamily = NastaliqFamily,
+                                    letterSpacing = 0.sp
                                 ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -182,7 +191,7 @@ fun LibraryScreen(
                 IconButton(
                     onClick = { viewModel.setSearchQuery("") },
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(48.dp)
                         .testTag("search_clear_btn")
                 ) {
                     Icon(
@@ -206,7 +215,7 @@ fun LibraryScreen(
                     }
                 },
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(48.dp)
                     .testTag("speech_to_text_mic")
             ) {
                 Icon(
@@ -242,8 +251,7 @@ fun LibraryScreen(
                         text = stringResource(R.string.library_recent_title),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = HighContrastGray,
-                        letterSpacing = 1.5.sp
+                        color = secondaryTextColor()
                     )
                 }
 
@@ -257,7 +265,7 @@ fun LibraryScreen(
                         Text(
                             text = stringResource(R.string.library_empty_folders),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = HighContrastGray
+                            color = secondaryTextColor()
                         )
                     }
                 } else {
@@ -297,8 +305,7 @@ fun LibraryScreen(
                         text = stringResource(R.string.library_folders_title),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = HighContrastGray,
-                        letterSpacing = 1.5.sp
+                        color = secondaryTextColor()
                     )
                     // Quick filter: show only starred/favorite entries (across all folders)
                     FilterChip(
@@ -375,14 +382,15 @@ fun LibraryScreen(
                 // Results list: global search across folders, and/or the favorites filter
                 Text(
                     text = when {
-                        favoritesOnly && searchQuery.isNotBlank() -> stringResource(R.string.library_favorites_query_title, searchQuery.trim().uppercase(java.util.Locale.ROOT))
+                        // The query is user-typed text and can be Urdu — it is
+                        // shown as typed, never uppercased or letter-tracked.
+                        favoritesOnly && searchQuery.isNotBlank() -> stringResource(R.string.library_favorites_query_title, searchQuery.trim())
                         favoritesOnly -> stringResource(R.string.library_favorites_title)
-                        else -> stringResource(R.string.library_results_title, searchQuery.trim().uppercase(java.util.Locale.ROOT))
+                        else -> stringResource(R.string.library_results_title, searchQuery.trim())
                     },
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = HighContrastGray,
-                    letterSpacing = 1.5.sp,
+                    color = secondaryTextColor(),
                     modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
                 )
                 if (filteredNaats.isEmpty()) {
@@ -461,7 +469,7 @@ fun LibraryScreen(
                 Text(
                     text = stringResource(R.string.library_search_in_folder, selectedFolder ?: ""),
                     style = MaterialTheme.typography.labelSmall,
-                    color = HighContrastGray,
+                    color = secondaryTextColor(),
                     modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
                 )
             }
@@ -497,7 +505,7 @@ fun LibraryScreen(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = stringResource(R.string.library_favorites_filter_off_cd),
-                        tint = HighContrastGray,
+                        tint = secondaryTextColor(),
                         modifier = Modifier.size(13.dp)
                     )
                 }
@@ -667,8 +675,7 @@ fun FolderSleekCard(
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = HighContrastGray,
-                        letterSpacing = 1.sp
+                        color = secondaryTextColor()
                     ),
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -730,20 +737,21 @@ fun RecentNaatCard(
                 Icon(
                     imageVector = if ("recorded" in audioTypes) Icons.Default.Mic else Icons.Default.MusicNote,
                     contentDescription = null,
-                    tint = HighContrastGray,
+                    tint = secondaryTextColor(),
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = stringResource(CategoryDisplay.displayNameRes(naat.category))
-                        .uppercase(java.util.Locale.ROOT),
+                    // Category names localize into Urdu — shown as-is, never
+                    // uppercased or letter-tracked (both break Arabic joining).
+                    text = stringResource(CategoryDisplay.displayNameRes(naat.category)),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
+                        fontWeight = FontWeight.Bold
                     ),
-                    color = HighContrastGray,
-                    maxLines = 1
+                    color = secondaryTextColor(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (isPlaying) {
                     Spacer(modifier = Modifier.weight(1f))
@@ -843,7 +851,7 @@ private fun EmptyStateGuide(
             Icon(
                 Icons.Default.LibraryMusic,
                 contentDescription = null,
-                tint = HighContrastGray,
+                tint = secondaryTextColor(),
                 modifier = Modifier.size(30.dp)
             )
         }
@@ -859,7 +867,7 @@ private fun EmptyStateGuide(
             text = bodyText,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium,
-            color = HighContrastGray
+            color = secondaryTextColor()
         )
         if (buttonText != null) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -881,7 +889,7 @@ private fun EmptyStateGuide(
             Text(
                 text = stringResource(R.string.empty_guide_import_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = HighContrastGray
+                color = secondaryTextColor()
             )
         }
     }
@@ -965,7 +973,7 @@ fun NaatRowItem(
                     Text(
                         text = stringResource(R.string.library_by_poet, naat.poet),
                         style = MaterialTheme.typography.bodySmall,
-                        color = HighContrastGray,
+                        color = secondaryTextColor(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp)
@@ -978,39 +986,39 @@ fun NaatRowItem(
                 val audioTypes = setOf(naat.audioType, naat.secondaryAudioType)
                 if ("recorded" in audioTypes) {
                     Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.library_recorded_cd),
-                        tint = HighContrastGray, modifier = Modifier.padding(end = 4.dp).size(20.dp))
+                        tint = secondaryTextColor(), modifier = Modifier.padding(end = 4.dp).size(20.dp))
                 }
                 if ("local_file" in audioTypes) {
                     Icon(Icons.Default.MusicNote, contentDescription = stringResource(R.string.library_linked_cd),
-                        tint = HighContrastGray, modifier = Modifier.padding(end = 4.dp).size(20.dp))
+                        tint = secondaryTextColor(), modifier = Modifier.padding(end = 4.dp).size(20.dp))
                 }
 
                 // Edit entry
-                IconButton(onClick = onEditClick, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = onEditClick, modifier = Modifier.size(48.dp)) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = stringResource(R.string.common_edit_entry),
-                        tint = HighContrastGray,
+                        tint = secondaryTextColor(),
                         modifier = Modifier.size(20.dp)
                     )
                 }
 
                 // Favorite Quick Heart Tag
-                IconButton(onClick = onFavoriteClick, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = onFavoriteClick, modifier = Modifier.size(48.dp)) {
                     Icon(
                         imageVector = if (naat.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = stringResource(R.string.library_favorite_toggle_cd),
-                        tint = if (naat.isFavorite) HighContrastRed else HighContrastGray,
+                        tint = if (naat.isFavorite) HighContrastRed else secondaryTextColor(),
                         modifier = Modifier.size(22.dp)
                     )
                 }
 
                 // Delete Entry
-                IconButton(onClick = onDeleteClick, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = onDeleteClick, modifier = Modifier.size(48.dp)) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = stringResource(R.string.library_delete_cd),
-                        tint = HighContrastGray.copy(alpha = 0.6f),
+                        tint = secondaryTextColor().copy(alpha = 0.6f),
                         modifier = Modifier.size(20.dp)
                     )
                 }

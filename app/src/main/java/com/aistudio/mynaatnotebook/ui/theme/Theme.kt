@@ -4,6 +4,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
+
+/**
+ * Theme-aware secondary text color. Resolves to [HighContrastGray] in dark
+ * theme and [HighContrastGrayLight] in light theme (the dark value alone
+ * failed WCAG AA small-text contrast on white).
+ */
+private val LocalSecondaryText = staticCompositionLocalOf { HighContrastGray }
+
+@Composable
+fun secondaryTextColor(): Color = LocalSecondaryText.current
 
 private val DarkColorScheme = darkColorScheme(
     primary = DarkText,
@@ -40,9 +53,13 @@ fun MyApplicationTheme(
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalSecondaryText provides if (darkTheme) HighContrastGray else HighContrastGrayLight
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

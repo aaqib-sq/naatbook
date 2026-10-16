@@ -65,9 +65,11 @@ import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.reader.ThinSeekBar
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
-import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
+import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
+import com.aistudio.mynaatnotebook.data.CustomFontStore
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
+import com.aistudio.mynaatnotebook.viewmodel.resolve
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.isActive
@@ -99,6 +101,7 @@ fun SettingsScreen(
     val pendingFontImport by settingsViewModel.pendingFontImport.collectAsStateWithLifecycle()
     val fontError by settingsViewModel.fontError.collectAsStateWithLifecycle()
     val backupProgress by backupViewModel.progress.collectAsStateWithLifecycle()
+    val backupOperation by backupViewModel.operation.collectAsStateWithLifecycle()
     val backupWorking by backupViewModel.isWorking.collectAsStateWithLifecycle()
     val lastBackupText by settingsViewModel.lastBackupText.collectAsStateWithLifecycle()
     val lastImportUri by settingsViewModel.lastImportUri.collectAsStateWithLifecycle()
@@ -109,6 +112,7 @@ fun SettingsScreen(
     val driveSyncInterval by driveViewModel.syncInterval.collectAsStateWithLifecycle()
     val driveSyncing by driveViewModel.isSyncing.collectAsStateWithLifecycle()
     val driveProgress by driveViewModel.progress.collectAsStateWithLifecycle()
+    val driveOperation by driveViewModel.operation.collectAsStateWithLifecycle()
     val drivePendingRestoreUri by driveViewModel.pendingRestoreUri.collectAsStateWithLifecycle()
     val driveConsentIntent by driveViewModel.consentIntent.collectAsStateWithLifecycle()
     var driveDisconnectConfirm by remember { mutableStateOf(false) }
@@ -273,7 +277,7 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { settingsViewModel.clearFontError() },
             title = { Text(stringResource(R.string.settings_font_error_title)) },
-            text = { Text(message) },
+            text = { Text(message.resolve(context)) },
             confirmButton = {
                 TextButton(onClick = { settingsViewModel.clearFontError() }) {
                     Text(stringResource(R.string.common_ok))
@@ -885,7 +889,12 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${(progress * 100).toInt()}%",
+                        text = stringResource(
+                            if (backupOperation == BackupViewModel.BackupOp.IMPORT)
+                                R.string.settings_progress_importing
+                            else
+                                R.string.settings_progress_exporting
+                        ) + " — ${(progress * 100).toInt()}%",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1027,6 +1036,7 @@ fun SettingsScreen(
                                             }
                                         }
                                         .padding(vertical = 9.dp)
+                                        .defaultMinSize(minHeight = 48.dp)
                                         .testTag("drive_interval_${interval.key}"),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -1077,7 +1087,12 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${(progress * 100).toInt()}%",
+                        text = stringResource(
+                            if (driveOperation == DriveViewModel.DriveOp.DOWNLOAD)
+                                R.string.settings_progress_downloading
+                            else
+                                R.string.settings_progress_syncing
+                        ) + " — ${(progress * 100).toInt()}%",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1161,16 +1176,16 @@ private fun SettingsGroupCard(
     }
 }
 
-/** Uniform small all-caps grey heading above every settings group. The
- * group's EXISTING title string is uppercased by style; no copy is renamed. */
+/** Uniform small grey heading above every settings group, shown as-is —
+ * the titles localize into Urdu, where uppercasing is meaningless and
+ * letter-tracking breaks Arabic joining. */
 @Composable
 private fun SettingsGroupHeading(title: String) {
     Text(
-        text = title.uppercase(),
+        text = title,
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        letterSpacing = 1.5.sp
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -1248,7 +1263,7 @@ private fun FontNameDialog(
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = { if (it.length <= CustomFontStore.MAX_FONT_NAME_LENGTH) name = it },
                     label = { Text(stringResource(R.string.settings_font_name_label)) },
                     singleLine = true,
                     modifier = Modifier
@@ -1314,7 +1329,7 @@ private fun SettingsActionRow(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = if (enabled) MaterialTheme.colorScheme.onBackground else HighContrastGray,
+                tint = if (enabled) MaterialTheme.colorScheme.onBackground else secondaryTextColor(),
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -1324,7 +1339,7 @@ private fun SettingsActionRow(
                 text = title,
                 fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (enabled) MaterialTheme.colorScheme.onBackground else HighContrastGray
+                color = if (enabled) MaterialTheme.colorScheme.onBackground else secondaryTextColor()
             )
             subtitle?.let {
                 Text(

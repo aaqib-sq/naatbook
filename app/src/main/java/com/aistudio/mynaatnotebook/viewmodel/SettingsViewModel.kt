@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.data.CustomFont
 import com.aistudio.mynaatnotebook.data.CustomFontStore
+import com.aistudio.mynaatnotebook.data.FontImportException
 import com.aistudio.mynaatnotebook.data.NaatViewModelDefaults
 import com.aistudio.mynaatnotebook.data.PendingFontImport
 import com.aistudio.mynaatnotebook.data.LocaleHelper
@@ -67,9 +68,9 @@ class SettingsViewModel @Inject constructor(
     /** A validated font file awaiting its name-and-save step, if any. */
     val pendingFontImport: StateFlow<PendingFontImport?> = _pendingFontImport.asStateFlow()
 
-    private val _fontError = MutableStateFlow<String?>(null)
+    private val _fontError = MutableStateFlow<StatusMessage?>(null)
     /** Last font import/delete error to show the user, if any. */
-    val fontError: StateFlow<String?> = _fontError.asStateFlow()
+    val fontError: StateFlow<StatusMessage?> = _fontError.asStateFlow()
 
     private val _lastBackupText = MutableStateFlow<String?>(null)
     /** "14 Oct 2026, 9:52 AM • Download/NaatBook" — null until the first backup. */
@@ -186,7 +187,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { customFontStore.beginImport(uri) }
                 .onSuccess { _pendingFontImport.value = it }
-                .onFailure { _fontError.value = it.message ?: "Could not import that font." }
+                .onFailure { _fontError.value = fontImportMessage(it) }
         }
     }
 
@@ -195,9 +196,15 @@ class SettingsViewModel @Inject constructor(
         _pendingFontImport.value = null
         viewModelScope.launch {
             runCatching { customFontStore.commitImport(pending, name) }
-                .onFailure { _fontError.value = it.message ?: "Could not save that font." }
+                .onFailure { _fontError.value = fontImportMessage(it) }
         }
     }
+
+    /** Typed import failures render in the user's language; anything else
+     * falls back to a generic (also localized) import-failed message. */
+    private fun fontImportMessage(error: Throwable): StatusMessage =
+        (error as? FontImportException)?.let { StatusMessage.Res(it.resId, it.args) }
+            ?: StatusMessage.Res(R.string.settings_font_error_unknown)
 
     fun cancelFontImport() {
         val pending = _pendingFontImport.value ?: return

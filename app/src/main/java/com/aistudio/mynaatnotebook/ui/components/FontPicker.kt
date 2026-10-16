@@ -134,7 +134,7 @@ fun FontPickerDialog(
                     onClick = onImport,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(48.dp)
                         .testTag("import_font_btn"),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(
@@ -144,7 +144,11 @@ fun FontPickerDialog(
                         contentColor = MaterialTheme.colorScheme.onBackground
                     )
                 ) {
-                    Text(stringResource(R.string.settings_import_font), maxLines = 1)
+                    Text(
+                        stringResource(R.string.settings_import_font),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 }
             }
@@ -175,7 +179,13 @@ fun FontPickerRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(
                 sample,
                 fontFamily = family,

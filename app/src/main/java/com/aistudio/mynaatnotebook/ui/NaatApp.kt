@@ -38,8 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import android.content.Context
 import com.aistudio.mynaatnotebook.viewmodel.StatusMessage
+import com.aistudio.mynaatnotebook.viewmodel.resolve
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.aistudio.mynaatnotebook.R
@@ -555,14 +555,3 @@ private fun AppBackHandler(
     }
 }
 
-/**
- * Resolves a [StatusMessage] to a display string using [Context.getString].
- * Nested [StatusMessage] arguments (e.g. error fallbacks) are resolved recursively.
- */
-private fun StatusMessage.resolve(context: Context): String = when (this) {
-    is StatusMessage.Text -> text
-    is StatusMessage.Res -> context.getString(
-        resId,
-        *args.map { if (it is StatusMessage) it.resolve(context) else it }.toTypedArray()
-    )
-}
