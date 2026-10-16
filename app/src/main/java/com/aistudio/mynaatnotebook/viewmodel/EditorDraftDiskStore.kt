@@ -31,6 +31,7 @@ internal class EditorDraftDiskStore(context: Context) {
             existingFavorite = json.optBoolean("existingFavorite"),
             existingCreatedAt = json.optLong("existingCreatedAt"),
             readerFontOverride = optional("readerFontOverride"),
+            titleFontOverride = optional("titleFontOverride"),
             newAttachmentPath = optional("newAttachmentPath"),
             newAttachmentName = optional("newAttachmentName"),
             finishedRecordingPath = optional("finishedRecordingPath")
@@ -56,6 +57,7 @@ internal class EditorDraftDiskStore(context: Context) {
             put("existingFavorite", draft.existingFavorite)
             put("existingCreatedAt", draft.existingCreatedAt)
             put("readerFontOverride", draft.readerFontOverride ?: JSONObject.NULL)
+            put("titleFontOverride", draft.titleFontOverride ?: JSONObject.NULL)
             put("newAttachmentPath", draft.newAttachmentPath ?: JSONObject.NULL)
             put("newAttachmentName", draft.newAttachmentName ?: JSONObject.NULL)
             put("finishedRecordingPath", draft.finishedRecordingPath ?: JSONObject.NULL)
