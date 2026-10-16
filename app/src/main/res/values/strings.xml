@@ -172,6 +172,7 @@
     <string name="editor_title_label">Title (Required)</string>
     <string name="editor_poet_label">Poet Name (Optional)</string>
     <string name="editor_font_label">Font for this entry</string>
+    <string name="editor_font_dialog_title">Font for this entry\'s name and lyrics</string>
     <string name="editor_font_follow_settings">Follow Settings</string>
     <string name="editor_folder_label">Folder Location</string>
     <string name="editor_lyrics_label">Lyrics</string>

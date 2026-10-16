@@ -39,14 +39,21 @@ object FontChoices {
             ?: if (urduScript) NastaliqFamily else FontFamily.Serif
     }
 
-    /** Entry titles: default is the plain system sans. */
+    /**
+     * Entry titles. Plain keys map directly; a missing custom font falls
+     * back to the plain sans. AUTO is script-aware (titles are per-entry,
+     * so the script of THIS entry's title decides): Urdu-script titles get
+     * Nastaliq, anything else the plain sans.
+     */
     fun resolveTitle(
         choice: String,
+        urduScript: Boolean,
         customFamilies: Map<String, FontFamily>
-    ): FontFamily = when (choice) {
-        SERIF -> FontFamily.Serif
-        NASTALIQ -> NastaliqFamily
-        SANS -> FontFamily.SansSerif
+    ): FontFamily = when {
+        choice == AUTO -> if (urduScript) NastaliqFamily else FontFamily.SansSerif
+        choice == SERIF -> FontFamily.Serif
+        choice == NASTALIQ -> NastaliqFamily
+        choice == SANS -> FontFamily.SansSerif
         else -> customId(choice)?.let { customFamilies[it] } ?: FontFamily.SansSerif
     }
 
@@ -62,5 +69,12 @@ object FontChoices {
      * null means "follow the global Settings reader font".
      */
     fun effectiveReaderChoice(override: String?, global: String): String =
+        override ?: global
+
+    /**
+     * Per-entry title-font precedence: the entry's own override wins;
+     * null means "follow the global Settings title font".
+     */
+    fun effectiveTitleChoice(override: String?, global: String): String =
         override ?: global
 }

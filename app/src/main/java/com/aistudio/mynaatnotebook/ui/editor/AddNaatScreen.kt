@@ -344,7 +344,7 @@ private fun EntryFontSection(viewModel: NaatViewModel, settingsViewModel: Settin
 
     if (showPicker) {
         FontPickerDialog(
-            title = stringResource(R.string.editor_font_label),
+            title = stringResource(R.string.editor_font_dialog_title),
             builtinKeys = FontChoices.READER_KEYS,
             currentChoice = override ?: FONT_FOLLOW_SETTINGS,
             customFonts = customFonts,

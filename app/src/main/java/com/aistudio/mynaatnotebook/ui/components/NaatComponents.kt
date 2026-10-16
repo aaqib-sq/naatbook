@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.audio.RecordingState
 import com.aistudio.mynaatnotebook.data.NaatCategories
 import com.aistudio.mynaatnotebook.data.NaatEntity
+import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
@@ -180,7 +181,10 @@ private fun BottomBarTab(
 fun GlobalMiniPlayer(
     viewModel: NaatViewModel,
     onOpen: () -> Unit,
-    titleFontFamily: FontFamily = FontFamily.SansSerif
+    // Raw title choice + custom families: the player title follows the same
+    // per-entry rule as the recents strip and the reader top bar.
+    titleFontChoice: String = FontChoices.SANS,
+    customFamilies: Map<String, FontFamily> = emptyMap()
 ) {
     val controller = viewModel.playbackController
     val nowPlaying by controller.nowPlaying.collectAsStateWithLifecycle()
@@ -194,6 +198,14 @@ fun GlobalMiniPlayer(
 
     val current = nowPlaying
     if (current == null || !hasSession) return
+
+    // Per-entry title: the playing entry's own override wins, else the global
+    // title font; AUTO is script-aware on this title's script.
+    val playerTitleFamily = FontChoices.resolveTitle(
+        FontChoices.effectiveTitleChoice(current.readerFontOverride, titleFontChoice),
+        usesArabicScript(current.title),
+        customFamilies
+    )
 
     val fg = MaterialTheme.colorScheme.onBackground
     Column(
@@ -229,7 +241,7 @@ fun GlobalMiniPlayer(
                     text = current.title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = titleFontFamily,
+                    fontFamily = playerTitleFamily,
                     color = fg,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

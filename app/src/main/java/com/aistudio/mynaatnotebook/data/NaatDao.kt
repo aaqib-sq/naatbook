@@ -19,7 +19,7 @@ interface NaatDao {
      *  falling back to edit time for entries never opened since this field existed. */
     @Query("""
         SELECT id, title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt,
-               secondaryAudioType, secondaryAudioPath
+               secondaryAudioType, secondaryAudioPath, readerFontOverride
         FROM naats
         ORDER BY COALESCE(lastOpenedAt, updatedAt) DESC
         LIMIT 10

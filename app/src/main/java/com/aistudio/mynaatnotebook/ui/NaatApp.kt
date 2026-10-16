@@ -88,10 +88,12 @@ fun NaatApp(
     var introRequested by rememberSaveable { mutableStateOf(false) }
     val foldersWithEntries by settingsViewModel.foldersWithEntries.collectAsStateWithLifecycle()
     // Title font resolved once here and handed to the surfaces that render
-    // entry titles (library rows, recents, mini player).
+    // entry titles with the GLOBAL font (library rows, mini player).
+    // The recents strip and the Reader top bar resolve per-entry from the
+    // same choice, so they take the raw choice + custom families as well.
     val titleFontChoice by settingsViewModel.titleFont.collectAsStateWithLifecycle()
     val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
-    val titleFontFamily = FontChoices.resolveTitle(titleFontChoice, customFamilies)
+    val titleFontFamily = FontChoices.resolveTitle(titleFontChoice, urduScript = false, customFamilies)
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val isAttaching by viewModel.isAttachingFile.collectAsStateWithLifecycle()
@@ -218,7 +220,8 @@ fun NaatApp(
                             Column {
                                 GlobalMiniPlayer(
                                     viewModel = viewModel,
-                                    titleFontFamily = titleFontFamily,
+                                    titleFontChoice = titleFontChoice,
+                                    customFamilies = customFamilies,
                                     onOpen = {
                                         viewModel.openNowPlayingEntry { found ->
                                             if (found && !showAddModal && navigationDebouncePassed()) {
@@ -282,7 +285,9 @@ fun NaatApp(
                                         onAddEntry = ::openAdd,
                                         foldersWithEntries = foldersWithEntries,
                                         onFoldersSeen = settingsViewModel::markFoldersWithEntries,
-                                        titleFontFamily = titleFontFamily
+                                        titleFontFamily = titleFontFamily,
+                                        titleFontChoice = titleFontChoice,
+                                        customFamilies = customFamilies
                                     )
                                 }
                             }
