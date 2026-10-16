@@ -413,7 +413,8 @@ class BackupManager @Inject constructor(
     /**
      * Import is prepare/commit: extraction and full metadata/content validation happen in a
      * private staging directory. Files are atomically renamed, then every row is inserted by
-     * one Room transaction. Any pre-commit failure leaves the notebook untouched; a database
+     * one Room transaction (in REPLACE, the inserts and the old-row deletes share one
+     * transaction). Any pre-commit failure leaves the notebook untouched; a database
      * failure rolls back only files created by this attempt.
      */
     suspend fun importBackup(
@@ -432,14 +433,20 @@ class BackupManager @Inject constructor(
             onProgress(0.45f)
             val plan = buildRestorePlan(staged)
             onProgress(0.55f)
+            // Audit fix (stage 1): dedupe within the archive itself — two
+            // entries with the same duplicate signature must not both land
+            // (first occurrence wins). The exporter never produces this;
+            // only a hand-made file can. In-archive duplicates stay counted
+            // in `skipped` for MERGE so the result stays truthful.
+            val planEntries = plan.entries.distinctBy { it.signature }
             // Snapshot of the current library: in MERGE it drives duplicate
-            // skipping; in REPLACE its rows are removed after a successful
+            // skipping; in REPLACE its rows are removed together with the
             // commit, so any pre-commit failure leaves the library untouched.
             val existingEntries = repository.allNaats.first()
             val newEntries: List<PlannedEntry>
             val skipped: Int
             if (mode == ImportMode.REPLACE) {
-                newEntries = plan.entries
+                newEntries = planEntries
                 skipped = 0
                 onProgress(0.65f)
             } else {
@@ -447,7 +454,7 @@ class BackupManager @Inject constructor(
                 val existingSignatures = loadExistingSignatures(existingEntries) { p ->
                     onProgress(0.55f + p * 0.1f)
                 }
-                newEntries = plan.entries.filter { it.signature !in existingSignatures }
+                newEntries = planEntries.filter { it.signature !in existingSignatures }
                 skipped = plan.entries.size - newEntries.size
             }
             onProgress(0.68f)
@@ -455,9 +462,35 @@ class BackupManager @Inject constructor(
                 listOfNotNull(it.primaryArchivePath, it.secondaryArchivePath)
             }.toSet()
             val neededAudio = plan.audioByArchivePath.filterKeys { it in neededArchivePaths }
-            val committed = commitRestorePlan(newEntries.map { it.entity }, neededAudio.values) { p ->
-                onProgress(0.68f + p * 0.32f)
+            // Audit fix (stage 1): files commit first (rollback unchanged);
+            // the database insert and — in REPLACE — the old-row deletes then
+            // share one Room transaction, so a failure mid-delete can no
+            // longer leave a mixed old+new library in the DB.
+            commitAudioFiles(neededAudio.values) { p ->
+                onProgress(0.68f + p * 0.24f)
             }
+            onProgress(0.92f)
+            val entities = newEntries.map { it.entity }
+            val committed: Int
+            var removedExisting = 0
+            if (mode == ImportMode.REPLACE && existingEntries.isNotEmpty()) {
+                val keptPaths = entities.flatMap {
+                    listOfNotNull(it.audioPath, it.secondaryAudioPath)
+                }.toSet()
+                committed = repository.replaceLibrary(
+                    entities, existingEntries.map { it.id }
+                ).size
+                removedExisting = existingEntries.size
+                // Any of the old rows' audio files the new library doesn't
+                // use are now orphans; delete them (best effort, as before).
+                existingEntries.flatMap { listOfNotNull(it.audioPath, it.secondaryAudioPath) }
+                    .distinct()
+                    .filter { it !in keptPaths }
+                    .forEach { path -> runCatching { File(path).delete() } }
+            } else {
+                committed = repository.insertAll(entities).size
+            }
+            onProgress(0.96f)
             // Adopt the backup's imported fonts (new ids only, cap applies;
             // each file is re-validated by the font store before adoption).
             // Audit fix: count the outcome — fonts used to be dropped
@@ -479,20 +512,6 @@ class BackupManager @Inject constructor(
                         else -> Unit // ALREADY_PRESENT or unexpected: nothing lost
                     }
                 }
-            }
-            var removedExisting = 0
-            if (mode == ImportMode.REPLACE && existingEntries.isNotEmpty()) {
-                // The backup is fully committed; only now remove the old rows
-                // and any of their audio files the new library doesn't use.
-                val keptPaths = newEntries.flatMap {
-                    listOfNotNull(it.entity.audioPath, it.entity.secondaryAudioPath)
-                }.toSet()
-                existingEntries.forEach { old -> repository.deleteById(old.id) }
-                removedExisting = existingEntries.size
-                existingEntries.flatMap { listOfNotNull(it.audioPath, it.secondaryAudioPath) }
-                    .distinct()
-                    .filter { it !in keptPaths }
-                    .forEach { path -> runCatching { File(path).delete() } }
             }
             onProgress(1f)
             ImportResult(committed, skipped, removedExisting, fontsAdded, fontsFailed)
@@ -731,11 +750,16 @@ class BackupManager @Inject constructor(
         return RestorePlan(entries, plannedAudioByArchivePath)
     }
 
-    private suspend fun commitRestorePlan(
-        entities: List<NaatEntity>,
+    /**
+     * Commits the staged audio files: tmp+rename per file, rolling back only
+     * files created by this attempt on failure. Rows are inserted by the
+     * caller afterwards (in REPLACE, inserts and old-row deletes share one
+     * Room transaction — see [NaatDao.replaceLibrary]).
+     */
+    private suspend fun commitAudioFiles(
         audio: Collection<PlannedAudio>,
         onProgress: (Float) -> Unit = {}
-    ): Int {
+    ) {
         val createdFiles = mutableListOf<File>()
         try {
             val audioList = audio.toList()
@@ -768,9 +792,7 @@ class BackupManager @Inject constructor(
                 }
                 onProgress((index + 1f) / audioList.size.coerceAtLeast(1) * 0.7f)
             }
-            repository.insertAll(entities)
             onProgress(1f)
-            return entities.size
         } catch (error: Exception) {
             createdFiles.forEach { it.delete() }
             throw error
