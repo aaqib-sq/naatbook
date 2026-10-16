@@ -51,6 +51,12 @@ class PlaybackController @Inject constructor(
     val isPreparing = engine.isPreparing
     val hasActiveSession = engine.hasActiveSession
 
+    // Declared before the init blocks: init restores the persisted playback
+    // speed on timerScope, so the scope must be initialized first.
+    private val timerScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate
+    )
+
     init {
         engine.onSessionStopped = {
             val wasEntrySession = _nowPlaying.value != null
@@ -216,9 +222,6 @@ class PlaybackController @Inject constructor(
     /** Remaining millis, or null when the timer is off. */
     val sleepTimerRemainingMs: StateFlow<Long?> = _sleepTimerRemainingMs.asStateFlow()
     private var sleepTimerJob: kotlinx.coroutines.Job? = null
-    private val timerScope = kotlinx.coroutines.CoroutineScope(
-        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate
-    )
 
     // --- Audit #21: resume-after-process-death persistence ---
     private var lastSavedPositionMs = -1L
