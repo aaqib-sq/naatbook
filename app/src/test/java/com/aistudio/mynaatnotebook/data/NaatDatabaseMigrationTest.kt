@@ -33,7 +33,7 @@ class NaatDatabaseMigrationTest {
     }
 
     @Test
-    fun `migration 1 through 7 preserves rows normalizes categories and applies column additions`() {
+    fun `migration 1 through 8 preserves rows normalizes categories and applies column additions`() {
         createVersionOneDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
@@ -43,7 +43,8 @@ class NaatDatabaseMigrationTest {
                 NaatDatabase.MIGRATION_3_4,
                 NaatDatabase.MIGRATION_4_5,
                 NaatDatabase.MIGRATION_5_6,
-                NaatDatabase.MIGRATION_6_7
+                NaatDatabase.MIGRATION_6_7,
+                NaatDatabase.MIGRATION_7_8
             )
             .allowMainThreadQueries()
             .build()
@@ -71,6 +72,11 @@ class NaatDatabaseMigrationTest {
         assertEquals(0, database!!.openHelper.writableDatabase
             .query("SELECT COUNT(*) FROM naats WHERE readerFontOverride IS NOT NULL")
             .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
+        // v8 title-font-override column arrives null for every pre-existing
+        // row; the backfill only copies non-null reader overrides.
+        assertEquals(0, database!!.openHelper.writableDatabase
+            .query("SELECT COUNT(*) FROM naats WHERE titleFontOverride IS NOT NULL")
+            .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
 
         assertEquals(
             linkedMapOf(
@@ -90,9 +96,9 @@ class NaatDatabaseMigrationTest {
         createVersionFiveDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
-            // The annotation now targets v7, so Room needs the full 5->7 path;
+            // The annotation now targets v8, so Room needs the full 5->8 path;
             // the assertions below still verify exactly the 5->6 step.
-            .addMigrations(NaatDatabase.MIGRATION_5_6, NaatDatabase.MIGRATION_6_7)
+            .addMigrations(NaatDatabase.MIGRATION_5_6, NaatDatabase.MIGRATION_6_7, NaatDatabase.MIGRATION_7_8)
             .allowMainThreadQueries()
             .build()
 
@@ -127,7 +133,9 @@ class NaatDatabaseMigrationTest {
         createVersionSixDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
-            .addMigrations(NaatDatabase.MIGRATION_6_7)
+            // The annotation now targets v8, so Room needs the full 6->8 path;
+            // the assertions below still verify exactly the 6->7 step.
+            .addMigrations(NaatDatabase.MIGRATION_6_7, NaatDatabase.MIGRATION_7_8)
             .allowMainThreadQueries()
             .build()
 
@@ -162,6 +170,97 @@ class NaatDatabaseMigrationTest {
             .use { cursor -> cursor.moveToFirst(); cursor.getString(0) })
     }
 
+
+    @Test
+    fun `migration 7 to 8 adds titleFontOverride with backfill and keeps rows`() {
+        createVersionSevenDatabase()
+
+        database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
+            .addMigrations(NaatDatabase.MIGRATION_7_8)
+            .allowMainThreadQueries()
+            .build()
+
+        val columns = mutableListOf<String>()
+        database!!.openHelper.writableDatabase
+            .query("PRAGMA table_info(naats)")
+            .use { cursor ->
+                while (cursor.moveToNext()) {
+                    columns.add(cursor.getString(cursor.getColumnIndexOrThrow("name")))
+                }
+            }
+        assertTrue(columns.contains("titleFontOverride"))
+
+        // Backfill: a set reader override (which visibly drove the title
+        // under v7) carries into the new title column; a null stays null.
+        assertEquals("serif", database!!.openHelper.writableDatabase
+            .query("SELECT titleFontOverride FROM naats WHERE title = 'Split row'")
+            .use { cursor -> cursor.moveToFirst(); cursor.getString(0) })
+        assertEquals(1, database!!.openHelper.writableDatabase
+            .query("SELECT COUNT(*) FROM naats WHERE titleFontOverride IS NULL")
+            .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
+
+        // Rows and the unrelated columns are preserved.
+        assertEquals(2, database!!.openHelper.writableDatabase
+            .query("SELECT COUNT(*) FROM naats")
+            .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
+        assertEquals("Naat", database!!.openHelper.writableDatabase
+            .query("SELECT category FROM naats WHERE title = 'Split row'")
+            .use { cursor -> cursor.moveToFirst(); cursor.getString(0) })
+        assertEquals("serif", database!!.openHelper.writableDatabase
+            .query("SELECT readerFontOverride FROM naats WHERE title = 'Split row'")
+            .use { cursor -> cursor.moveToFirst(); cursor.getString(0) })
+    }
+
+
+    private fun createVersionSevenDatabase() {
+        val file = context.getDatabasePath(TEST_DATABASE)
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            // Faithful v7: the v6 schema plus the nullable readerFontOverride
+            // column that MIGRATION_6_7 adds (TEXT, nullable by design).
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS naats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    title TEXT NOT NULL,
+                    poet TEXT,
+                    category TEXT NOT NULL,
+                    lyrics TEXT,
+                    audioType TEXT NOT NULL,
+                    audioPath TEXT,
+                    isFavorite INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    secondaryAudioType TEXT NOT NULL,
+                    secondaryAudioPath TEXT,
+                    audioDisplayName TEXT,
+                    secondaryAudioDisplayName TEXT,
+                    lastOpenedAt INTEGER,
+                    readerFontOverride TEXT
+                )
+                """.trimIndent()
+            )
+            // A real v7 database built by the migration chain carries the
+            // updatedAt index (MIGRATION_3_4); Room's post-migration schema
+            // validation fails without it.
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_naats_updatedAt ON naats(updatedAt)")
+            // One row with a set reader override (the backfill source), one
+            // without (must stay null after migration).
+            db.execSQL(
+                "INSERT INTO naats " +
+                    "(title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt, " +
+                    "updatedAt, secondaryAudioType, lastOpenedAt, readerFontOverride) " +
+                    "VALUES ('Split row', NULL, 'Naat', 'line', 'none', NULL, 0, 1, 1, 'none', NULL, 'serif')"
+            )
+            db.execSQL(
+                "INSERT INTO naats " +
+                    "(title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt, " +
+                    "updatedAt, secondaryAudioType, lastOpenedAt, readerFontOverride) " +
+                    "VALUES ('Plain row', NULL, 'Naat', 'line', 'none', NULL, 0, 2, 2, 'none', NULL, NULL)"
+            )
+            db.version = 7
+        }
+    }
     private fun createVersionFiveDatabase() {
         val file = context.getDatabasePath(TEST_DATABASE)
         file.parentFile?.mkdirs()
