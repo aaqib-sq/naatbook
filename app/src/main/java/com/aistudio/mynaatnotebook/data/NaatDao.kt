@@ -59,6 +59,19 @@ interface NaatDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNaats(naats: List<NaatEntity>): List<Long>
 
+    /**
+     * Audit fix (stage 1): REPLACE-mode restores used to delete the old rows
+     * one-by-one *after* the new rows were committed, outside any shared
+     * transaction — an interruption mid-delete could leave a mixed old+new
+     * library. The inserts and the old-row deletes now share one transaction.
+     */
+    @Transaction
+    suspend fun replaceLibrary(newNaats: List<NaatEntity>, oldIds: List<Int>): List<Long> {
+        val rowIds = insertNaats(newNaats)
+        oldIds.forEach { deleteNaatById(it) }
+        return rowIds
+    }
+
     @Update
     suspend fun updateNaat(naat: NaatEntity)
 
