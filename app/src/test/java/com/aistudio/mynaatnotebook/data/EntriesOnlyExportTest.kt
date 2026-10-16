@@ -206,7 +206,11 @@ class EntriesOnlyExportTest {
 
     @Test
     fun `old backup without the field imports with null override`() = runBlocking {
-        val archive = archive(entriesOnlyDocument("audio/gone.m4a"))
+        // A real v2 entries-only backup carries a content-addressed audio
+        // reference ("audio/<sha256>.<ext>") with no payload; a malformed
+        // reference would be rejected by the validity guard instead.
+        val validV2Reference = "audio/${"a".repeat(64)}.m4a"
+        val archive = archive(entriesOnlyDocument(validV2Reference))
 
         val result = manager.importBackup(Uri.fromFile(archive), ImportMode.MERGE)
 
