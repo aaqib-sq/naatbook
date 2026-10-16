@@ -62,14 +62,14 @@ class NaatViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, initialDraft.editingId)
     val editorMetadata: StateFlow<EditorMetadataDraft> = editorDraft
-        .map { EditorMetadataDraft(it.editingId, it.title, it.poet, it.category, it.lyrics, it.readerFontOverride) }
+        .map { EditorMetadataDraft(it.editingId, it.title, it.poet, it.category, it.lyrics, it.readerFontOverride, it.titleFontOverride) }
         .distinctUntilChanged()
         .stateIn(
             viewModelScope,
             SharingStarted.Eagerly,
             EditorMetadataDraft(
                 initialDraft.editingId, initialDraft.title, initialDraft.poet,
-                initialDraft.category, initialDraft.lyrics, initialDraft.readerFontOverride
+                initialDraft.category, initialDraft.lyrics, initialDraft.readerFontOverride, initialDraft.titleFontOverride
             )
         )
     val editorAttachments: StateFlow<EditorAttachmentDraft> = editorDraft
@@ -712,7 +712,8 @@ class NaatViewModel @Inject constructor(
                 existingSecondaryAudioDisplayName = naat.secondaryAudioDisplayName,
                 existingFavorite = naat.isFavorite,
                 existingCreatedAt = naat.createdAt,
-                readerFontOverride = naat.readerFontOverride
+                readerFontOverride = naat.readerFontOverride,
+                titleFontOverride = naat.titleFontOverride
             ), immediate = true)
         }
         _editingNaat.value = naat
@@ -1016,7 +1017,8 @@ class NaatViewModel @Inject constructor(
                             audioDisplayName = if (audioType == "local_file") linkedDisplayName else null,
                             secondaryAudioDisplayName =
                                 if (secondaryAudioType == "local_file") linkedDisplayName else null,
-                            readerFontOverride = draft.readerFontOverride
+                            readerFontOverride = draft.readerFontOverride,
+                            titleFontOverride = draft.titleFontOverride
                         )
                         val id = repository.insert(entity).toInt()
                         entity.copy(id = id)
@@ -1037,7 +1039,8 @@ class NaatViewModel @Inject constructor(
                             audioDisplayName = if (audioType == "local_file") linkedDisplayName else null,
                             secondaryAudioDisplayName =
                                 if (secondaryAudioType == "local_file") linkedDisplayName else null,
-                            readerFontOverride = draft.readerFontOverride
+                            readerFontOverride = draft.readerFontOverride,
+                            titleFontOverride = draft.titleFontOverride
                         )
                         repository.update(entity)
                         entity
