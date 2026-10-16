@@ -91,7 +91,7 @@ import com.aistudio.mynaatnotebook.ui.components.AudioAttachmentPreview
 import com.aistudio.mynaatnotebook.ui.components.RecordingVuMeter
 import com.aistudio.mynaatnotebook.ui.components.formatTime
 import com.aistudio.mynaatnotebook.ui.components.usesArabicScript
-import com.aistudio.mynaatnotebook.ui.theme.HighContrastGray
+import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.viewmodel.EditorAttachmentDraft
@@ -218,7 +218,7 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
             Text(
                 text = stringResource(R.string.editor_folder_label),
                 style = MaterialTheme.typography.bodyMedium,
-                color = HighContrastGray,
+                color = secondaryTextColor(),
                 modifier = Modifier.padding(start = 4.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -269,7 +269,7 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
                             }
                         },
                         modifier = Modifier.testTag("lyrics_dictate_mic")
-                    ) { Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.editor_dictate_cd), tint = HighContrastGray) }
+                    ) { Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.editor_dictate_cd), tint = secondaryTextColor()) }
                 },
                 modifier = Modifier.fillMaxWidth().height(180.dp).testTag("add_naat_lyrics"),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -325,7 +325,7 @@ private fun EntryFontRowView(
         Text(
             text = stringResource(labelRes),
             style = MaterialTheme.typography.bodyMedium,
-            color = HighContrastGray,
+            color = secondaryTextColor(),
             modifier = Modifier.padding(start = 4.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -361,7 +361,7 @@ private fun EntryFontRowView(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = HighContrastGray
+                tint = secondaryTextColor()
             )
         }
     }
@@ -413,16 +413,17 @@ private fun EditorSectionCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
-/** Small caps label at the top of an editor section card. */
+/** Small label at the top of an editor section card. Shown as-is: the
+ * labels localize into Urdu, where uppercasing is meaningless and
+ * letter-tracking breaks joining. */
 @Composable
 private fun EditorCardLabel(text: String) {
     Text(
-        text = text.uppercase(java.util.Locale.ROOT),
+        text = text,
         style = MaterialTheme.typography.labelSmall.copy(
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.5.sp
+            fontWeight = FontWeight.Bold
         ),
-        color = HighContrastGray,
+        color = secondaryTextColor(),
         modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 2.dp)
     )
 }
@@ -561,7 +562,7 @@ private fun EditorAudioSection(viewModel: NaatViewModel) {
                             attachments.newAttachmentName?.let {
                                 stringResource(R.string.editor_attached_file, it)
                             } ?: path.substringAfterLast('/'),
-                            color = HighContrastGray,
+                            color = secondaryTextColor(),
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.weight(1f),
                             maxLines = 1,
@@ -601,7 +602,7 @@ private fun ExistingAttachments(
                 Icon(
                     if (type == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
                     contentDescription = null,
-                    tint = HighContrastGray
+                    tint = secondaryTextColor()
                 )
                 Spacer(Modifier.width(6.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -617,7 +618,7 @@ private fun ExistingAttachments(
                         Text(
                             text = displayName,
                             style = MaterialTheme.typography.bodySmall,
-                            color = HighContrastGray,
+                            color = secondaryTextColor(),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -653,7 +654,7 @@ private fun BrowseAudioButton(
         // the cancel control — a huge copy no longer traps the user.
         onClick = { if (isAttaching) onCancelAttach() else onClick() },
         enabled = enabled || isAttaching,
-        modifier = modifier.height(44.dp).testTag("link_external_file_btn"),
+        modifier = modifier.height(48.dp).testTag("link_external_file_btn"),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)),
         colors = ButtonDefaults.outlinedButtonColors(
@@ -673,7 +674,11 @@ private fun BrowseAudioButton(
         } else {
             Icon(Icons.Default.MusicNote, contentDescription = null)
             Spacer(Modifier.width(4.dp))
-            Text(stringResource(R.string.editor_browse_short), maxLines = 1)
+            Text(
+                stringResource(R.string.editor_browse_short),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -733,7 +738,7 @@ private fun RecorderControls(
                 Icon(
                     if (state == RecordingState.RECORDING) Icons.Default.FiberManualRecord else Icons.Default.Pause,
                     contentDescription = null,
-                    tint = if (state == RecordingState.RECORDING) HighContrastRed else HighContrastGray,
+                    tint = if (state == RecordingState.RECORDING) HighContrastRed else secondaryTextColor(),
                     modifier = Modifier.size(14.dp)
                 )
                 Text(formatTime(elapsed.toInt()), fontWeight = FontWeight.Bold,
@@ -752,7 +757,7 @@ private fun RecorderControls(
                             if (hasExistingRecorded) confirmRecord = true
                             else permission.launch(android.Manifest.permission.RECORD_AUDIO)
                         },
-                        modifier = Modifier.weight(1f).height(44.dp).testTag("start_recording_btn"),
+                        modifier = Modifier.weight(1f).height(48.dp).testTag("start_recording_btn"),
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(
                             1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
