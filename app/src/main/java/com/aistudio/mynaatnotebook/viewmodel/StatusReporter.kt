@@ -1,6 +1,7 @@
 package com.aistudio.mynaatnotebook.viewmodel
 
 import androidx.annotation.StringRes
+import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,4 +56,19 @@ class StatusReporter @Inject constructor() {
     fun clear() {
         _message.value = null
     }
+}
+
+/**
+ * Resolves a [StatusMessage] to a display string using [Context.getString].
+ * Nested [StatusMessage] arguments (e.g. error fallbacks) are resolved recursively.
+ *
+ * Lifted out of NaatApp (where it was private) so any UI surface — e.g. the
+ * font-import error dialog — can render a [StatusMessage] the same way toasts do.
+ */
+fun StatusMessage.resolve(context: Context): String = when (this) {
+    is StatusMessage.Text -> text
+    is StatusMessage.Res -> context.getString(
+        resId,
+        *args.map { if (it is StatusMessage) it.resolve(context) else it }.toTypedArray()
+    )
 }

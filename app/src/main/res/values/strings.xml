@@ -13,6 +13,8 @@
     <string name="player_skip_forward_cd">Forward 10 seconds</string>
     <string name="player_sleep_timer_title">Sleep timer</string>
     <string name="player_sleep_timer_off">Off</string>
+    <string name="player_sleep_timer_minutes">%1$d min</string>
+    <string name="player_sleep_timer_active">Active: %1$d min remaining</string>
     <string name="library_now_playing">Playing</string>
     <string name="empty_guide_title">Nothing here yet</string>
     <string name="empty_guide_add">Add first entry</string>
@@ -61,6 +63,11 @@
     <string name="settings_font_delete_message">“%1$s” will be removed from the app.</string>
     <string name="settings_font_delete_in_use">“%1$s” is in use right now. It will be removed and the default font will take its place.</string>
     <string name="settings_font_error_title">Font not imported</string>
+    <string name="settings_font_error_invalid">That file is not a valid font.</string>
+    <string name="settings_font_error_duplicate">This font is already added.</string>
+    <string name="settings_font_error_too_large">Font file is too large (max 15 MB).</string>
+    <string name="settings_font_error_limit">Font limit reached (%1$d). Delete one first.</string>
+    <string name="settings_font_error_unknown">Could not import that font.</string>
     <string name="settings_font_new_title">New font</string>
     <string name="settings_font_file_label">File: %1$s</string>
     <string name="settings_font_name_label">Font name</string>
@@ -134,6 +141,9 @@
     <string name="reader_font_label">Font:</string>
     <string name="reader_autoscroll_on">Scrolling</string>
     <string name="reader_autoscroll_off">AutoScroll</string>
+    <string name="reader_text_size_label">Text size</string>
+    <string name="reader_autoscroll_label">Auto scroll</string>
+    <string name="reader_scroll_speed_label">Scroll speed</string>
     <string name="reader_tap_label">Show or hide reader controls</string>
     <string name="reader_no_lyrics">No written lyrics provided.\nReady to recite with attached media!</string>
     <string name="reader_voice_note">Voice Note</string>
@@ -245,6 +255,10 @@
     <string name="status_export_success">Library Backup Exported Successfully! %1$d entries.</string>
     <string name="status_export_failed">Export Failed: %1$s</string>
     <string name="status_importing">Importing backup, please wait...</string>
+    <string name="settings_progress_exporting">Exporting backup</string>
+    <string name="settings_progress_importing">Importing backup</string>
+    <string name="settings_progress_syncing">Syncing with Drive</string>
+    <string name="settings_progress_downloading">Downloading from Drive</string>
     <string name="status_import_success">Library Restored Successfully! Loaded %1$d entries.</string>
     <string name="status_import_fonts_restored">Also restored %1$d imported fonts from the backup</string>
     <string name="status_import_fonts_failed">%1$d fonts from the backup could not be restored</string>

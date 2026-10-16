@@ -44,6 +44,12 @@ class BackupViewModel @Inject constructor(
     private val _progress = MutableStateFlow<Float?>(null)
     val progress: StateFlow<Float?> = _progress.asStateFlow()
 
+    /** The in-flight operation, so the progress row names it (not just %). */
+    enum class BackupOp { EXPORT, IMPORT }
+
+    private val _operation = MutableStateFlow<BackupOp?>(null)
+    val operation: StateFlow<BackupOp?> = _operation.asStateFlow()
+
     /** The in-flight backup/restore coroutine, so the UI can cancel it. */
     private var backupJob: Job? = null
 
@@ -60,6 +66,7 @@ class BackupViewModel @Inject constructor(
     fun backupNotebook(uri: Uri, entriesOnly: Boolean = false) {
         if (_isWorking.value) return
         _isWorking.value = true
+        _operation.value = BackupOp.EXPORT
         _progress.value = 0f
         backupJob = viewModelScope.launch {
             try {
@@ -84,6 +91,7 @@ class BackupViewModel @Inject constructor(
                     }
                 }
             } finally {
+                _operation.value = null
                 _progress.value = null
                 _isWorking.value = false
                 backupJob = null
@@ -95,6 +103,7 @@ class BackupViewModel @Inject constructor(
     fun backupNotebookToAppFolder(fileName: String, entriesOnly: Boolean = false) {
         if (_isWorking.value) return
         _isWorking.value = true
+        _operation.value = BackupOp.EXPORT
         _progress.value = 0f
         backupJob = viewModelScope.launch {
             try {
@@ -115,6 +124,7 @@ class BackupViewModel @Inject constructor(
                     }
                 }
             } finally {
+                _operation.value = null
                 _progress.value = null
                 _isWorking.value = false
                 backupJob = null
@@ -125,6 +135,7 @@ class BackupViewModel @Inject constructor(
     fun restoreNotebook(uri: Uri, mode: ImportMode = ImportMode.MERGE) {
         if (_isWorking.value) return
         _isWorking.value = true
+        _operation.value = BackupOp.IMPORT
         _progress.value = 0f
         // Audit fix: a REPLACE restore deletes the old library (and its audio
         // files) — if an entry was playing, its mini player used to linger as
@@ -177,6 +188,7 @@ class BackupViewModel @Inject constructor(
                     }
                 }
             } finally {
+                _operation.value = null
                 _progress.value = null
                 _isWorking.value = false
                 backupJob = null

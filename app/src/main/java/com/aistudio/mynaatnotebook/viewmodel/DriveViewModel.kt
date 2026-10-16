@@ -58,6 +58,12 @@ class DriveViewModel @Inject constructor(
     private val _progress = MutableStateFlow<Float?>(null)
     val progress: StateFlow<Float?> = _progress.asStateFlow()
 
+    /** The in-flight operation, so the progress row names it (not just %). */
+    enum class DriveOp { SYNC, DOWNLOAD }
+
+    private val _operation = MutableStateFlow<DriveOp?>(null)
+    val operation: StateFlow<DriveOp?> = _operation.asStateFlow()
+
     private val _pendingRestoreUri = MutableStateFlow<Uri?>(null)
     /** Downloaded Drive backup awaiting the merge/replace choice. */
     val pendingRestoreUri: StateFlow<Uri?> = _pendingRestoreUri.asStateFlow()
@@ -125,6 +131,7 @@ class DriveViewModel @Inject constructor(
     private fun runSync(manual: Boolean) {
         if (_isSyncing.value) return
         _isSyncing.value = true
+        _operation.value = DriveOp.SYNC
         _progress.value = 0f
         driveJob = viewModelScope.launch {
             try {
@@ -141,6 +148,7 @@ class DriveViewModel @Inject constructor(
                         }
                     }
             } finally {
+                _operation.value = null
                 _progress.value = null
                 _isSyncing.value = false
                 driveJob = null
@@ -152,6 +160,7 @@ class DriveViewModel @Inject constructor(
     fun restoreLatest() {
         if (_isSyncing.value) return
         _isSyncing.value = true
+        _operation.value = DriveOp.DOWNLOAD
         _progress.value = 0f
         driveJob = viewModelScope.launch {
             try {
@@ -166,6 +175,7 @@ class DriveViewModel @Inject constructor(
                         }
                     }
             } finally {
+                _operation.value = null
                 _progress.value = null
                 _isSyncing.value = false
                 driveJob = null
