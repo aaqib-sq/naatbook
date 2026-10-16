@@ -13,6 +13,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -308,7 +309,7 @@ class DriveSyncManager @Inject constructor(
             while (offset < total) {
                 // Audit TOP 4: cooperative cancellation — a cancelled sync
                 // stops between chunks instead of finishing the upload.
-                ensureActive()
+                currentCoroutineContext().ensureActive()
                 raf.seek(offset)
                 val want = minOf(CHUNK_SIZE.toLong(), total - offset).toInt()
                 var read = 0
@@ -370,7 +371,7 @@ class DriveSyncManager @Inject constructor(
                 while (true) {
                     // Audit TOP 4: cooperative cancellation — a cancelled
                     // restore download stops between chunks.
-                    ensureActive()
+                    currentCoroutineContext().ensureActive()
                     val n = input.read(buffer)
                     if (n < 0) break
                     output.write(buffer, 0, n)
