@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.audio.RecordingState
 import com.aistudio.mynaatnotebook.data.NaatCategories
 import com.aistudio.mynaatnotebook.ui.components.CategoryDisplay
+import com.aistudio.mynaatnotebook.ui.components.usesArabicScript
+import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.data.NaatSummary
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
@@ -74,7 +76,11 @@ fun LibraryScreen(
     onAddEntry: () -> Unit,
     foldersWithEntries: Set<String>,
     onFoldersSeen: (Set<String>) -> Unit,
-    titleFontFamily: FontFamily
+    titleFontFamily: FontFamily,
+    // Raw title choice + custom families: only the recents strip resolves
+    // titles per-entry; list rows keep the global titleFontFamily above.
+    titleFontChoice: String,
+    customFamilies: Map<String, FontFamily>
 ) {
     val context = LocalContext.current
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -266,7 +272,15 @@ fun LibraryScreen(
                                 naat = naat,
                                 isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
                                 onClick = { onOpenReader(naat.id) },
-                                titleFontFamily = titleFontFamily
+                                // Per-entry title: the entry's own override wins;
+                                // AUTO is script-aware on this title's script.
+                                titleFontFamily = FontChoices.resolveTitle(
+                                    FontChoices.effectiveTitleChoice(
+                                        naat.readerFontOverride, titleFontChoice
+                                    ),
+                                    usesArabicScript(naat.title),
+                                    customFamilies
+                                )
                             )
                         }
                     }
