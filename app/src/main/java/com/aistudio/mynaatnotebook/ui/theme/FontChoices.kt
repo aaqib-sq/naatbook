@@ -56,4 +56,11 @@ object FontChoices {
         NASTALIQ -> NastaliqFamily
         else -> FontFamily.SansSerif
     }
+
+    /**
+     * Per-entry reader-font precedence: the entry's own override wins;
+     * null means "follow the global Settings reader font".
+     */
+    fun effectiveReaderChoice(override: String?, global: String): String =
+        override ?: global
 }

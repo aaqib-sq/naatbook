@@ -26,5 +26,11 @@ data class NaatEntity(
     // ("linked_<timestamp>_file.mp3"). Null for recordings and for entries
     // linked before this field existed.
     val audioDisplayName: String? = null,
-    val secondaryAudioDisplayName: String? = null
+    val secondaryAudioDisplayName: String? = null,
+    /**
+     * Per-entry reader-font override, stored in the same encoding as
+     * SettingsStore.readerFont (a FontChoices key, or "custom:<id>").
+     * Null means "follow the global Settings reader font".
+     */
+    val readerFontOverride: String? = null
 )

@@ -96,11 +96,20 @@ import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.viewmodel.EditorAttachmentDraft
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import com.aistudio.mynaatnotebook.ui.components.FONT_FOLLOW_SETTINGS
+import com.aistudio.mynaatnotebook.ui.components.FontPickerDialog
+import com.aistudio.mynaatnotebook.ui.components.FontPickerLeadChoice
+import com.aistudio.mynaatnotebook.ui.components.fontChoiceLabel
+import com.aistudio.mynaatnotebook.ui.theme.FontChoices
+import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 
 /** Keyed lazy editor: only visible sections are composed and high-frequency media state is local. */
 @Composable
 fun AddNaatModal(
     viewModel: NaatViewModel,
+    settingsViewModel: SettingsViewModel,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -119,7 +128,7 @@ fun AddNaatModal(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item(key = "header") { EditorHeader(viewModel, onClose) }
-            item(key = "metadata") { EditorMetadataSection(viewModel) }
+            item(key = "metadata") { EditorMetadataSection(viewModel, settingsViewModel) }
             item(key = "audio") { EditorAudioSection(viewModel) }
             item(key = "bottom-space") { Spacer(Modifier.height(8.dp)) }
         }
@@ -156,7 +165,7 @@ private fun EditorHeader(viewModel: NaatViewModel, onClose: () -> Unit) {
 }
 
 @Composable
-private fun EditorMetadataSection(viewModel: NaatViewModel) {
+private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: SettingsViewModel) {
     val context = LocalContext.current
     val metadata by viewModel.editorMetadata.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
@@ -228,6 +237,10 @@ private fun EditorMetadataSection(viewModel: NaatViewModel) {
             }
         }
 
+        // Per-entry reader font (approved design): null follows the global
+        // Settings reader font; any choice applies to this entry's lyrics only.
+        EntryFontSection(viewModel, settingsViewModel)
+
         // Lyrics in their own card (approved design).
         EditorSectionCard {
             EditorCardLabel(stringResource(R.string.editor_lyrics_label))
@@ -263,6 +276,95 @@ private fun EditorMetadataSection(viewModel: NaatViewModel) {
                 colors = borderlessFieldColors()
             )
         }
+    }
+}
+
+/**
+ * Per-entry reader-font picker row. A null override means "follow the global
+ * Settings reader font"; any other choice applies to this entry's lyrics
+ * only (built-in or imported font).
+ */
+@Composable
+private fun EntryFontSection(viewModel: NaatViewModel, settingsViewModel: SettingsViewModel) {
+    val metadata by viewModel.editorMetadata.collectAsStateWithLifecycle()
+    val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
+    val globalReaderFont by settingsViewModel.readerFont.collectAsStateWithLifecycle()
+    val customFonts by settingsViewModel.customFonts.collectAsStateWithLifecycle()
+    val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
+    var showPicker by remember { mutableStateOf(false) }
+
+    val override = metadata.readerFontOverride
+    val currentLabel = override?.let { fontChoiceLabel(it, customFonts) }
+        ?: stringResource(R.string.editor_font_follow_settings)
+
+    Column {
+        Text(
+            text = stringResource(R.string.editor_font_label),
+            style = MaterialTheme.typography.bodyMedium,
+            color = HighContrastGray,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !isSaving) { showPicker = true }
+                .padding(vertical = 10.dp)
+                .testTag("entry_font_btn"),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Aa",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = currentLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = HighContrastGray
+            )
+        }
+    }
+
+    if (showPicker) {
+        FontPickerDialog(
+            title = stringResource(R.string.editor_font_label),
+            builtinKeys = FontChoices.READER_KEYS,
+            currentChoice = override ?: FONT_FOLLOW_SETTINGS,
+            customFonts = customFonts,
+            customFamilies = customFamilies,
+            onPick = { choice ->
+                viewModel.updateDraft {
+                    it.copy(readerFontOverride = if (choice == FONT_FOLLOW_SETTINGS) null else choice)
+                }
+                showPicker = false
+            },
+            onDismiss = { showPicker = false },
+            leadChoices = listOf(
+                FontPickerLeadChoice(
+                    choiceKey = FONT_FOLLOW_SETTINGS,
+                    label = stringResource(R.string.editor_font_follow_settings),
+                    sample = fontChoiceLabel(globalReaderFont, customFonts),
+                    testTag = "font_picker_row_follow_settings"
+                )
+            )
+        )
     }
 }
 

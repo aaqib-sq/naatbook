@@ -33,7 +33,7 @@ class NaatDatabaseMigrationTest {
     }
 
     @Test
-    fun `migration 1 through 5 preserves rows normalizes categories and timestamps edits`() {
+    fun `migration 1 through 7 preserves rows normalizes categories and applies column additions`() {
         createVersionOneDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
@@ -42,7 +42,8 @@ class NaatDatabaseMigrationTest {
                 NaatDatabase.MIGRATION_2_3,
                 NaatDatabase.MIGRATION_3_4,
                 NaatDatabase.MIGRATION_4_5,
-                NaatDatabase.MIGRATION_5_6
+                NaatDatabase.MIGRATION_5_6,
+                NaatDatabase.MIGRATION_6_7
             )
             .allowMainThreadQueries()
             .build()
@@ -66,6 +67,10 @@ class NaatDatabaseMigrationTest {
         assertEquals(0, database!!.openHelper.writableDatabase
             .query("SELECT COUNT(*) FROM naats WHERE audioDisplayName IS NOT NULL OR secondaryAudioDisplayName IS NOT NULL")
             .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
+        // v7 font-override column arrives null for every pre-existing row.
+        assertEquals(0, database!!.openHelper.writableDatabase
+            .query("SELECT COUNT(*) FROM naats WHERE readerFontOverride IS NOT NULL")
+            .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
 
         assertEquals(
             linkedMapOf(
@@ -85,7 +90,9 @@ class NaatDatabaseMigrationTest {
         createVersionFiveDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
-            .addMigrations(NaatDatabase.MIGRATION_5_6)
+            // The annotation now targets v7, so Room needs the full 5->7 path;
+            // the assertions below still verify exactly the 5->6 step.
+            .addMigrations(NaatDatabase.MIGRATION_5_6, NaatDatabase.MIGRATION_6_7)
             .allowMainThreadQueries()
             .build()
 
@@ -113,6 +120,46 @@ class NaatDatabaseMigrationTest {
             linkedMapOf("First" to "10:null", "Second" to "20:null"),
             rows
         )
+    }
+
+    @Test
+    fun `migration 6 to 7 adds readerFontOverride with null default and keeps rows`() {
+        createVersionSixDatabase()
+
+        database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
+            .addMigrations(NaatDatabase.MIGRATION_6_7)
+            .allowMainThreadQueries()
+            .build()
+
+        val columns = mutableListOf<String>()
+        database!!.openHelper.writableDatabase
+            .query("PRAGMA table_info(naats)")
+            .use { cursor ->
+                while (cursor.moveToNext()) {
+                    columns.add(cursor.getString(cursor.getColumnIndexOrThrow("name")))
+                }
+            }
+        assertTrue(columns.contains("readerFontOverride"))
+
+        // v7 column arrives null for every pre-existing row; other columns intact.
+        assertEquals(0, database!!.openHelper.writableDatabase
+            .query("SELECT COUNT(*) FROM naats WHERE readerFontOverride IS NOT NULL")
+            .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
+        database!!.openHelper.writableDatabase
+            .query("SELECT title, category, isFavorite FROM naats WHERE title = 'Font row'")
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Font row", cursor.getString(0))
+                assertEquals("Naat", cursor.getString(1))
+                assertEquals(0, cursor.getInt(2))
+            }
+
+        // A set override survives the migrated schema.
+        database!!.openHelper.writableDatabase
+            .execSQL("UPDATE naats SET readerFontOverride = 'nastaliq' WHERE title = 'Font row'")
+        assertEquals("nastaliq", database!!.openHelper.writableDatabase
+            .query("SELECT readerFontOverride FROM naats WHERE title = 'Font row'")
+            .use { cursor -> cursor.moveToFirst(); cursor.getString(0) })
     }
 
     private fun createVersionFiveDatabase() {
@@ -153,6 +200,47 @@ class NaatDatabaseMigrationTest {
                 )
             }
             db.version = 5
+        }
+    }
+
+    private fun createVersionSixDatabase() {
+        val file = context.getDatabasePath(TEST_DATABASE)
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            // Faithful v6: the v5 schema plus the nullable lastOpenedAt column
+            // that MIGRATION_5_6 adds (INTEGER, nullable by design).
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS naats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    title TEXT NOT NULL,
+                    poet TEXT,
+                    category TEXT NOT NULL,
+                    lyrics TEXT,
+                    audioType TEXT NOT NULL,
+                    audioPath TEXT,
+                    isFavorite INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    secondaryAudioType TEXT NOT NULL,
+                    secondaryAudioPath TEXT,
+                    audioDisplayName TEXT,
+                    secondaryAudioDisplayName TEXT,
+                    lastOpenedAt INTEGER
+                )
+                """.trimIndent()
+            )
+            // A real v6 database built by the migration chain carries the
+            // updatedAt index (MIGRATION_3_4); Room's post-migration schema
+            // validation fails without it.
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_naats_updatedAt ON naats(updatedAt)")
+            db.execSQL(
+                "INSERT INTO naats " +
+                    "(title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt, " +
+                    "updatedAt, secondaryAudioType, lastOpenedAt) " +
+                    "VALUES ('Font row', NULL, 'Naat', 'line', 'none', NULL, 0, 1, 1, 'none', NULL)"
+            )
+            db.version = 6
         }
     }
 
