@@ -879,12 +879,24 @@ fun SettingsScreen(
                         .testTag("backup_progress_bar"),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${(progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // Audit TOP 4: stop an in-progress export/import. The
+                    // work is cooperative — staging is cleaned and nothing
+                    // partial is committed.
+                    TextButton(
+                        onClick = { backupViewModel.cancelBackupWork() },
+                        modifier = Modifier.testTag("backup_cancel_btn")
+                    ) { Text(stringResource(R.string.common_cancel)) }
+                }
             }
         }
 
@@ -1059,12 +1071,22 @@ fun SettingsScreen(
                         .testTag("drive_progress_bar"),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${(progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // Audit TOP 4: stop an in-progress Drive sync/download.
+                    TextButton(
+                        onClick = { driveViewModel.cancelDriveWork() },
+                        modifier = Modifier.testTag("drive_cancel_btn")
+                    ) { Text(stringResource(R.string.common_cancel)) }
+                }
             }
         }
 
