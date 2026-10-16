@@ -47,6 +47,19 @@ class CustomFontStore @Inject constructor(
     companion object {
         const val MAX_FONTS = 10
         const val MAX_FONT_BYTES = 15L * 1024 * 1024
+        /**
+         * Audit fix (stage 1): a backup-declared font `name` goes straight
+         * into the registry and the picker UI — a hostile JSON could store a
+         * 100KB name or control characters. Cap and clean restore-path names.
+         * (The picker-import naming dialog is user-typed, so it stays as-is.)
+         */
+        const val MAX_FONT_NAME_LENGTH = 60
+
+        /** Restores only: control chars out, length capped, never blank. */
+        internal fun sanitizeRestoredFontName(raw: String): String =
+            raw.filterNot { it.isISOControl() }.trim().take(MAX_FONT_NAME_LENGTH)
+                .ifBlank { "My Font" }
+
         // sfnt magic: TrueType (0x00010000), legacy 'true', OpenType 'OTTO'
         private val FONT_MAGICS = listOf(
             byteArrayOf(0x00, 0x01, 0x00, 0x00),
@@ -281,7 +294,7 @@ class CustomFontStore @Inject constructor(
             if (!stagedFile.renameTo(destination)) {
                 stagedFile.copyTo(destination, overwrite = true)
             }
-            writeRegistry(current + CustomFont(id, uniqueName(name, current), fileName))
+            writeRegistry(current + CustomFont(id, uniqueName(sanitizeRestoredFontName(name), current), fileName))
             FontRestoreResult.ADOPTED
         }
 

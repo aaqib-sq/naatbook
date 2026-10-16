@@ -36,6 +36,13 @@ class NaatRepository @Inject constructor(private val naatDao: NaatDao) {
 
     suspend fun insertAll(naats: List<NaatEntity>): List<Long> = naatDao.insertNaats(naats)
 
+    /**
+     * Audit fix (stage 1): REPLACE restore — inserts the new rows and deletes
+     * the old ones inside one Room transaction (see [NaatDao.replaceLibrary]).
+     */
+    suspend fun replaceLibrary(newNaats: List<NaatEntity>, oldIds: List<Int>): List<Long> =
+        naatDao.replaceLibrary(newNaats, oldIds)
+
     suspend fun update(naat: NaatEntity) = naatDao.updateNaat(naat)
 
     suspend fun toggleFavorite(id: Int): NaatEntity? {
