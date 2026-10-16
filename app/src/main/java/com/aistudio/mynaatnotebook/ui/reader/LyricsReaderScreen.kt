@@ -163,6 +163,13 @@ fun LyricsReaderScreen(
     val effectiveReaderChoice = FontChoices.effectiveReaderChoice(naat.readerFontOverride, readerFontChoice)
     val titleFontChoice by settingsViewModel.titleFont.collectAsStateWithLifecycle()
     val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
+    // Reader top-bar title: the entry's own font override wins, else the
+    // global title font; AUTO is script-aware on this title's script.
+    val perEntryTitleFamily = FontChoices.resolveTitle(
+        FontChoices.effectiveTitleChoice(naat.readerFontOverride, titleFontChoice),
+        usesArabicScript(naat.title),
+        customFamilies
+    )
 
     val readerChromeVisible = !immersive || immersiveChromeVisible
 
@@ -288,7 +295,7 @@ fun LyricsReaderScreen(
                     onEdit = { onEdit(naat) },
                     onEnterImmersive = ::enterImmersive,
                     onExitImmersive = ::exitImmersive,
-                    titleFontFamily = FontChoices.resolveTitle(titleFontChoice, customFamilies)
+                    titleFontFamily = perEntryTitleFamily
                 )
                 ReaderControls(
                     fontSize = localFontSize,
