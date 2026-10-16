@@ -25,6 +25,7 @@
     <string name="common_delete">Delete</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_discard">Discard</string>
+    <string name="common_undo">Undo</string>
     <string name="common_edit_entry">Edit entry</string>
     <string name="common_database_error">database error</string>
 
@@ -218,6 +219,13 @@
     <string name="discard_title">Discard unsaved entry?</string>
     <string name="discard_message">Your unsaved text and newly recorded or attached audio will be discarded.</string>
     <string name="discard_keep_editing">Keep editing</string>
+    <string name="editor_keep_draft">Save draft for later</string>
+    <string name="editor_draft_kept">Draft saved for later</string>
+    <string name="editor_kept_draft_title">Saved draft</string>
+    <string name="editor_kept_draft_message">You have a draft you saved for later. Continue working on it?</string>
+    <string name="editor_kept_draft_continue">Continue draft</string>
+    <string name="editor_kept_draft_fresh">Start fresh</string>
+    <string name="editor_kept_draft_edit_anyway">Edit anyway</string>
 
     <!-- Status / toast messages -->
     <string name="status_recording_start_failed">Unable to start recording</string>
@@ -226,6 +234,8 @@
     <string name="status_entry_updated">Entry Updated!</string>
     <string name="status_save_failed">Save failed: %1$s</string>
     <string name="status_entry_deleted">Entry deleted</string>
+    <string name="status_entry_restored">Entry restored</string>
+    <string name="status_cancelled">Cancelled</string>
     <string name="status_entry_missing">Entry no longer exists</string>
     <string name="status_delete_failed">Delete failed: %1$s</string>
     <string name="status_favorite_failed">Could not update favorite</string>
