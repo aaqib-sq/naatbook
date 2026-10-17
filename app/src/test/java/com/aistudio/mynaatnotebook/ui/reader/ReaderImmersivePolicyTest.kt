@@ -32,6 +32,25 @@ class ReaderImmersivePolicyTest {
     }
 
     @Test
+    fun doubleTapNeedsTwoIntentionalTapsInsideTheWindow() {
+        assertTrue(ReaderImmersivePolicy.isDoubleTap(1_000L, 1_300L))
+        assertTrue(
+            ReaderImmersivePolicy.isDoubleTap(
+                1_000L,
+                1_000L + ReaderImmersivePolicy.DOUBLE_TAP_WINDOW_MS
+            )
+        )
+        assertFalse(
+            ReaderImmersivePolicy.isDoubleTap(
+                1_000L,
+                1_000L + ReaderImmersivePolicy.DOUBLE_TAP_WINDOW_MS + 1L
+            )
+        )
+        assertFalse(ReaderImmersivePolicy.isDoubleTap(0L, 1_200L))
+        assertFalse(ReaderImmersivePolicy.isDoubleTap(2_000L, 1_500L))
+    }
+
+    @Test
     fun onlyCleanShortSingleFingerTapTogglesChrome() {
         assertTrue(
             ReaderImmersivePolicy.isIntentionalSingleTap(
