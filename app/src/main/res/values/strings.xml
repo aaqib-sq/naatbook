@@ -324,6 +324,11 @@
     <string name="status_drive_no_backup">No backup in Drive yet — sync first</string>
     <string name="status_drive_disconnected">Google account disconnected</string>
     <string name="status_drive_consent_needed">Google needs your permission to continue</string>
+    <string name="status_drive_restore_available">Drive already has a backup — use Restore from Drive to bring it back</string>
+    <string name="status_drive_empty_skipped">Library is empty — nothing was backed up</string>
+    <string name="drive_empty_confirm_title">Back up an empty library?</string>
+    <string name="drive_empty_confirm_message">This library is empty, but Drive already holds a backup with entries. Syncing now makes the empty library the newest backup, and only the newest 2 backups are kept.</string>
+    <string name="drive_empty_confirm_action">Back up anyway</string>
     <!-- About section (Settings group, Privacy Policy + Contact Us screens) -->
     <string name="about_back">Back</string>
     <string name="settings_about_group">About</string>
