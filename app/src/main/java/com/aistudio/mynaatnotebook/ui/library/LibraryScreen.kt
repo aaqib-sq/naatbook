@@ -235,7 +235,7 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(viewModel.libraryHomeScrollState)
             ) {
                 // Recents first (approved design): the entries a user returns
                 // to most sit at the top as swipeable cards; the full lists
@@ -272,6 +272,7 @@ fun LibraryScreen(
                     // Room already applies updatedAt DESC and strict LIMIT 10,
                     // so this strip stays bounded however large the library gets.
                     LazyRow(
+                        state = viewModel.libraryRecentsListState,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
@@ -420,6 +421,7 @@ fun LibraryScreen(
                     }
                 } else {
                     LazyColumn(
+                        state = viewModel.librarySearchListState,
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -554,6 +556,7 @@ fun LibraryScreen(
                     }
                 }
             } else {
+                state = viewModel.libraryFolderListState,
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
