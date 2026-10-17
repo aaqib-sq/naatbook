@@ -1298,7 +1298,7 @@ class NaatViewModel @Inject constructor(
                         if (_selectedNaat.value?.id == deleted.id) _selectedNaat.value = null
                         // The old "Entry deleted" toast is replaced by the undo
                         // snackbar (collected from undoDeleteOffers in NaatApp).
-                        _undoDeleteOffers.emit(UndoDeleteOffer(undoToken))
+                        _undoDeleteOffers.value = UndoDeleteOffer(undoToken)
                         onSuccess()
                     }
                 }
@@ -1368,8 +1368,17 @@ class NaatViewModel @Inject constructor(
     private var pendingDelete: PendingDelete? = null
     private var pendingDeleteExpiryJob: Job? = null
     private var undoTokenCounter = 0L
-    private val _undoDeleteOffers = MutableSharedFlow<UndoDeleteOffer>(extraBufferCapacity = 1)
-    val undoDeleteOffers: SharedFlow<UndoDeleteOffer> = _undoDeleteOffers.asSharedFlow()
+    // Conflated hand-off for the undo snackbar: always carries only the
+    // LATEST offer. A buffered SharedFlow used to suspend the delete itself
+    // once its single buffer slot filled — during rapid one-by-one deletes
+    // the third delete onwards blocked for seconds on the previous
+    // snackbar's lifetime (device report 2026-10-17). Setting a StateFlow
+    // value never suspends the deleter.
+    private val _undoDeleteOffers = MutableStateFlow<UndoDeleteOffer?>(null)
+    val undoDeleteOffers: StateFlow<UndoDeleteOffer?> = _undoDeleteOffers.asStateFlow()
+
+    /** True while [token] still names the parked, undoable deletion. */
+    fun isUndoOfferLive(token: Long): Boolean = pendingDelete?.token == token
 
     private fun pendingDeleteDir(): File = File(context.filesDir, "pending_delete").apply { mkdirs() }
 
