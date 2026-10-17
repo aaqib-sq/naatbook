@@ -10,6 +10,7 @@ import com.aistudio.mynaatnotebook.data.SettingsStore
 import com.aistudio.mynaatnotebook.data.shouldAutoSync
 import com.aistudio.mynaatnotebook.data.drive.DriveException
 import com.aistudio.mynaatnotebook.data.drive.DriveSyncManager
+import com.aistudio.mynaatnotebook.data.drive.SyncOutcome
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -122,13 +123,40 @@ class DriveViewModel @Inject constructor(
         }
         viewModelScope.launch { settingsStore.setDriveEmail(email) }
         statusReporter.show(R.string.status_drive_connected, email)
-        // First backup right away, so connecting is immediately useful.
-        runSync(manual = true)
+        // Audit round 2 (S1): never upload blindly on sign-in. If Drive
+        // already holds backups, this device may be a fresh install whose
+        // (possibly empty) library must not become the newest backup —
+        // point at Restore instead. Only a genuinely empty Drive folder
+        // gets the immediate first backup. If the check itself fails,
+        // upload nothing; "Sync now" stays one tap away and is guarded.
+        viewModelScope.launch {
+            driveManager.remoteBackups()
+                .onSuccess { existing ->
+                    if (existing.isEmpty()) {
+                        runSync(manual = true)
+                    } else {
+                        statusReporter.show(R.string.status_drive_restore_available)
+                    }
+                }
+        }
     }
 
     fun syncNow() = runSync(manual = true)
 
-    private fun runSync(manual: Boolean) {
+    private val _emptySyncConfirm = MutableStateFlow(false)
+    /** Manual sync was skipped by the empty-library guard; ask first. */
+    val emptySyncConfirm: StateFlow<Boolean> = _emptySyncConfirm.asStateFlow()
+
+    fun confirmEmptySync() {
+        _emptySyncConfirm.value = false
+        runSync(manual = true, forced = true)
+    }
+
+    fun dismissEmptySync() {
+        _emptySyncConfirm.value = false
+    }
+
+    private fun runSync(manual: Boolean, forced: Boolean = false) {
         if (_isSyncing.value) return
         _isSyncing.value = true
         _operation.value = DriveOp.SYNC
@@ -136,9 +164,21 @@ class DriveViewModel @Inject constructor(
         driveJob = viewModelScope.launch {
             try {
                 if (manual) statusReporter.show(R.string.status_drive_syncing)
-                driveManager.syncNow { p -> _progress.value = p.coerceIn(0f, 1f) }
-                    .onSuccess { count ->
-                        statusReporter.show(R.string.status_drive_sync_success, count)
+                driveManager.syncNow(
+                    onProgress = { p -> _progress.value = p.coerceIn(0f, 1f) },
+                    forced = forced
+                )
+                    .onSuccess { outcome ->
+                        when (outcome) {
+                            is SyncOutcome.Uploaded -> statusReporter.show(
+                                R.string.status_drive_sync_success, outcome.count
+                            )
+                            SyncOutcome.SkippedEmpty -> if (manual) {
+                                _emptySyncConfirm.value = true
+                            } else {
+                                statusReporter.show(R.string.status_drive_empty_skipped)
+                            }
+                        }
                     }
                     .onFailure { error ->
                         if (error is CancellationException) {
