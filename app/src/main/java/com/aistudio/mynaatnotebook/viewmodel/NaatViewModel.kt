@@ -4,6 +4,8 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -213,6 +215,17 @@ class NaatViewModel @Inject constructor(
 
     private val _selectedFolder = MutableStateFlow<String?>(null) // null means "All" / Folder Grid View
     val selectedFolder: StateFlow<String?> = _selectedFolder.asStateFlow()
+
+    // Library scroll positions live in the ViewModel, not in remember:
+    // the home grid, recents strip and the folder/search lists all leave
+    // composition when a folder opens or the reader pushes on top, so a
+    // composable-local state reset the scroll to the top after every
+    // open-and-return (device report 2026-10-17: deleting down the list
+    // meant re-scrolling from the top after each delete).
+    val libraryHomeScrollState = ScrollState(0)
+    val libraryRecentsListState = LazyListState()
+    val librarySearchListState = LazyListState()
+    val libraryFolderListState = LazyListState()
 
     private val _showFavoritesOnly = MutableStateFlow(false)
     val showFavoritesOnly: StateFlow<Boolean> = _showFavoritesOnly.asStateFlow()
