@@ -59,6 +59,7 @@ import com.aistudio.mynaatnotebook.ui.settings.PrivacyPolicyScreen
 import com.aistudio.mynaatnotebook.ui.settings.SettingsScreen
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.flow.collectLatest
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
@@ -250,7 +251,14 @@ fun NaatApp(
                 // the viewmodel, so a late tap can never resurrect a
                 // finalized deletion.
                 LaunchedEffect(Unit) {
-                    viewModel.undoDeleteOffers.collect { offer ->
+                    // collectLatest: a newer delete replaces the visible
+                    // snackbar instead of queueing behind it (only the
+                    // newest deletion is undoable anyway — a fresh delete
+                    // finalizes the previous one inside the viewmodel).
+                    viewModel.undoDeleteOffers.collectLatest { offer ->
+                        if (offer == null || !viewModel.isUndoOfferLive(offer.token)) {
+                            return@collectLatest
+                        }
                         val result = snackbarHostState.showSnackbar(
                             message = undoDeletedMessage,
                             actionLabel = undoActionLabel,
