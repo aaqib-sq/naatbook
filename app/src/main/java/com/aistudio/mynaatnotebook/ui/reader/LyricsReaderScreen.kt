@@ -75,6 +75,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.withFrameNanos
@@ -101,7 +102,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.collectLatest
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -143,12 +146,29 @@ fun LyricsReaderScreen(
             settingsViewModel.saveReaderScrollOffset(naat.id, scrollState.value)
         }
     }
+    // Restore must ALWAYS settle at this entry's own offset (0 = top):
+    // skipping the scroll when nothing was saved used to leave an in-place
+    // entry switch (same reader instance, new naat) sitting at the previous
+    // entry's leftover position, mid-text (reader audit H1).
+    var restoreSettled by remember(naat.id) { mutableStateOf(false) }
     LaunchedEffect(naat.id) {
         val saved = settingsViewModel.getReaderScrollOffset(naat.id)
-        if (saved > 0) {
-            withFrameNanos { }
-            val target = clampedRestoreOffset(saved, scrollState.maxValue)
-            if (target > 0) scrollState.scrollTo(target)
+        withFrameNanos { }
+        val target = clampedRestoreOffset(saved, scrollState.maxValue)
+        if (scrollState.value != target) scrollState.scrollTo(target)
+        restoreSettled = true
+    }
+    // The dispose-save above loses the position when the process dies
+    // mid-reading (reader audit M1): also save while reading — collectLatest
+    // restarts the delay on every change, so a write lands about a second
+    // after scrolling pauses, never per pixel. The restore gate keeps a
+    // stale pre-restore position from being written under this entry's id.
+    LaunchedEffect(naat.id) {
+        snapshotFlow { scrollState.value }.collectLatest { offset ->
+            delay(1_000)
+            if (restoreSettled) {
+                settingsViewModel.saveReaderScrollOffset(naat.id, offset)
+            }
         }
     }
 
@@ -170,9 +190,11 @@ fun LyricsReaderScreen(
     var hasMeasuredTopChrome by remember { mutableStateOf(false) }
     var bottomChromeHeightPx by remember { mutableIntStateOf(0) }
 
-    // Auto-scroll engine configuration.
-    var autoScrollActive by rememberSaveable { mutableStateOf(false) }
-    var scrollSpeed by rememberSaveable { mutableFloatStateOf(1f) }
+    // Auto-scroll engine configuration. Keyed per entry like the immersive
+    // state above: an unkeyed rememberSaveable leaked "auto-scroll ON at
+    // A's speed" into the next entry on an in-place switch (reader audit H2).
+    var autoScrollActive by rememberSaveable(naat.id) { mutableStateOf(false) }
+    var scrollSpeed by rememberSaveable(naat.id) { mutableFloatStateOf(1f) }
 
     // Sizing controls.
     val defaultFontSize by settingsViewModel.globalFontSize.collectAsStateWithLifecycle()
@@ -403,13 +425,25 @@ private fun ReaderTopBar(
         }
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
+            // Arabic-script titles get the same care as the lyrics surface:
+            // Nastaliq has no Bold cut (synthetic bold muddies the joins),
+            // its tall glyphs need a roomier line height than the Latin
+            // default, and a long title must ellipsize — the old default
+            // Clip cut it mid-glyph inside a joined word (reader audit).
+            val titleIsArabic = usesArabicScript(naat.title)
             Text(
                 text = naat.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style =
+                    if (titleIsArabic) {
+                        MaterialTheme.typography.titleMedium.copy(lineHeight = 30.sp)
+                    } else {
+                        MaterialTheme.typography.titleMedium
+                    },
+                fontWeight = if (titleIsArabic) FontWeight.Normal else FontWeight.Bold,
                 fontFamily = titleFontFamily,
                 color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             // The poet line exists only when the entry has a poet — a blank
             // poet no longer renders a noisy "Unknown" placeholder.
@@ -418,7 +452,8 @@ private fun ReaderTopBar(
                     text = stringResource(R.string.reader_poet, naat.poet),
                     style = MaterialTheme.typography.bodySmall,
                     color = secondaryTextColor(),
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -855,6 +890,7 @@ private fun ReaderAudioControls(
         PlayerTransportControls(
             controller = controller,
             playing = playing,
+            ownsSelected = ownsSelected,
             onPlayPause = {
                 if (playing) controller.pause()
                 else if (ownsSelected) controller.resume()
@@ -875,6 +911,7 @@ private fun ReaderAudioControls(
 private fun PlayerTransportControls(
     controller: com.aistudio.mynaatnotebook.audio.PlaybackController,
     playing: Boolean,
+    ownsSelected: Boolean,
     onPlayPause: () -> Unit
 ) {
     val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
@@ -897,9 +934,13 @@ private fun PlayerTransportControls(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Skip backward 10s
+            // Skip backward 10s. Gated on session ownership: the seekbar
+            // already shows 0:00 when the live session belongs to another
+            // entry, but the skip buttons used to seek THAT entry's audio
+            // anyway (reader audit M3).
             IconButton(
                 onClick = { controller.skipBackward() },
+                enabled = ownsSelected,
                 modifier = Modifier.testTag("reader_skip_back")
             ) {
                 Icon(
@@ -931,9 +972,10 @@ private fun PlayerTransportControls(
                     )
                 }
             }
-            // Skip forward 10s
+            // Skip forward 10s (same ownership gate as skip-back, audit M3).
             IconButton(
                 onClick = { controller.skipForward() },
+                enabled = ownsSelected,
                 modifier = Modifier.testTag("reader_skip_forward")
             ) {
                 Icon(
