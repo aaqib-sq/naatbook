@@ -115,6 +115,7 @@ fun SettingsScreen(
     val driveOperation by driveViewModel.operation.collectAsStateWithLifecycle()
     val drivePendingRestoreUri by driveViewModel.pendingRestoreUri.collectAsStateWithLifecycle()
     val driveConsentIntent by driveViewModel.consentIntent.collectAsStateWithLifecycle()
+    val driveEmptySyncConfirm by driveViewModel.emptySyncConfirm.collectAsStateWithLifecycle()
     var driveDisconnectConfirm by remember { mutableStateOf(false) }
 
     // Which font picker is open: "reader", "title", or null.
@@ -907,6 +908,26 @@ fun SettingsScreen(
                     ) { Text(stringResource(R.string.common_cancel)) }
                 }
             }
+        }
+
+        // Audit round 2 (S1/S2): a manual sync skipped by the empty-library
+        // guard asks before an empty backup is allowed over Drive's real ones.
+        if (driveEmptySyncConfirm) {
+            AlertDialog(
+                onDismissRequest = { driveViewModel.dismissEmptySync() },
+                title = { Text(stringResource(R.string.drive_empty_confirm_title)) },
+                text = { Text(stringResource(R.string.drive_empty_confirm_message)) },
+                confirmButton = {
+                    TextButton(onClick = { driveViewModel.confirmEmptySync() }) {
+                        Text(stringResource(R.string.drive_empty_confirm_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { driveViewModel.dismissEmptySync() }) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
