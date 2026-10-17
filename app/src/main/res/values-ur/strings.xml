@@ -324,6 +324,11 @@
     <string name="status_drive_no_backup">ڈرائیو میں ابھی کوئی بیک اپ نہیں — پہلے بھیجیں</string>
     <string name="status_drive_disconnected">گوگل اکاؤنٹ الگ کر دیا گیا</string>
     <string name="status_drive_consent_needed">جاری رکھنے کے لیے گوگل کو آپ کی اجازت چاہیے</string>
+    <string name="status_drive_restore_available">ڈرائیو میں پہلے سے بیک اپ موجود ہے — واپس لانے کے لیے Restore from Drive استعمال کریں</string>
+    <string name="status_drive_empty_skipped">لائبریری خالی ہے — کوئی بیک اپ نہیں بھیجا گیا</string>
+    <string name="drive_empty_confirm_title">خالی لائبریری کا بیک اپ بھیجیں؟</string>
+    <string name="drive_empty_confirm_message">یہ لائبریری خالی ہے، مگر ڈرائیو میں پہلے سے اندراجات والا بیک اپ موجود ہے۔ ابھی بھیجنے سے خالی لائبریری سب سے نیا بیک اپ بن جائے گی، اور صرف تازہ ترین 2 بیک اپ ہی رکھے جاتے ہیں۔</string>
+    <string name="drive_empty_confirm_action">پھر بھی بھیجیں</string>
     <!-- About section (Settings group, Privacy Policy + Contact Us screens) -->
     <string name="about_back">پیچھے جائیں</string>
     <string name="settings_about_group">ایپ کے بارے میں</string>
