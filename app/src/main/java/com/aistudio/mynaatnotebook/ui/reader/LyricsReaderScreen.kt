@@ -225,6 +225,13 @@ fun LyricsReaderScreen(
         showImmersiveHint = false
     }
 
+    // Double-tap on the lyrics toggles the whole immersive mode, so the
+    // reader never has to reach for the top-bar button (owner request
+    // 2026-10-17). Single taps keep their existing meaning.
+    fun toggleImmersiveMode() {
+        if (immersive) exitImmersive() else enterImmersive()
+    }
+
     fun toggleImmersiveChrome() {
         if (!immersive) return
         val fromTop = if (immersiveChromeVisible) topChromeHeightPx else 0
@@ -296,6 +303,7 @@ fun LyricsReaderScreen(
             bottomChromePaddingPx = bottomContentPaddingPx,
             immersive = immersive,
             onIntentionalTap = ::toggleImmersiveChrome,
+            onDoubleTap = ::toggleImmersiveMode,
             readerFontChoice = effectiveReaderChoice,
             customFamilies = customFamilies
         )
@@ -660,6 +668,7 @@ private fun ReaderLyricsViewport(
     bottomChromePaddingPx: Int,
     immersive: Boolean,
     onIntentionalTap: () -> Unit,
+    onDoubleTap: () -> Unit,
     readerFontChoice: String,
     customFamilies: Map<String, FontFamily>
 ) {
@@ -668,9 +677,9 @@ private fun ReaderLyricsViewport(
     val bottomPadding = with(density) { bottomChromePaddingPx.toDp() } + ReaderBottomBreathingRoom
     val horizontalPadding = if (immersive) 24.dp else 20.dp
     val tapLabel = if (immersive) stringResource(R.string.reader_tap_label) else ""
-    val tapModifier = Modifier.toggleReaderChromeOnIntentionalTap(
-        enabled = immersive,
-        onTap = onIntentionalTap
+    val tapModifier = Modifier.toggleReaderImmersiveOnTap(
+        onTap = onIntentionalTap,
+        onDoubleTap = onDoubleTap
     )
 
     if (naat.lyrics.isNullOrBlank()) {
@@ -1081,45 +1090,53 @@ private fun ApplyImmersiveSystemBars(enabled: Boolean) {
 }
 
 /**
- * A non-consuming detector layered beside verticalScroll. It only invokes the
- * toggle for a short, one-finger tap within touch slop; drags, swipes, long
- * presses, and multi-touch gestures continue to belong to lyric scrolling.
+ * A non-consuming detector layered beside verticalScroll. It only invokes
+ * the callbacks for a short, one-finger tap within touch slop; drags,
+ * swipes, long presses, and multi-touch gestures continue to belong to
+ * lyric scrolling. Two intentional taps released within the double-tap
+ * window fire [onDoubleTap] instead of a second [onTap] — in immersive
+ * mode the first tap still toggles the chrome immediately, so a
+ * double-tap briefly shows the bars on its way out; outside immersive a
+ * single tap stays a no-op and only the pair enters full screen.
  */
-private fun Modifier.toggleReaderChromeOnIntentionalTap(
-    enabled: Boolean,
-    onTap: () -> Unit
-): Modifier = if (!enabled) {
-    this
-} else {
-    pointerInput(onTap) {
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            val origin = down.position
-            val startedAt = down.uptimeMillis
-            var maxTravel = 0f
-            var maxPointers = 1
-            var released = false
-            var releasedAt = startedAt
+private fun Modifier.toggleReaderImmersiveOnTap(
+    onTap: () -> Unit,
+    onDoubleTap: () -> Unit
+): Modifier = pointerInput(onTap, onDoubleTap) {
+    var lastTapReleaseMs = 0L
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val origin = down.position
+        val startedAt = down.uptimeMillis
+        var maxTravel = 0f
+        var maxPointers = 1
+        var released = false
+        var releasedAt = startedAt
 
-            do {
-                val event = awaitPointerEvent()
-                maxPointers = maxOf(maxPointers, event.changes.count { it.pressed })
-                event.changes.firstOrNull { it.id == down.id }?.let { change ->
-                    maxTravel = maxOf(maxTravel, (change.position - origin).getDistance())
-                    if (change.changedToUpIgnoreConsumed()) {
-                        released = true
-                        releasedAt = change.uptimeMillis
-                    }
+        do {
+            val event = awaitPointerEvent()
+            maxPointers = maxOf(maxPointers, event.changes.count { it.pressed })
+            event.changes.firstOrNull { it.id == down.id }?.let { change ->
+                maxTravel = maxOf(maxTravel, (change.position - origin).getDistance())
+                if (change.changedToUpIgnoreConsumed()) {
+                    released = true
+                    releasedAt = change.uptimeMillis
                 }
-            } while (event.changes.any { it.pressed })
+            }
+        } while (event.changes.any { it.pressed })
 
-            if (released && ReaderImmersivePolicy.isIntentionalSingleTap(
-                    travelPx = maxTravel,
-                    touchSlopPx = viewConfiguration.touchSlop,
-                    pointerCount = maxPointers,
-                    durationMs = releasedAt - startedAt
-                )
-            ) {
+        if (released && ReaderImmersivePolicy.isIntentionalSingleTap(
+                travelPx = maxTravel,
+                touchSlopPx = viewConfiguration.touchSlop,
+                pointerCount = maxPointers,
+                durationMs = releasedAt - startedAt
+            )
+        ) {
+            if (ReaderImmersivePolicy.isDoubleTap(lastTapReleaseMs, releasedAt)) {
+                lastTapReleaseMs = 0L
+                onDoubleTap()
+            } else {
+                lastTapReleaseMs = releasedAt
                 onTap()
             }
         }

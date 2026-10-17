@@ -10,6 +10,14 @@ package com.aistudio.mynaatnotebook.ui.reader
 internal object ReaderImmersivePolicy {
     const val MAX_SINGLE_TAP_DURATION_MS = 300L
 
+    /** Two intentional taps released this close together read as one double-tap. */
+    const val DOUBLE_TAP_WINDOW_MS = 350L
+
+    fun isDoubleTap(previousReleaseMs: Long, currentReleaseMs: Long): Boolean =
+        previousReleaseMs > 0L &&
+            currentReleaseMs >= previousReleaseMs &&
+            currentReleaseMs - previousReleaseMs <= DOUBLE_TAP_WINDOW_MS
+
     fun scrollCompensationPx(fromTopChromePx: Int, toTopChromePx: Int): Float =
         (toTopChromePx - fromTopChromePx).toFloat()
 
