@@ -49,6 +49,18 @@ class DriveException(
 /** One backup file stored in the Drive folder. */
 data class DriveBackupInfo(val fileId: String, val name: String, val createdAtMs: Long?)
 
+/** Outcome of a sync attempt (audit round 2, S1/S2). */
+sealed interface SyncOutcome {
+    /** A backup was uploaded; [count] entries went up. */
+    data class Uploaded(val count: Int) : SyncOutcome
+
+    /**
+     * Nothing was uploaded: the local library is empty and Drive already
+     * holds backups, so an empty upload would have endangered them.
+     */
+    data object SkippedEmpty : SyncOutcome
+}
+
 private class DriveHttpException(val code: Int, message: String) : IOException(message)
 
 /**
@@ -105,9 +117,19 @@ class DriveSyncManager @Inject constructor(
 
     /**
      * Build the backup ZIP and upload it to Drive, then prune old backups
-     * and record the sync bookkeeping. Returns the exported entry count.
+     * and record the sync bookkeeping.
+     *
+     * Empty-library guard (audit round 2, S1/S2): when the local library
+     * has 0 entries and the Drive folder already holds backups, the upload
+     * is skipped ([SyncOutcome.SkippedEmpty]) unless [forced] — an empty
+     * upload must never become the newest backup over real ones, because
+     * rotation keeps only the newest [KEEP_BACKUPS] and a restore against
+     * the empty file reads as "0 entries" (REPLACE would wipe the phone).
      */
-    suspend fun syncNow(onProgress: (Float) -> Unit): Result<Int> = withContext(Dispatchers.IO) {
+    suspend fun syncNow(
+        onProgress: (Float) -> Unit,
+        forced: Boolean = false
+    ): Result<SyncOutcome> = withContext(Dispatchers.IO) {
         runCatching {
             withApi { token ->
                 val folderId = ensureFolder(token)
@@ -117,21 +139,34 @@ class DriveSyncManager @Inject constructor(
                     val count = backupManager.exportBackupToFile(staged) { p ->
                         onProgress(p * 0.3f)
                     }.getOrThrow()
+                    // The entry count rides in the file name so an empty
+                    // backup is recognizable at a glance in the Drive app.
                     val name = BACKUP_FILE_PREFIX +
-                        SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".zip"
-                    var uploadedId: String? = null
-                    try {
-                        uploadedId = uploadBackup(token, folderId, staged, name) { p ->
-                            onProgress(0.3f + p * 0.7f)
-                        }
-                        // Rotation: keep only the newest backups.
-                        listBackups(token, folderId).drop(KEEP_BACKUPS).forEach { old ->
-                            currentCoroutineContext().ensureActive()
-                            runCatching { deleteFile(token, old.fileId) }
-                        }
-                        settingsStore.recordDriveSync(System.currentTimeMillis(), hash)
-                        count
-                    } catch (e: CancellationException) {
+                        SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) +
+                        "-n$count.zip"
+                    val existing = listBackups(token, folderId)
+                    if (DriveSyncPolicy.decideUpload(count, existing.size, forced) ==
+                        UploadDecision.SKIP_EMPTY_OVER_EXISTING
+                    ) {
+                        SyncOutcome.SkippedEmpty
+                    } else {
+                        var uploadedId: String? = null
+                        try {
+                            uploadedId = uploadBackup(token, folderId, staged, name) { p ->
+                                onProgress(0.3f + p * 0.7f)
+                            }
+                            // Rotation: keep only the newest backups. An empty
+                            // upload (only possible when forced, or as the very
+                            // first backup) never evicts existing backups.
+                            if (count > 0) {
+                                listBackups(token, folderId).drop(KEEP_BACKUPS).forEach { old ->
+                                    currentCoroutineContext().ensureActive()
+                                    runCatching { deleteFile(token, old.fileId) }
+                                }
+                            }
+                            settingsStore.recordDriveSync(System.currentTimeMillis(), hash)
+                            SyncOutcome.Uploaded(count)
+                        } catch (e: CancellationException) {
                         // The cancel raced a completed upload: remove the orphan so
                         // Drive keeps only acknowledged syncs, and don't record a
                         // sync the user stopped. Best-effort and non-cancellable;
@@ -142,10 +177,25 @@ class DriveSyncManager @Inject constructor(
                             }
                         }
                         throw e
+                        }
                     }
                 } finally {
                     staged.delete()
                 }
+            }
+        }
+    }
+
+    /**
+     * Metadata of the backups currently in the Drive folder (newest first);
+     * an absent folder reads as an empty list. Cheap — no file downloads.
+     * Used to decide whether a sign-in should upload anything at all.
+     */
+    suspend fun remoteBackups(): Result<List<DriveBackupInfo>> = withContext(Dispatchers.IO) {
+        runCatching {
+            withApi { token ->
+                val folderId = findFolder(token)
+                if (folderId == null) emptyList() else listBackups(token, folderId)
             }
         }
     }
