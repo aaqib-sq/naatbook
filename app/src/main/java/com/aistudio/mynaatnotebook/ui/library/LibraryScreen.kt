@@ -556,8 +556,8 @@ fun LibraryScreen(
                     }
                 }
             } else {
-                state = viewModel.libraryFolderListState,
                 LazyColumn(
+                    state = viewModel.libraryFolderListState,
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
