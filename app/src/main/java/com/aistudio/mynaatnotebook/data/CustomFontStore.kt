@@ -57,7 +57,7 @@ class CustomFontStore @Inject constructor(
     private val settingsStore: SettingsStore
 ) {
     companion object {
-        const val MAX_FONTS = 10
+        const val MAX_FONTS = 50
         const val MAX_FONT_BYTES = 15L * 1024 * 1024
         /**
          * Audit fix (stage 1): a backup-declared font `name` goes straight
