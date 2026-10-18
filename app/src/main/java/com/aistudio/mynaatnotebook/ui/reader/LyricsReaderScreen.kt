@@ -10,6 +10,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
@@ -191,6 +195,7 @@ fun LyricsReaderScreen(
     var topChromeHeightPx by remember { mutableIntStateOf(0) }
     var hasMeasuredTopChrome by remember { mutableStateOf(false) }
     var bottomChromeHeightPx by remember { mutableIntStateOf(0) }
+    var hasMeasuredBottomChrome by remember { mutableStateOf(false) }
 
     // Auto-scroll engine configuration. Keyed per entry like the immersive
     // state above: an unkeyed rememberSaveable leaked "auto-scroll ON at
@@ -334,7 +339,8 @@ fun LyricsReaderScreen(
     // Until the top chrome has been measured once, snap to the target so
     // the first composition never glides in from a zero padding.
     val topContentPaddingPx = if (hasMeasuredTopChrome) animatedTopPaddingPx else targetTopPaddingPx
-    val bottomContentPaddingPx = animatedBottomPaddingPx
+    val bottomContentPaddingPx =
+        if (hasMeasuredBottomChrome) animatedBottomPaddingPx else targetBottomPaddingPx
 
     Box(
         modifier = Modifier
@@ -383,13 +389,30 @@ fun LyricsReaderScreen(
                     onScrollSpeedChange = { scrollSpeed = it }
                 )
             }
+        }
 
+        // The audio card glides in/out like every other moving part of
+        // this screen. It used to sit inside the plain chrome `if` above,
+        // teleporting in and out while the paddings and system bars
+        // animated around it — on audio entries the card visibly arrived
+        // with a jerk. The bottom padding also snapped on first
+        // measurement (see bottomContentPaddingPx), like the top has
+        // always done, so opening an audio entry no longer tweens the
+        // scroll area from zero while the card is already fully drawn.
+        AnimatedVisibility(
+            visible = readerChromeVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
             ReaderAudioControls(
                 naat = naat,
                 viewModel = viewModel,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .onSizeChanged { bottomChromeHeightPx = it.height }
+                    .onSizeChanged {
+                        bottomChromeHeightPx = it.height
+                        hasMeasuredBottomChrome = true
+                    }
                     .testTag("reader_chrome_bottom")
             )
         }
