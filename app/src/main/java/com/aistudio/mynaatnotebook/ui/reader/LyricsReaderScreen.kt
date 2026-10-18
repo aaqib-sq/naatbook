@@ -8,6 +8,8 @@ import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
@@ -218,21 +220,17 @@ fun LyricsReaderScreen(
     val readerChromeVisible = !immersive || immersiveChromeVisible
 
     /*
-     * The lyric viewport always fills the entire reader window. Chrome is rendered
-     * as an overlay and only changes scroll-content padding, never the viewport's
-     * origin or height. Before any top chrome change we move ScrollState by the
-     * exact padding delta. Consequently the currently read line stays in the same
-     * screen position instead of jumping when controls appear/disappear.
+     * The lyric viewport always fills the entire reader window; chrome is an
+     * overlay and only the scroll-content padding changes. Padding changes
+     * are animated (see the padding block below) and a follower shifts
+     * ScrollState by the same per-frame delta, so the line being read stays
+     * glued to its screen position. The old instant compensation also aimed
+     * at 0 instead of the real hidden-state padding, overshooting by the
+     * whole safe-top gap on every flip — the visible jerk on toggles.
      */
-    fun compensateForTopChromeChange(fromPx: Int, toPx: Int) {
-        scrollState.dispatchRawDelta(
-            ReaderImmersivePolicy.scrollCompensationPx(fromPx, toPx)
-        )
-    }
 
     fun enterImmersive() {
         if (immersive) return
-        compensateForTopChromeChange(topChromeHeightPx, 0)
         immersive = true
         immersiveChromeVisible = false
         showImmersiveHint = true
@@ -240,8 +238,6 @@ fun LyricsReaderScreen(
 
     fun exitImmersive() {
         if (!immersive) return
-        val fromTop = if (immersiveChromeVisible) topChromeHeightPx else 0
-        compensateForTopChromeChange(fromTop, topChromeHeightPx)
         immersive = false
         immersiveChromeVisible = false
         showImmersiveHint = false
@@ -256,23 +252,17 @@ fun LyricsReaderScreen(
 
     fun toggleImmersiveChrome() {
         if (!immersive) return
-        val fromTop = if (immersiveChromeVisible) topChromeHeightPx else 0
-        val toTop = if (immersiveChromeVisible) 0 else topChromeHeightPx
-        compensateForTopChromeChange(fromTop, toTop)
+        // Inside immersive mode the content padding never changes (the
+        // chrome floats over a constant gap), so this flip moves no text.
         immersiveChromeVisible = !immersiveChromeVisible
         showImmersiveHint = !immersiveChromeVisible
     }
 
     fun updateTopChromeHeight(heightPx: Int) {
         if (heightPx == topChromeHeightPx) return
-        val oldHeight = topChromeHeightPx
         topChromeHeightPx = heightPx
-        // On initial Reader composition there is no previously visible lyric line
-        // to anchor: leave ScrollState at zero so the first verse begins below the
-        // freshly measured chrome. Subsequent changes preserve the active line.
-        if (readerChromeVisible && hasMeasuredTopChrome) {
-            compensateForTopChromeChange(oldHeight, heightPx)
-        }
+        // Padding follows this measurement through the animated target
+        // below; the anchor follower keeps the read line steady meanwhile.
         hasMeasuredTopChrome = true
     }
 
@@ -308,8 +298,43 @@ fun LyricsReaderScreen(
         WindowInsets.displayCutout.getTop(density),
         WindowInsets.statusBars.getTop(density)
     ) + with(density) { 12.dp.toPx() }.toInt()
-    val topContentPaddingPx = if (readerChromeVisible) topChromeHeightPx else safeTopPx
-    val bottomContentPaddingPx = if (readerChromeVisible) bottomChromeHeightPx else 0
+    // Full screen keeps ONE constant top gap whether the chrome is summoned
+    // or not — the chrome floats over it, so showing/hiding controls inside
+    // immersive mode never moves the text at all. The gap itself starts the
+    // lyrics a little lower than before (owner request 2026-10-18: +24dp
+    // under the safe top). Only entering/leaving immersive changes the
+    // target, and that change is animated; the follower below shifts the
+    // scroll by the same per-frame delta so the read line glides instead
+    // of teleporting.
+    val immersiveTopPx = safeTopPx + with(density) { 24.dp.toPx() }.toInt()
+    val targetTopPaddingPx = if (immersive) immersiveTopPx else topChromeHeightPx
+    val targetBottomPaddingPx = if (immersive) 0 else bottomChromeHeightPx
+    val animatedTopPaddingPx by animateIntAsState(
+        targetValue = targetTopPaddingPx,
+        animationSpec = tween(durationMillis = 300),
+        label = "readerTopPadding"
+    )
+    val animatedBottomPaddingPx by animateIntAsState(
+        targetValue = targetBottomPaddingPx,
+        animationSpec = tween(durationMillis = 300),
+        label = "readerBottomPadding"
+    )
+    var lastAnimatedTopPx by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { animatedTopPaddingPx }.collect { current ->
+            val last = lastAnimatedTopPx
+            lastAnimatedTopPx = current
+            if (last != null && restoreSettled) {
+                scrollState.dispatchRawDelta(
+                    ReaderImmersivePolicy.scrollCompensationPx(last, current)
+                )
+            }
+        }
+    }
+    // Until the top chrome has been measured once, snap to the target so
+    // the first composition never glides in from a zero padding.
+    val topContentPaddingPx = if (hasMeasuredTopChrome) animatedTopPaddingPx else targetTopPaddingPx
+    val bottomContentPaddingPx = animatedBottomPaddingPx
 
     Box(
         modifier = Modifier
@@ -826,6 +851,19 @@ private fun ReaderAudioControls(
     val duration = if (ownsSelected) playerDuration else 0
     val selectedType = attachments.firstOrNull { it.second == selectedPath }?.first ?: attachments.first().first
 
+    val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
+    val sleepRemaining by controller.sleepTimerRemainingMs.collectAsStateWithLifecycle()
+    // Audit #11: while Media3 prepares a file the play tap used to
+    // look ignored for a second or two — spinner in the button instead.
+    val preparing by controller.isPreparing.collectAsStateWithLifecycle()
+    var showSleepDialog by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
+    val speedLabel = "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x"
+    val sleepLabel = sleepRemaining?.let { ms ->
+        val mins = (ms / 60_000L).toInt()
+        val secs = ((ms % 60_000L) / 1000L).toInt()
+        "%d:%02d".format(mins, secs)
+    }
     Column(
         modifier
             .fillMaxWidth()
@@ -858,20 +896,78 @@ private fun ReaderAudioControls(
                 }
             }
         }
-        Text(
-            if (selectedType == "recorded") stringResource(R.string.reader_voice_note) else stringResource(R.string.reader_linked_audio),
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = secondaryTextColor()
-        )
-        // Line 1: seek — current time, full-width thin line, total time
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                formatTime(position),
-                style = MaterialTheme.typography.bodySmall,
-                color = secondaryTextColor()
+        // Slim single-row player (owner request 2026-10-18): the old stack —
+        // a centered type label, a full-width seek row and a separate
+        // transport row — ate ~140dp under the lyrics. Everything now lives
+        // in one 48dp row: type icon, skip back, play/pause, skip forward,
+        // the thin seek line, the time, and the overflow menu (speed +
+        // sleep timer). The attachment switcher above only appears when
+        // the entry carries two audios.
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                if (selectedType == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
+                contentDescription = null,
+                tint = secondaryTextColor(),
+                modifier = Modifier.size(18.dp)
             )
+            Spacer(Modifier.width(2.dp))
+            // Skip backward 10s. Gated on session ownership: the seekbar
+            // shows 0:00 when the live session belongs to another entry,
+            // but the skip buttons used to seek THAT entry's audio anyway
+            // (reader audit M3).
+            IconButton(
+                onClick = { controller.skipBackward() },
+                enabled = ownsSelected,
+                modifier = Modifier.size(40.dp).testTag("reader_skip_back")
+            ) {
+                Icon(
+                    Icons.Default.Replay10,
+                    contentDescription = stringResource(R.string.player_skip_back_cd),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            // Filled play/pause
+            IconButton(
+                onClick = {
+                    if (playing) controller.pause()
+                    else if (ownsSelected) controller.resume()
+                    else viewModel.startEntryPlayback(naat, selectedPath)
+                },
+                modifier = Modifier
+                    .size(46.dp)
+                    .background(MaterialTheme.colorScheme.onBackground, CircleShape)
+                    .testTag("reader_play_pause")
+            ) {
+                if (preparing && !playing) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.background,
+                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(22.dp)
+                    )
+                } else {
+                    Icon(
+                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (playing) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
+                        tint = MaterialTheme.colorScheme.background,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            }
+            // Skip forward 10s (same ownership gate as skip-back).
+            IconButton(
+                onClick = { controller.skipForward() },
+                enabled = ownsSelected,
+                modifier = Modifier.size(40.dp).testTag("reader_skip_forward")
+            ) {
+                Icon(
+                    Icons.Default.Forward10,
+                    contentDescription = stringResource(R.string.player_skip_forward_cd),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
             ThinSeekBar(
                 fraction = if (duration > 0) position.toFloat() / duration.toFloat() else 0f,
                 onFractionChange = { f ->
@@ -880,128 +976,22 @@ private fun ReaderAudioControls(
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp).testTag("reader_audio_seekbar")
             )
             Text(
-                formatTime(duration),
-                style = MaterialTheme.typography.bodySmall,
+                "${formatTime(position)} / ${formatTime(duration)}",
+                style = MaterialTheme.typography.labelSmall,
                 color = secondaryTextColor()
             )
-        }
-        // Line 2: transport — speed chip, skip back, big play/pause, skip
-        // forward, sleep timer chip (same layout as the approved preview).
-        PlayerTransportControls(
-            controller = controller,
-            playing = playing,
-            ownsSelected = ownsSelected,
-            onPlayPause = {
-                if (playing) controller.pause()
-                else if (ownsSelected) controller.resume()
-                else viewModel.startEntryPlayback(naat, selectedPath)
-            }
-        )
-    }
-}
-
-/**
- * Transport row for the reader player: skip-back, a large filled play/pause
- * button and skip-forward centered, with a three-dot overflow menu at the
- * right edge holding playback speed and the sleep timer (both used rarely,
- * so they no longer take permanent space in the player). When a sleep timer
- * is running, its remaining time stays visible next to the dots.
- */
-@Composable
-private fun PlayerTransportControls(
-    controller: com.aistudio.mynaatnotebook.audio.PlaybackController,
-    playing: Boolean,
-    ownsSelected: Boolean,
-    onPlayPause: () -> Unit
-) {
-    val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
-    val sleepRemaining by controller.sleepTimerRemainingMs.collectAsStateWithLifecycle()
-    // Audit #11: while Media3 prepares a file there used to be no feedback
-    // at all — the play tap looked ignored for a second or two.
-    val preparing by controller.isPreparing.collectAsStateWithLifecycle()
-    var showSleepDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    var menuExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val speedLabel = "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x"
-    val sleepLabel = sleepRemaining?.let { ms ->
-        val mins = (ms / 60_000L).toInt()
-        val secs = ((ms % 60_000L) / 1000L).toInt()
-        "%d:%02d".format(mins, secs)
-    }
-
-    Box(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
-        Row(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Skip backward 10s. Gated on session ownership: the seekbar
-            // already shows 0:00 when the live session belongs to another
-            // entry, but the skip buttons used to seek THAT entry's audio
-            // anyway (reader audit M3).
-            IconButton(
-                onClick = { controller.skipBackward() },
-                enabled = ownsSelected,
-                modifier = Modifier.testTag("reader_skip_back")
-            ) {
-                Icon(
-                    Icons.Default.Replay10,
-                    contentDescription = stringResource(R.string.player_skip_back_cd),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            // Big filled play/pause
-            IconButton(
-                onClick = onPlayPause,
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(MaterialTheme.colorScheme.onBackground, CircleShape)
-                    .testTag("reader_play_pause")
-            ) {
-                if (preparing && !playing) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.background,
-                        strokeWidth = 2.5.dp,
-                        modifier = Modifier.size(26.dp)
-                    )
-                } else {
-                    Icon(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playing) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
-                        tint = MaterialTheme.colorScheme.background,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-            }
-            // Skip forward 10s (same ownership gate as skip-back, audit M3).
-            IconButton(
-                onClick = { controller.skipForward() },
-                enabled = ownsSelected,
-                modifier = Modifier.testTag("reader_skip_forward")
-            ) {
-                Icon(
-                    Icons.Default.Forward10,
-                    contentDescription = stringResource(R.string.player_skip_forward_cd),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-        // Right edge: remaining sleep time (when a timer runs) + overflow menu
-        Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
             if (sleepLabel != null) {
+                Spacer(Modifier.width(4.dp))
                 Text(
                     text = sleepLabel,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = secondaryTextColor()
                 )
-                Spacer(Modifier.width(2.dp))
             }
             Box {
                 IconButton(
                     onClick = { menuExpanded = true },
-                    modifier = Modifier.testTag("reader_more_btn")
+                    modifier = Modifier.size(40.dp).testTag("reader_more_btn")
                 ) {
                     Icon(
                         Icons.Default.MoreVert,
