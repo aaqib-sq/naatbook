@@ -148,6 +148,7 @@
     <string name="reader_no_lyrics">No written lyrics provided.\nReady to recite with attached media!</string>
     <string name="reader_voice_note">Voice Note</string>
     <string name="reader_linked_audio">Linked Audio</string>
+    <string name="reader_switch_audio_cd">Switch audio</string>
 
     <!-- Library -->
     <string name="library_search_cd">Search icon</string>

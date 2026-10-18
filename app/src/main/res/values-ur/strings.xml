@@ -148,6 +148,7 @@
     <string name="reader_no_lyrics">کوئی تحریری اشعار فراہم نہیں کیے گئے۔\nمنسلک آڈیو کے ساتھ پڑھنے کے لیے تیار!</string>
     <string name="reader_voice_note">آواز کا نوٹ</string>
     <string name="reader_linked_audio">منسلک آڈیو</string>
+    <string name="reader_switch_audio_cd">آڈیو بدلیں</string>
 
     <!-- Library -->
     <string name="library_search_cd">تلاش کا نشان</string>

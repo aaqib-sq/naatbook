@@ -895,48 +895,51 @@ private fun ReaderAudioControls(
             .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-        if (attachments.size > 1) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                attachments.forEach { (type, path) ->
-                    TextButton(
-                        onClick = {
-                            selectedPath = path
-                            viewModel.startEntryPlayback(naat, path)
-                        },
-                        modifier = Modifier.testTag("reader_select_$type")
-                    ) {
-                        Icon(
-                            if (type == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            if (type == "recorded") stringResource(R.string.reader_voice_note) else stringResource(R.string.reader_linked_audio),
-                            fontWeight = if (selectedPath == path) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
-            }
-        }
         // Slim single-row player (owner request 2026-10-18): the old stack —
         // a centered type label, a full-width seek row and a separate
         // transport row — ate ~140dp under the lyrics. Everything now lives
         // in one 48dp row: type icon, skip back, play/pause, skip forward,
         // the thin seek line, the time, and the overflow menu (speed +
-        // sleep timer). The attachment switcher above only appears when
-        // the entry carries two audios.
+        // sleep timer). When the entry carries two audios, the leading
+        // type icon doubles as the attachment switch (owner request
+        // 2026-10-19): one tap selects the other file — it never starts
+        // playback, and a live session of this entry's other file stops
+        // on the spot.
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                if (selectedType == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
-                contentDescription = null,
-                tint = secondaryTextColor(),
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(2.dp))
+            if (attachments.size > 1) {
+                IconButton(
+                    onClick = {
+                        val next = attachments.firstOrNull { it.second != selectedPath }
+                        if (next != null) {
+                            if (nowPlaying?.naatId == naat.id &&
+                                nowPlaying?.audioPath != next.second
+                            ) {
+                                controller.stop()
+                            }
+                            selectedPath = next.second
+                        }
+                    },
+                    modifier = Modifier.size(40.dp).testTag("reader_audio_switch")
+                ) {
+                    Icon(
+                        if (selectedType == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
+                        contentDescription = stringResource(R.string.reader_switch_audio_cd),
+                        tint = secondaryTextColor(),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else {
+                Icon(
+                    if (selectedType == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = secondaryTextColor(),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(2.dp))
+            }
             // Skip backward 10s. Gated on session ownership: the seekbar
             // shows 0:00 when the live session belongs to another entry,
             // but the skip buttons used to seek THAT entry's audio anyway
