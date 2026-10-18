@@ -851,6 +851,19 @@ private fun ReaderAudioControls(
     val duration = if (ownsSelected) playerDuration else 0
     val selectedType = attachments.firstOrNull { it.second == selectedPath }?.first ?: attachments.first().first
 
+    val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
+    val sleepRemaining by controller.sleepTimerRemainingMs.collectAsStateWithLifecycle()
+    // Audit #11: while Media3 prepares a file the play tap used to
+    // look ignored for a second or two — spinner in the button instead.
+    val preparing by controller.isPreparing.collectAsStateWithLifecycle()
+    var showSleepDialog by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
+    val speedLabel = "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x"
+    val sleepLabel = sleepRemaining?.let { ms ->
+        val mins = (ms / 60_000L).toInt()
+        val secs = ((ms % 60_000L) / 1000L).toInt()
+        "%d:%02d".format(mins, secs)
+    }
     Column(
         modifier
             .fillMaxWidth()
@@ -890,19 +903,6 @@ private fun ReaderAudioControls(
         // the thin seek line, the time, and the overflow menu (speed +
         // sleep timer). The attachment switcher above only appears when
         // the entry carries two audios.
-        val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
-        val sleepRemaining by controller.sleepTimerRemainingMs.collectAsStateWithLifecycle()
-        // Audit #11: while Media3 prepares a file the play tap used to
-        // look ignored for a second or two — spinner in the button instead.
-        val preparing by controller.isPreparing.collectAsStateWithLifecycle()
-        var showSleepDialog by remember { mutableStateOf(false) }
-        var menuExpanded by remember { mutableStateOf(false) }
-        val speedLabel = "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x"
-        val sleepLabel = sleepRemaining?.let { ms ->
-            val mins = (ms / 60_000L).toInt()
-            val secs = ((ms % 60_000L) / 1000L).toInt()
-            "%d:%02d".format(mins, secs)
-        }
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
