@@ -648,11 +648,12 @@ fun FolderSleekCard(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.End
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(46.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(iconBg),
                 contentAlignment = Alignment.Center
@@ -661,13 +662,16 @@ fun FolderSleekCard(
                     painter = iconPainter,
                     contentDescription = stringResource(CategoryDisplay.displayNameRes(folder)),
                     tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(26.dp)
                 )
             }
-            Column {
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = stringResource(CategoryDisplay.displayNameRes(folder)),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontSize = 20.sp,
+                        lineHeight = 36.sp
+                    ),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
@@ -676,7 +680,8 @@ fun FolderSleekCard(
                 Text(
                     text = stringResource(R.string.library_entries_count, count),
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = secondaryTextColor()
                     ),
