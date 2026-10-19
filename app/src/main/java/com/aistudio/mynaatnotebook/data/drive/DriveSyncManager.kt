@@ -22,12 +22,14 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -93,7 +95,9 @@ class DriveSyncManager @Inject constructor(
         private const val UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
         private const val FOLDER_MIME = "application/vnd.google-apps.folder"
         private const val CHUNK_SIZE = 1_048_576 // 1 MiB; a multiple of 256 KiB, as resumable uploads require
-        private const val KEEP_BACKUPS = 2
+        // Audit 02 M2: 2 was too thin a window — one bad newest backup
+        // could evict the last good one before a restore noticed.
+        private const val KEEP_BACKUPS = 3
         private const val BUFFER_SIZE = 32 * 1024
     }
 
@@ -154,6 +158,23 @@ class DriveSyncManager @Inject constructor(
                         try {
                             uploadedId = uploadBackup(token, folderId, staged, name) { p ->
                                 onProgress(0.3f + p * 0.7f)
+                            }
+                            // Audit 02 M2: verify the bytes Drive stored
+                            // match the local zip before rotation trusts
+                            // this upload as the newest good backup. A
+                            // mismatch deletes the bad copy and fails the
+                            // sync, so older backups stay untouched.
+                            val newId = uploadedId
+                            if (newId != null) {
+                                val remoteMd5 = runCatching { remoteMd5(token, newId) }.getOrNull()
+                                if (remoteMd5 != null &&
+                                    !remoteMd5.equals(md5Hex(staged), ignoreCase = true)
+                                ) {
+                                    runCatching { deleteFile(token, newId) }
+                                    throw DriveException(
+                                        "Upload verification failed — please sync again"
+                                    )
+                                }
                             }
                             // Rotation: keep only the newest backups. An empty
                             // upload (only possible when forced, or as the very
@@ -493,6 +514,28 @@ class DriveSyncManager @Inject constructor(
             throw e
         }
         onProgress(1f)
+    }
+
+    /** MD5 of a Drive file's stored bytes, as reported by the API. */
+    private fun remoteMd5(token: String, fileId: String): String? {
+        val conn = openConnection("$FILES_URL/$fileId?fields=md5Checksum", token, "GET")
+        return JSONObject(checkedBody(conn)).optString("md5Checksum")
+            .takeIf { it.isNotBlank() }
+    }
+
+    private fun md5Hex(file: File): String {
+        val digest = MessageDigest.getInstance("MD5")
+        FileInputStream(file).use { input ->
+            val buffer = ByteArray(BUFFER_SIZE)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                digest.update(buffer, 0, n)
+            }
+        }
+        return digest.digest().joinToString("") {
+            (it.toInt() and 0xff).toString(16).padStart(2, '0')
+        }
     }
 
     private fun deleteFile(token: String, fileId: String) {
