@@ -307,12 +307,7 @@ class Media3PlaybackEngine @Inject constructor(
         progressJob = scope.launch {
             while (isActive && hasActiveSession()) {
                 publishState()
-                // Audit 05 M7: a paused player has nothing moving to
-                // publish — the 250ms loop used to spin for the whole
-                // paused session. Poll at 1s while paused/buffering-idle;
-                // resume is picked up within a second, and play state
-                // changes also arrive through the player listener.
-                delay(if (player.isPlaying) 250 else 1000)
+                delay(250)
             }
         }
     }
