@@ -265,7 +265,11 @@ class NaatViewModel @Inject constructor(
         _searchQuery.debounce(160).distinctUntilChanged(),
         _selectedFolder,
         _showFavoritesOnly
-    ) { query, folder, favoritesOnly -> Triple(query.trim(), folder, favoritesOnly) }
+    ) { query, folder, favoritesOnly ->
+        // Audit 03 M2: fold Arabic-script variants/harakat on the query
+        // side; the DAO folds the stored columns with the same rules.
+        Triple(normalizeSearchText(query), folder, favoritesOnly)
+    }
         .distinctUntilChanged()
         .flatMapLatest { (query, folder, favoritesOnly) ->
             // Room executes title/poet/lyrics matching on its query executor and returns only
@@ -273,6 +277,12 @@ class NaatViewModel @Inject constructor(
             // Stage-2 UX audit: rank the matches (title > poet > lyrics-only) on the way out.
             repository.filteredSummaries(query, folder, favoritesOnly)
                 .map { rankSearchResults(it, query) }
+        }
+        // Audit 03 H-b: a Room failure used to leave the list silently
+        // stale or empty with no trace anywhere.
+        .catch { error ->
+            Log.e("NaatViewModel", "Library filter flow failed", error)
+            emit(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -317,7 +327,21 @@ class NaatViewModel @Inject constructor(
                         ) it.copy(finishedRecordingPath = null) else it
                         _editorDraft.value = cleaned
                         draftStore.save(cleaned)
+                        // Audit 03 M5: rehydrate the edited row, or the
+                        // discard check has no original to compare with
+                        // and every restored edit draft reads as "unsaved
+                        // changes" — even when nothing was touched.
+                        cleaned.editingId?.let { editId ->
+                            _editingNaat.value = runCatching {
+                                repository.getNaatById(editId)
+                            }.getOrNull()
+                        }
                         _showAddModal.value = true
+                    }
+                    if (staleFile != null) {
+                        // Audit 03 L9: the dropped take used to vanish
+                        // silently; say so once.
+                        statusReporter.show(R.string.editor_recording_lost)
                     }
                     if (staleFile != null &&
                         _editorDraft.value.finishedRecordingPath == staleFile.absolutePath
@@ -372,9 +396,8 @@ class NaatViewModel @Inject constructor(
 
     // Status/toast messages are shared process-wide via StatusReporter so every
     // feature ViewModel reports through the single channel the UI already collects.
-    val statusMessage: StateFlow<StatusMessage?> = statusReporter.message
-
-    fun clearStatusMessage() = statusReporter.clear()
+    /** Queued status receipts (audit 03 M13) — NaatApp drains them in order. */
+    val statusMessages: kotlinx.coroutines.flow.Flow<StatusMessage> = statusReporter.messages
 
     private fun persistDraft(draft: EditorDraft, immediate: Boolean = false) {
         _editorDraft.value = draft
@@ -517,6 +540,9 @@ class NaatViewModel @Inject constructor(
             } catch (error: Exception) {
                 Log.e("NaatViewModel", "Keep draft failed", error)
                 keptDraftPending = false
+                // Audit 03 M6: this failure was log-only — the dialog had
+                // already closed and the user believed the draft was safe.
+                statusReporter.show(R.string.editor_draft_keep_failed)
             }
         }
     }
@@ -596,7 +622,7 @@ class NaatViewModel @Inject constructor(
                 settingsStore.clearLastPlayback()
                 return@launch
             }
-            playbackController.restoreEntry(naat, saved.positionMs)
+            playbackController.restoreEntry(naat, saved.positionMs, saved.audioPath)
         }
     }
 
@@ -627,7 +653,13 @@ class NaatViewModel @Inject constructor(
     }
 
     fun selectFolder(folder: String?) {
+        if (_selectedFolder.value == folder) return
         _selectedFolder.value = folder
+        // Audit 03 M3: the folder list state is shared across folders, so
+        // a new folder used to open mid-scroll wherever the last one left
+        // it. (Returning from an entry keeps the position — only an
+        // actual folder change resets.)
+        viewModelScope.launch { libraryFolderListState.scrollTo(0) }
     }
 
     fun setSearchQuery(query: String) {
@@ -938,7 +970,10 @@ class NaatViewModel @Inject constructor(
     }
 
     fun attachLocalFile(uri: Uri, onResult: (Boolean) -> Unit = {}) {
-        if (!attachmentGate.tryStart()) return
+        if (!attachmentGate.tryStart()) {
+            statusReporter.show(R.string.status_busy_wait)
+            return
+        }
         _isAttachingFile.value = true
         attachJob = viewModelScope.launch {
             try {
@@ -1020,7 +1055,11 @@ class NaatViewModel @Inject constructor(
 
     // --- CRUD DB Operations ---
     fun saveDraft(forceSave: Boolean = false) {
-        if (!saveGate.tryStart()) return
+        if (!saveGate.tryStart()) {
+            // Audit 03 L6: a busy gate used to swallow the tap silently.
+            statusReporter.show(R.string.status_busy_wait)
+            return
+        }
         // Defensive: UI blocks blank titles, but never trust the UI alone.
         if (_editorDraft.value.title.isBlank()) {
             saveGate.finish()
@@ -1032,6 +1071,22 @@ class NaatViewModel @Inject constructor(
         // re-add — warn before saving instead of silently duplicating. The
         // check is async; the save gate stays held until it resolves.
         val draftSnapshot = _editorDraft.value
+        // Audit 03 M4: saving an untouched edit used to bump updatedAt
+        // (thrusting the entry to the top of Recents via its fallback)
+        // and announce "Entry Updated!" when nothing had changed. Close
+        // quietly with an honest message instead — no row is written.
+        val original = _editingNaat.value
+        if (draftSnapshot.editingId != null && original != null &&
+            original.id == draftSnapshot.editingId &&
+            !draftSnapshot.hasUnsavedChanges(original)
+        ) {
+            saveGate.finish()
+            clearDraft()
+            _editingNaat.value = null
+            _showAddModal.value = false
+            statusReporter.show(R.string.status_entry_no_changes)
+            return
+        }
         if (!forceSave && draftSnapshot.editingId == null) {
             viewModelScope.launch {
                 val duplicate = try {
@@ -1156,7 +1211,12 @@ class NaatViewModel @Inject constructor(
                             readerFontOverride = draft.readerFontOverride,
                             titleFontOverride = draft.titleFontOverride
                         )
-                        repository.update(entity)
+                        // Audit 03 H-a: the update count used to go
+                        // unchecked — if a restore had removed the row
+                        // mid-edit, the save still announced success.
+                        if (repository.update(entity) == 0) {
+                            throw IOException("The entry no longer exists")
+                        }
                         entity
                     }
 
@@ -1257,7 +1317,10 @@ class NaatViewModel @Inject constructor(
         deleteNaatInternal(naat.id, onSuccess)
 
     private fun deleteNaatInternal(id: Int, onSuccess: () -> Unit) {
-        if (!deleteGate.tryStart()) return
+        if (!deleteGate.tryStart()) {
+            statusReporter.show(R.string.status_busy_wait)
+            return
+        }
         _isDeleting.value = true
         viewModelScope.launch {
             try {
@@ -1267,6 +1330,10 @@ class NaatViewModel @Inject constructor(
                     val current = repository.getNaatById(id) ?: return@exclusive null to -1L
                     // A second delete during an open undo window supersedes the
                     // first: the earlier deletion finalizes (its files die) now.
+                    // Audit 03 L20: that used to happen with no signal at
+                    // all — the user never learned the first entry's undo
+                    // window had closed early.
+                    val supersededPendingDelete = pendingDelete != null
                     finalizePendingDelete()
                     repository.delete(current)
                     withContext(Dispatchers.Main.immediate) {
@@ -1299,6 +1366,9 @@ class NaatViewModel @Inject constructor(
                         // The old "Entry deleted" toast is replaced by the undo
                         // snackbar (collected from undoDeleteOffers in NaatApp).
                         _undoDeleteOffers.value = UndoDeleteOffer(undoToken)
+                        if (supersededPendingDelete) {
+                            statusReporter.show(R.string.status_previous_delete_finalized)
+                        }
                         onSuccess()
                     }
                 }
