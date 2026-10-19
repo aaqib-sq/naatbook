@@ -117,7 +117,7 @@
     <string name="onboarding_scene_browse">فائل منتخب کریں</string>
     <string name="onboarding_scene_lyrics">یا نبی سلام علیک\nیا رسول سلام علیک</string>
     <string name="onboarding_scene_export_sub">اپنی پوری لائبریری کی ایک نقل محفوظ کریں</string>
-    <string name="onboarding_scene_last_backup">آخری بیک اپ: 14 Oct 2026</string>
+    <string name="onboarding_scene_last_backup">آخری بیک اپ: 14 اکتوبر 2026</string>
     <string name="onboarding_scene_path">Download / NaatBook</string>
     <string name="settings_intro_title">ایپ کا تعارف</string>
     <string name="settings_intro_subtitle">خوش آمدیدی صفحات دوبارہ دیکھیں</string>
@@ -225,6 +225,7 @@
     <string name="player_preview_pause_cd">پیش نظارہ روکیں</string>
     <string name="player_preview_play_cd">پیش نظارہ چلائیں</string>
     <string name="player_preview_label">پیش نظارہ</string>
+    <string name="player_preview_title">آڈیو پیش نظارہ</string>
 
     <!-- Discard dialog -->
     <string name="discard_title">غیر محفوظ اندراج رد کریں؟</string>
@@ -253,17 +254,32 @@
     <string name="status_entry_lookup_failed">اندراج نہیں کھل سکا</string>
     <string name="status_open_playing_failed">چلتا ہوا اندراج نہیں کھل سکا: %1$s</string>
     <string name="status_exporting">بیک اپ برآمد ہو رہا ہے، براہ کرم انتظار کریں...</string>
-    <string name="status_export_success">لائبریری کا بیک اپ کامیابی سے برآمد ہو گیا! %1$d اندراجات۔</string>
+    <plurals name="status_export_success">
+        <item quantity="one">لائبریری کا بیک اپ کامیابی سے برآمد ہو گیا! %1$d اندراج۔</item>
+        <item quantity="other">لائبریری کا بیک اپ کامیابی سے برآمد ہو گیا! %1$d اندراجات۔</item>
+    </plurals>
     <string name="status_export_failed">برآمد ناکام: %1$s</string>
     <string name="status_importing">بیک اپ درآمد ہو رہا ہے، براہ کرم انتظار کریں...</string>
     <string name="settings_progress_exporting">بیک اپ بن رہا ہے</string>
     <string name="settings_progress_importing">بیک اپ لایا جا رہا ہے</string>
     <string name="settings_progress_syncing">ڈرائیو سے سنک ہو رہا ہے</string>
     <string name="settings_progress_downloading">ڈرائیو سے ڈاؤن لوڈ ہو رہا ہے</string>
-    <string name="status_import_success">لائبریری کامیابی سے بحال ہو گئی! %1$d اندراجات شامل ہو گئے۔</string>
-    <string name="status_import_fonts_restored">بیک اپ سے %1$d درآمد شدہ فونٹ بھی بحال ہو گئے</string>
-    <string name="status_import_fonts_failed">بیک اپ کے %1$d فونٹ بحال نہیں ہو سکے</string>
-    <string name="status_import_success_skipped">درآمد مکمل: %1$d نئے اندراجات شامل ہوئے، %2$d پہلے سے موجود تھے (چھوڑ دیے گئے)۔</string>
+    <plurals name="status_import_success">
+        <item quantity="one">لائبریری کامیابی سے بحال ہو گئی! %1$d اندراج شامل ہو گیا۔</item>
+        <item quantity="other">لائبریری کامیابی سے بحال ہو گئی! %1$d اندراجات شامل ہو گئے۔</item>
+    </plurals>
+    <plurals name="status_import_fonts_restored">
+        <item quantity="one">بیک اپ سے %1$d درآمد شدہ فونٹ بھی بحال ہو گیا</item>
+        <item quantity="other">بیک اپ سے %1$d درآمد شدہ فونٹ بھی بحال ہو گئے</item>
+    </plurals>
+    <plurals name="status_import_fonts_failed">
+        <item quantity="one">بیک اپ کا %1$d فونٹ بحال نہیں ہو سکا</item>
+        <item quantity="other">بیک اپ کے %1$d فونٹ بحال نہیں ہو سکے</item>
+    </plurals>
+    <plurals name="status_import_success_skipped">
+        <item quantity="one">درآمد مکمل: %1$d نیا اندراج شامل ہوا، %2$d پہلے سے موجود تھے (چھوڑ دیے گئے)۔</item>
+        <item quantity="other">درآمد مکمل: %1$d نئے اندراجات شامل ہوئے، %2$d پہلے سے موجود تھے (چھوڑ دیے گئے)۔</item>
+    </plurals>
     <string name="status_import_failed">درآمد ناکام: %1$s</string>
     <string name="status_error_database">ڈیٹا بیس کی خرابی</string>
     <string name="status_error_storage">ذخیرے کی خرابی</string>
@@ -316,21 +332,24 @@
     <string name="settings_drive_disconnect">اکاؤنٹ الگ کریں</string>
     <string name="settings_drive_disconnect_subtitle">ڈرائیو میں موجود بیک اپ وہیں رہیں گے</string>
     <string name="settings_drive_disconnect_title">گوگل اکاؤنٹ الگ کریں؟</string>
-    <string name="settings_drive_disconnect_message">نات بُک اس اکاؤنٹ پر بیک اپ بھیجنا بند کر دے گی۔ ڈرائیو میں پہلے سے محفوظ بیک اپ حذف نہیں ہوں گے۔</string>
+    <string name="settings_drive_disconnect_message">NaatBook اس اکاؤنٹ پر بیک اپ بھیجنا بند کر دے گی۔ ڈرائیو میں پہلے سے محفوظ بیک اپ حذف نہیں ہوں گے۔</string>
     <string name="status_drive_connected">گوگل اکاؤنٹ جُڑ گیا: %1$s</string>
     <string name="status_drive_sign_in_failed">گوگل سائن ان ناکام رہا</string>
     <string name="status_drive_check_failed">اکاؤنٹ جڑ گیا، مگر Drive پر بیک اپ کی جانچ ناکام رہی</string>
     <string name="status_drive_reconnect_needed">سیشن ختم ہو گیا — Google Drive دوبارہ جوڑیں</string>
     <string name="status_drive_consent_declined">اجازت نہیں ملی — کارروائی منسوخ کر دی گئی</string>
     <string name="status_drive_syncing">گوگل ڈرائیو پر بھیجا جا رہا ہے...</string>
-    <string name="status_drive_sync_success">ڈرائیو بیک اپ تازہ ہو گیا! %1$d اندراجات۔</string>
+    <plurals name="status_drive_sync_success">
+        <item quantity="one">ڈرائیو بیک اپ تازہ ہو گیا! %1$d اندراج۔</item>
+        <item quantity="other">ڈرائیو بیک اپ تازہ ہو گیا! %1$d اندراجات۔</item>
+    </plurals>
     <string name="status_drive_sync_failed">ڈرائیو پر بھیجنا ناکام: %1$s</string>
     <string name="status_drive_downloading">ڈرائیو سے بیک اپ اُتارا جا رہا ہے...</string>
     <string name="status_drive_download_failed">ڈرائیو سے بیک اپ اُتارنا ناکام: %1$s</string>
     <string name="status_drive_no_backup">ڈرائیو میں ابھی کوئی بیک اپ نہیں — پہلے بھیجیں</string>
     <string name="status_drive_disconnected">گوگل اکاؤنٹ الگ کر دیا گیا</string>
     <string name="status_drive_consent_needed">جاری رکھنے کے لیے گوگل کو آپ کی اجازت چاہیے</string>
-    <string name="status_drive_restore_available">ڈرائیو میں پہلے سے بیک اپ موجود ہے — واپس لانے کے لیے Restore from Drive استعمال کریں</string>
+    <string name="status_drive_restore_available">ڈرائیو میں پہلے سے بیک اپ موجود ہے — واپس لانے کے لیے «ڈرائیو سے واپس لائیں» استعمال کریں</string>
     <string name="status_drive_empty_skipped">لائبریری خالی ہے — کوئی بیک اپ نہیں بھیجا گیا</string>
     <string name="drive_empty_confirm_title">خالی لائبریری کا بیک اپ بھیجیں؟</string>
     <string name="drive_empty_confirm_message">یہ لائبریری خالی ہے، مگر ڈرائیو میں پہلے سے اندراجات والا بیک اپ موجود ہے۔ ابھی بھیجنے سے خالی لائبریری سب سے نیا بیک اپ بن جائے گی، اور صرف تازہ ترین 2 بیک اپ ہی رکھے جاتے ہیں۔</string>
@@ -351,15 +370,15 @@
     <string name="contact_instagram_label">انسٹاگرام</string>
     <string name="contact_instagram_button">انسٹاگرام کھولیں</string>
     <string name="privacy_body_updated">آخری تازہ کاری: 15 اکتوبر 2026</string>
-    <string name="privacy_body_intro">نات بُک ایک ذاتی نوٹ بک ایپ ہے جس میں نعتیں (اشعار، نوٹس اور آڈیو) محفوظ کی جاتی ہیں۔ یہ پالیسی بتاتی ہے کہ ایپ استعمال کرتے وقت آپ کی معلومات کا کیا ہوتا ہے۔</string>
+    <string name="privacy_body_intro">NaatBook ایک ذاتی نوٹ بک ایپ ہے جس میں نعتیں (اشعار، نوٹس اور آڈیو) محفوظ کی جاتی ہیں۔ یہ پالیسی بتاتی ہے کہ ایپ استعمال کرتے وقت آپ کی معلومات کا کیا ہوتا ہے۔</string>
     <string name="privacy_h_data">آپ کا ڈیٹا آپ ہی کا رہتا ہے</string>
-    <string name="privacy_p_data_1">نات بُک میں آپ جو کچھ بناتے ہیں — اندراجات، متن، فولڈر، ریکارڈنگ اور درآمد کیے گئے فونٹ — سب آپ کے اپنے آلے میں محفوظ رہتا ہے۔</string>
-    <string name="privacy_p_data_2">نات بُک میں کوئی صارف اکاؤنٹ نہیں، کوئی اشتہار نہیں، اور نہ کوئی تجزیات یا ٹریکنگ ہے۔</string>
+    <string name="privacy_p_data_1">NaatBook میں آپ جو کچھ بناتے ہیں — اندراجات، متن، فولڈر، ریکارڈنگ اور درآمد کیے گئے فونٹ — سب آپ کے اپنے آلے میں محفوظ رہتا ہے۔</string>
+    <string name="privacy_p_data_2">NaatBook میں کوئی صارف اکاؤنٹ نہیں، کوئی اشتہار نہیں، اور نہ کوئی تجزیات یا ٹریکنگ ہے۔</string>
     <string name="privacy_p_data_3">ڈیولپر آپ کا مواد یا ذاتی معلومات کبھی وصول، جمع، فروخت یا شیئر نہیں کرتا۔</string>
     <string name="privacy_h_drive">اختیاری گوگل ڈرائیو بیک اپ</string>
-    <string name="privacy_p_drive_intro">نات بُک ایک اختیاری بیک اپ سہولت دیتی ہے جو آپ کے اپنے گوگل اکاؤنٹ سے کام کرتی ہے:</string>
+    <string name="privacy_p_drive_intro">NaatBook ایک اختیاری بیک اپ سہولت دیتی ہے جو آپ کے اپنے گوگل اکاؤنٹ سے کام کرتی ہے:</string>
     <string name="privacy_b_drive_1">یہ سہولت صرف اس وقت کام کرتی ہے جب آپ خود ایپ کے اندر اپنا گوگل اکاؤنٹ جوڑتے ہیں۔</string>
-    <string name="privacy_b_drive_2">بیک اپ صرف آپ کی اپنی گوگل ڈرائیو میں، "نات بُک بیک اپ" نامی ایک واضح فولڈر میں محفوظ ہوتے ہیں۔</string>
+    <string name="privacy_b_drive_2">بیک اپ صرف آپ کی اپنی گوگل ڈرائیو میں، "NaatBook Backup" نامی ایک واضح فولڈر میں محفوظ ہوتے ہیں۔</string>
     <string name="privacy_b_drive_3">ایپ صرف وہی فائلیں دیکھ سکتی ہے جو اس نے خود بنائی ہیں (گوگل ڈرائیو کی drive.file اجازت)۔ وہ آپ کی ڈرائیو کی کسی اور فائل کو دیکھ، پڑھ یا بدل نہیں سکتی۔</string>
     <string name="privacy_b_drive_4">بیک اپ کی نقول براہِ راست ایپ اور آپ کی گوگل ڈرائیو کے درمیان منتقل ہوتی ہیں۔ وہ ڈیولپر یا کسی اور سرور کو نہیں بھیجی جاتیں۔</string>
     <string name="privacy_b_drive_5">آپ ایپ کی سیٹنگز سے کسی بھی وقت اپنا اکاؤنٹ الگ کر سکتے ہیں، اور اپنی ڈرائیو سے بیک اپ فائلیں کسی بھی وقت حذف کر سکتے ہیں۔</string>

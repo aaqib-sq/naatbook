@@ -177,8 +177,8 @@ class DriveViewModel @Inject constructor(
                 )
                     .onSuccess { outcome ->
                         when (outcome) {
-                            is SyncOutcome.Uploaded -> statusReporter.show(
-                                R.string.status_drive_sync_success, outcome.count
+                            is SyncOutcome.Uploaded -> statusReporter.showPlural(
+                                R.plurals.status_drive_sync_success, outcome.count, outcome.count
                             )
                             SyncOutcome.SkippedEmpty -> if (manual) {
                                 _emptySyncConfirm.value = true

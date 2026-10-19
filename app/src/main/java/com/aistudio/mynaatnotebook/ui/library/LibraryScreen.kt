@@ -37,7 +37,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
@@ -47,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.audio.RecordingState
@@ -789,13 +787,20 @@ fun RecentNaatCard(
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(5.dp))
+                val categoryName = stringResource(CategoryDisplay.displayNameRes(naat.category))
                 Text(
                     // Category names localize into Urdu — shown as-is, never
                     // uppercased or letter-tracked (both break Arabic joining).
-                    text = stringResource(CategoryDisplay.displayNameRes(naat.category)),
+                    text = categoryName,
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
+                        // Audit 06 L4: synthetic Bold muddies Arabic-script
+                        // joins; the chip is Bold only for Latin names.
+                        fontWeight = if (usesArabicScript(categoryName)) {
+                            FontWeight.Normal
+                        } else {
+                            FontWeight.Bold
+                        }
                     ),
                     color = secondaryTextColor(),
                     maxLines = 1,

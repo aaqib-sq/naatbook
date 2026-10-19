@@ -172,11 +172,11 @@ class PlaybackController @Inject constructor(
         }
     }
 
-    fun playPreview(path: String) {
+    fun playPreview(path: String, title: String) {
         engine.play(
             audioPath = path,
             mediaId = "preview:${path.hashCode()}",
-            title = "Audio preview",
+            title = title,
             artist = null
         )
         if (!engine.hasActiveSession()) return
