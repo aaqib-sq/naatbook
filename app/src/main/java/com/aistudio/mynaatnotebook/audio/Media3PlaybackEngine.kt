@@ -63,7 +63,7 @@ class Media3PlaybackEngine @Inject constructor(
      * log-only — the tap looked dead to the user. The controller wires this
      * to the shared status reporter so a failure is always announced.
      */
-    internal var onPlaybackError: ((PlaybackException) -> Unit)? = null
+    internal var onPlaybackError: (() -> Unit)? = null
 
     /**
      * Audit #21: fired by [ensureIdle] BEFORE state is cleared, while the
@@ -106,7 +106,7 @@ class Media3PlaybackEngine @Inject constructor(
 
             override fun onPlayerError(error: PlaybackException) {
                 Log.e(TAG, "Media3 playback failed", error)
-                onPlaybackError?.invoke(error)
+                onPlaybackError?.invoke()
                 scheduleTerminalStop()
             }
         })
