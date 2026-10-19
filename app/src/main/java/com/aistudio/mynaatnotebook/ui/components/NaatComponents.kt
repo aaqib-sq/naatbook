@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
@@ -45,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.audio.RecordingState
@@ -371,7 +369,7 @@ fun AudioAttachmentPreview(
                 when {
                     isPlaying -> controller.pause()
                     ownsPreview -> controller.resume()
-                    else -> controller.playPreview(path)
+                    else -> controller.playPreview(path, stringResource(R.string.player_preview_title))
                 }
             },
             modifier = Modifier.testTag("audio_preview_play")
@@ -406,7 +404,8 @@ fun formatTime(ms: Int): String {
 }
 
 // Arabic-script detection (Urdu/Persian/Punjabi/Arabic): drives the Nastaliq
-// font selection and RTL layout direction. Anything Latin stays Serif + LTR.
+// font selection and the reader text surface's own direction. The app layout
+// itself never mirrors (settled design) — anything Latin stays Serif.
 private val arabicScriptRegex =
     Regex("[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF\\uFE70-\\uFEFF]")
 
