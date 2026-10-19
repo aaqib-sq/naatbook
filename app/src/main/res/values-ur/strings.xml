@@ -91,7 +91,7 @@
     <string name="settings_identity_sub">%1$s · 100%% آف لائن | ڈیٹا کی کوئی نگرانی نہیں</string>
 
     <!-- Reader -->
-    <string name="reader_tap_hint">کنٹرول دکھانے کے لیے ایک بار تھپتھپائیں</string>
+    <string name="reader_tap_hint">کنٹرول دکھانے کے لیے ایک بار تھپتھپائیں · فل اسکرین سے نکلنے کے لیے دو بار تھپتھپائیں یا Back دبائیں</string>
     <string name="reader_close_cd">ریڈر بند کریں</string>
     <string name="onboarding_skip">چھوڑیں</string>
     <string name="onboarding_next">آگے</string>
@@ -368,4 +368,11 @@
     <string name="privacy_b_perm_mic">مائیکروفون — صرف اس وقت استعمال ہوتا ہے جب آپ اپنی مرضی سے ایپ کے اندر آڈیو ریکارڈ کرتے ہیں۔</string>
     <string name="privacy_h_contact">رابطہ</string>
     <string name="privacy_p_contact">اس پالیسی کے بارے میں کسی بھی سوال کے لیے ڈیولپر سے اس پتے پر رابطہ کریں: %1$s۔</string>
+    <string name="status_entry_no_changes">کوئی تبدیلی نہیں ہوئی</string>
+    <string name="status_busy_wait">تھوڑا انتظار کریں — پچھلا کام ابھی مکمل ہو رہا ہے</string>
+    <string name="status_previous_delete_finalized">پچھلی حذف اب مستقل ہو گئی ہے</string>
+    <string name="status_playback_file_missing">آڈیو فائل اس ڈیوائس پر نہیں ملی</string>
+    <string name="editor_draft_keep_failed">ڈرافٹ بعد کے لیے محفوظ نہیں ہو سکا</string>
+    <string name="editor_recording_lost">ادھوری ریکارڈنگ بازیاب نہیں ہو سکی</string>
+    <string name="reader_switched_audio">%1$s منتخب ہو گئی</string>
 </resources>
