@@ -75,7 +75,7 @@ class BackupViewModel @Inject constructor(
                     _progress.value = p.coerceIn(0f, 1f)
                 }
                 result.onSuccess { count ->
-                    statusReporter.showPlural(R.plurals.status_export_success, count, count)
+                    statusReporter.show(R.string.status_export_success, count)
                     settingsStore.recordBackup(
                         System.currentTimeMillis(),
                         uri.lastPathSegment?.substringAfterLast('/') ?: "Chosen place"
@@ -112,7 +112,7 @@ class BackupViewModel @Inject constructor(
                     _progress.value = p.coerceIn(0f, 1f)
                 }
                 result.onSuccess { (count, label) ->
-                    statusReporter.showPlural(R.plurals.status_export_success, count, count)
+                    statusReporter.show(R.string.status_export_success, count)
                     settingsStore.recordBackup(System.currentTimeMillis(), label)
                 }.onFailure {
                     if (isCancelled(it)) {
@@ -159,12 +159,12 @@ class BackupViewModel @Inject constructor(
                             importResult.imported, importResult.removedExisting
                         )
                     } else if (importResult.skipped > 0) {
-                        statusReporter.showPlural(
-                            R.plurals.status_import_success_skipped,
-                            importResult.imported, importResult.imported, importResult.skipped
+                        statusReporter.show(
+                            R.string.status_import_success_skipped,
+                            importResult.imported, importResult.skipped
                         )
                     } else {
-                        statusReporter.showPlural(R.plurals.status_import_success, importResult.imported, importResult.imported)
+                        statusReporter.show(R.string.status_import_success, importResult.imported)
                     }
                     // Font outcome was previously invisible: if the backup
                     // carried fonts that could not be restored (or new ones
@@ -172,14 +172,12 @@ class BackupViewModel @Inject constructor(
                     if (importResult.fontsFailed > 0 || importResult.fontsAdded > 0) {
                         delay(2_800)
                         if (importResult.fontsFailed > 0) {
-                            statusReporter.showPlural(
-                                R.plurals.status_import_fonts_failed,
-                                importResult.fontsFailed, importResult.fontsFailed
+                            statusReporter.show(
+                                R.string.status_import_fonts_failed, importResult.fontsFailed
                             )
                         } else {
-                            statusReporter.showPlural(
-                                R.plurals.status_import_fonts_restored,
-                                importResult.fontsAdded, importResult.fontsAdded
+                            statusReporter.show(
+                                R.string.status_import_fonts_restored, importResult.fontsAdded
                             )
                         }
                     }
