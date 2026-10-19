@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [NaatEntity::class], version = 8, exportSchema = true)
+@Database(entities = [NaatEntity::class], version = 9, exportSchema = true)
 abstract class NaatDatabase : RoomDatabase() {
 
     abstract fun naatDao(): NaatDao
@@ -85,6 +85,17 @@ abstract class NaatDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE naats ADD COLUMN titleFontOverride TEXT")
                 db.execSQL("UPDATE naats SET titleFontOverride = readerFontOverride WHERE readerFontOverride IS NOT NULL")
+            }
+        }
+
+        /** v8 -> v9: indexes for the library's hot orderings/filters
+         *  (audit 05 M1). Names follow Room's index_<table>_<column>
+         *  convention so the migrated schema matches the entity schema. */
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_naats_createdAt ON naats(createdAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_naats_category ON naats(category)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_naats_lastOpenedAt ON naats(lastOpenedAt)")
             }
         }
     }
