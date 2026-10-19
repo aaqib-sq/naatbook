@@ -11,12 +11,14 @@ import com.aistudio.mynaatnotebook.data.NaatSummary
  * newest-first order is preserved inside each tier.
  */
 fun rankSearchResults(results: List<NaatSummary>, query: String): List<NaatSummary> {
-    val q = query.trim()
+    // Audit 03 M2: ranking compares with the same Arabic-script folding
+    // the DAO applies, or variant spellings would rank as lyrics-only hits.
+    val q = normalizeSearchText(query)
     if (q.isEmpty()) return results
     return results.sortedWith(compareBy { summary ->
         when {
-            summary.title.contains(q, ignoreCase = true) -> 0
-            summary.poet?.contains(q, ignoreCase = true) == true -> 1
+            normalizeSearchText(summary.title).contains(q) -> 0
+            summary.poet?.let { normalizeSearchText(it).contains(q) } == true -> 1
             else -> 2
         }
     })
