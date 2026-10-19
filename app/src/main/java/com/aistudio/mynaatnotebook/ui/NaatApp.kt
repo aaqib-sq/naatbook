@@ -7,6 +7,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,6 +60,7 @@ import com.aistudio.mynaatnotebook.ui.settings.PrivacyPolicyScreen
 import com.aistudio.mynaatnotebook.ui.settings.SettingsScreen
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
+import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import kotlinx.coroutines.flow.collectLatest
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
@@ -406,35 +408,39 @@ fun NaatApp(
                     AlertDialog(
                         onDismissRequest = { showDiscardConfirmation = false },
                         title = { Text(stringResource(R.string.discard_title)) },
-                        text = {
-                            Column {
-                                Text(
-                                    stringResource(R.string.discard_message)
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                // Audit TOP 3: park the draft instead of
-                                // destroying it — text, fonts, recording and
-                                // attachment stay on disk for later.
-                                TextButton(
-                                    onClick = {
-                                        showDiscardConfirmation = false
-                                        viewModel.keepEditorDraftForLater()
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) { Text(stringResource(R.string.editor_keep_draft)) }
-                            }
-                        },
+                        // Audit 04 L3: the message slot holds the message
+                        // only — "Save draft for later" used to be embedded
+                        // in it as a full-width button, breaking the
+                        // anatomy every other dialog follows. It is the
+                        // dialog's primary (confirm) action now.
+                        text = { Text(stringResource(R.string.discard_message)) },
                         confirmButton = {
+                            // Audit TOP 3: park the draft instead of
+                            // destroying it — text, fonts, recording and
+                            // attachment stay on disk for later.
                             TextButton(
                                 onClick = {
                                     showDiscardConfirmation = false
-                                    viewModel.setShowAddModal(false)
+                                    viewModel.keepEditorDraftForLater()
                                 }
-                            ) { Text(stringResource(R.string.common_discard)) }
+                            ) { Text(stringResource(R.string.editor_keep_draft)) }
                         },
                         dismissButton = {
-                            TextButton(onClick = { showDiscardConfirmation = false }) {
-                                Text(stringResource(R.string.discard_keep_editing))
+                            Row {
+                                TextButton(
+                                    onClick = {
+                                        showDiscardConfirmation = false
+                                        viewModel.setShowAddModal(false)
+                                    }
+                                ) {
+                                    Text(
+                                        stringResource(R.string.common_discard),
+                                        color = HighContrastRed
+                                    )
+                                }
+                                TextButton(onClick = { showDiscardConfirmation = false }) {
+                                    Text(stringResource(R.string.discard_keep_editing))
+                                }
                             }
                         }
                     )
