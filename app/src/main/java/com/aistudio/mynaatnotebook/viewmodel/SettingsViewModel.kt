@@ -8,6 +8,8 @@ import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.data.CustomFont
 import com.aistudio.mynaatnotebook.data.CustomFontStore
 import com.aistudio.mynaatnotebook.data.FontImportException
+import com.aistudio.mynaatnotebook.data.FontPickOutcome
+import com.aistudio.mynaatnotebook.data.ZipFontImportResult
 import com.aistudio.mynaatnotebook.data.NaatViewModelDefaults
 import com.aistudio.mynaatnotebook.data.PendingFontImport
 import com.aistudio.mynaatnotebook.data.LocaleHelper
@@ -188,12 +190,45 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setReaderScrollOffset(naatId, offsetPx) }
     }
 
-    /** Phase 1 of font import: validate the picked file, then await a name. */
+    /**
+     * A picked file: a ZIP imports every font inside it in one batch
+     * (summary messages follow); anything else starts phase 1 of the
+     * single-file import — validate, then await a name.
+     */
     fun beginFontImport(uri: Uri) {
         viewModelScope.launch {
-            runCatching { customFontStore.beginImport(uri) }
-                .onSuccess { _pendingFontImport.value = it }
+            runCatching { customFontStore.importPicked(uri) }
+                .onSuccess { outcome ->
+                    when (outcome) {
+                        is FontPickOutcome.Single -> _pendingFontImport.value = outcome.pending
+                        is FontPickOutcome.Batch -> reportZipFontImport(outcome.result)
+                    }
+                }
                 .onFailure { _fontError.value = fontImportMessage(it) }
+        }
+    }
+
+    /** The ZIP batch speaks in summary counts, not the naming dialog. */
+    private fun reportZipFontImport(result: ZipFontImportResult) {
+        if (result.fontsFound == 0) {
+            _fontError.value = StatusMessage.Res(R.string.settings_font_zip_none)
+            return
+        }
+        if (result.imported > 0) {
+            statusReporter.showPlural(
+                R.plurals.settings_font_zip_done, result.imported, result.imported
+            )
+        }
+        val skipped = result.duplicates + result.invalid + result.tooLarge
+        if (skipped > 0) {
+            statusReporter.show(R.string.settings_font_zip_skipped, skipped)
+        }
+        if (result.limitSkipped > 0) {
+            statusReporter.show(
+                R.string.settings_font_zip_limit,
+                result.limitSkipped,
+                CustomFontStore.MAX_FONTS
+            )
         }
     }
 
