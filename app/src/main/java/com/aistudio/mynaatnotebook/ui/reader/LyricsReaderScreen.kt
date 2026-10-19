@@ -912,7 +912,23 @@ private fun ReaderAudioControls(
     val ownsSelected = nowPlaying?.naatId == naat.id && nowPlaying?.audioPath == selectedPath && hasSession
     val playing = ownsSelected && playerIsPlaying
     val position = if (ownsSelected) playerPosition else 0
-    val duration = if (ownsSelected) playerDuration else 0
+    // Audit 03 M10: when a track ends, the session clears and the length
+    // used to vanish with it ("0:00 / 0:00"). Keep the last known length
+    // for the file it belonged to. (Engine positions/durations are Int
+    // milliseconds in this codebase.)
+    var lastDuration by remember(naat.id) { mutableStateOf(0) }
+    var lastDurationPath by remember(naat.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(playerDuration, nowPlaying?.audioPath) {
+        if (playerDuration > 0 && nowPlaying?.naatId == naat.id) {
+            lastDuration = playerDuration
+            lastDurationPath = nowPlaying?.audioPath
+        }
+    }
+    val duration = when {
+        ownsSelected && playerDuration > 0 -> playerDuration
+        lastDurationPath == selectedPath -> lastDuration
+        else -> 0
+    }
     val selectedType = attachments.firstOrNull { it.second == selectedPath }?.first ?: attachments.first().first
 
     val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
