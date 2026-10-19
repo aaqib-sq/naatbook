@@ -490,7 +490,7 @@ private fun ReaderTopBar(
             // its tall glyphs need a roomier line height than the Latin
             // default, and a long title must ellipsize — the old default
             // Clip cut it mid-glyph inside a joined word (reader audit).
-            val titleIsArabic = remember(naat.title) { usesArabicScript(naat.title) }
+            val titleIsArabic = usesArabicScript(naat.title)
             Text(
                 text = naat.title,
                 style =
@@ -524,20 +524,12 @@ private fun ReaderTopBar(
         val readerContext = LocalContext.current
         val hasLyrics = !naat.lyrics.isNullOrBlank()
         val clipboard = LocalClipboardManager.current
-        // Audit 05 M6+L1: the share text (a full copy of the lyrics) and
-        // the audio-file probe (disk stats) used to be rebuilt on every
-        // recomposition of this bar — playback progress recomposes it
-        // several times a second. Both depend only on the entry.
-        val shareText = remember(naat.id, naat.title, naat.poet, naat.lyrics) {
-            if (hasLyrics) buildString {
-                append(naat.title)
-                if (!naat.poet.isNullOrBlank()) append("\n— ").append(naat.poet)
-                append("\n\n").append(naat.lyrics)
-            } else ""
-        }
-        val audioShareFile = remember(naat.id, naat.audioPath, naat.secondaryAudioPath) {
-            shareableAudioFile(naat)
-        }
+        val shareText = if (hasLyrics) buildString {
+            append(naat.title)
+            if (!naat.poet.isNullOrBlank()) append("\n— ").append(naat.poet)
+            append("\n\n").append(naat.lyrics)
+        } else ""
+        val audioShareFile = shareableAudioFile(naat)
 
         if (!immersive) {
             // "Aa" text-size panel: the permanent font strip is gone. Text
@@ -840,7 +832,7 @@ private fun ReaderLyricsViewport(
         return
     }
 
-    val urduLyrics = remember(naat.lyrics) { usesArabicScript(naat.lyrics) }
+    val urduLyrics = usesArabicScript(naat.lyrics)
     CompositionLocalProvider(
         LocalLayoutDirection provides if (urduLyrics) LayoutDirection.Rtl else LayoutDirection.Ltr
     ) {
