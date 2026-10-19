@@ -33,7 +33,7 @@ class NaatDatabaseMigrationTest {
     }
 
     @Test
-    fun `migration 1 through 8 preserves rows normalizes categories and applies column additions`() {
+    fun `migration 1 through 9 preserves rows normalizes categories and applies column additions`() {
         createVersionOneDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
@@ -44,7 +44,8 @@ class NaatDatabaseMigrationTest {
                 NaatDatabase.MIGRATION_4_5,
                 NaatDatabase.MIGRATION_5_6,
                 NaatDatabase.MIGRATION_6_7,
-                NaatDatabase.MIGRATION_7_8
+                NaatDatabase.MIGRATION_7_8,
+                NaatDatabase.MIGRATION_8_9
             )
             .allowMainThreadQueries()
             .build()
@@ -89,6 +90,17 @@ class NaatDatabaseMigrationTest {
             ),
             migrated
         )
+
+        // v9: the hot-path indexes exist once the full chain has run.
+        val indexNames = mutableListOf<String>()
+        database!!.openHelper.writableDatabase
+            .query("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'naats'")
+            .use { cursor ->
+                while (cursor.moveToNext()) indexNames.add(cursor.getString(0))
+            }
+        assertTrue(indexNames.contains("index_naats_createdAt"))
+        assertTrue(indexNames.contains("index_naats_category"))
+        assertTrue(indexNames.contains("index_naats_lastOpenedAt"))
     }
 
     @Test
@@ -96,9 +108,9 @@ class NaatDatabaseMigrationTest {
         createVersionFiveDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
-            // The annotation now targets v8, so Room needs the full 5->8 path;
+            // The annotation now targets v9, so Room needs the full 5->9 path;
             // the assertions below still verify exactly the 5->6 step.
-            .addMigrations(NaatDatabase.MIGRATION_5_6, NaatDatabase.MIGRATION_6_7, NaatDatabase.MIGRATION_7_8)
+            .addMigrations(NaatDatabase.MIGRATION_5_6, NaatDatabase.MIGRATION_6_7, NaatDatabase.MIGRATION_7_8, NaatDatabase.MIGRATION_8_9)
             .allowMainThreadQueries()
             .build()
 
@@ -133,9 +145,9 @@ class NaatDatabaseMigrationTest {
         createVersionSixDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
-            // The annotation now targets v8, so Room needs the full 6->8 path;
+            // The annotation now targets v9, so Room needs the full 6->9 path;
             // the assertions below still verify exactly the 6->7 step.
-            .addMigrations(NaatDatabase.MIGRATION_6_7, NaatDatabase.MIGRATION_7_8)
+            .addMigrations(NaatDatabase.MIGRATION_6_7, NaatDatabase.MIGRATION_7_8, NaatDatabase.MIGRATION_8_9)
             .allowMainThreadQueries()
             .build()
 
@@ -176,7 +188,9 @@ class NaatDatabaseMigrationTest {
         createVersionSevenDatabase()
 
         database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
-            .addMigrations(NaatDatabase.MIGRATION_7_8)
+            // The annotation now targets v9, so the 8->9 step rides along;
+            // the assertions below still verify exactly the 7->8 step.
+            .addMigrations(NaatDatabase.MIGRATION_7_8, NaatDatabase.MIGRATION_8_9)
             .allowMainThreadQueries()
             .build()
 
@@ -211,6 +225,82 @@ class NaatDatabaseMigrationTest {
             .use { cursor -> cursor.moveToFirst(); cursor.getString(0) })
     }
 
+
+    @Test
+    fun `migration 8 to 9 creates hot-path indexes and keeps rows`() {
+        createVersionEightDatabase()
+
+        database = Room.databaseBuilder(context, NaatDatabase::class.java, TEST_DATABASE)
+            .addMigrations(NaatDatabase.MIGRATION_8_9)
+            .allowMainThreadQueries()
+            .build()
+
+        val indexNames = mutableListOf<String>()
+        database!!.openHelper.writableDatabase
+            .query("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'naats'")
+            .use { cursor ->
+                while (cursor.moveToNext()) indexNames.add(cursor.getString(0))
+            }
+        assertTrue(indexNames.contains("index_naats_createdAt"))
+        assertTrue(indexNames.contains("index_naats_category"))
+        assertTrue(indexNames.contains("index_naats_lastOpenedAt"))
+        // The pre-existing updatedAt index survives alongside the new ones.
+        assertTrue(indexNames.contains("index_naats_updatedAt"))
+
+        // Rows and their data are untouched by an index-only step.
+        assertEquals(2, database!!.openHelper.writableDatabase
+            .query("SELECT COUNT(*) FROM naats")
+            .use { cursor -> cursor.moveToFirst(); cursor.getInt(0) })
+        assertEquals("serif", database!!.openHelper.writableDatabase
+            .query("SELECT titleFontOverride FROM naats WHERE title = 'Split row'")
+            .use { cursor -> cursor.moveToFirst(); cursor.getString(0) })
+    }
+
+    private fun createVersionEightDatabase() {
+        val file = context.getDatabasePath(TEST_DATABASE)
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            // Faithful v8: the v7 schema plus the nullable titleFontOverride
+            // column MIGRATION_7_8 adds, with its backfill already applied.
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS naats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    title TEXT NOT NULL,
+                    poet TEXT,
+                    category TEXT NOT NULL,
+                    lyrics TEXT,
+                    audioType TEXT NOT NULL,
+                    audioPath TEXT,
+                    isFavorite INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    secondaryAudioType TEXT NOT NULL,
+                    secondaryAudioPath TEXT,
+                    audioDisplayName TEXT,
+                    secondaryAudioDisplayName TEXT,
+                    lastOpenedAt INTEGER,
+                    readerFontOverride TEXT,
+                    titleFontOverride TEXT
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_naats_updatedAt ON naats(updatedAt)")
+            db.execSQL(
+                "INSERT INTO naats " +
+                    "(title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt, " +
+                    "updatedAt, secondaryAudioType, lastOpenedAt, readerFontOverride, titleFontOverride) " +
+                    "VALUES ('Split row', NULL, 'Naat', 'line', 'none', NULL, 0, 1, 1, 'none', NULL, 'serif', 'serif')"
+            )
+            db.execSQL(
+                "INSERT INTO naats " +
+                    "(title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt, " +
+                    "updatedAt, secondaryAudioType, lastOpenedAt, readerFontOverride, titleFontOverride) " +
+                    "VALUES ('Plain row', NULL, 'Naat', 'line', 'none', NULL, 0, 2, 2, 'none', NULL, NULL, NULL)"
+            )
+            db.version = 8
+        }
+    }
 
     private fun createVersionSevenDatabase() {
         val file = context.getDatabasePath(TEST_DATABASE)
