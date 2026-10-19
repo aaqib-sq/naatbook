@@ -225,6 +225,7 @@
     <string name="player_preview_pause_cd">Pause preview</string>
     <string name="player_preview_play_cd">Play preview</string>
     <string name="player_preview_label">Preview</string>
+    <string name="player_preview_title">Audio preview</string>
 
     <!-- Discard dialog -->
     <string name="discard_title">Discard unsaved entry?</string>
