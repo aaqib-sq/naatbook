@@ -134,13 +134,19 @@ class NaatViewModel @Inject constructor(
     /** Exact text-identity match (title + poet + folder + lyrics), new entries only. */
     private suspend fun findTextDuplicate(draft: EditorDraft): NaatEntity? {
         fun norm(value: String?): String = value?.trim()?.lowercase().orEmpty()
-        val all = repository.allNaats.first()
-        return all.firstOrNull { entry ->
-            norm(entry.title) == norm(draft.title) &&
-                norm(entry.poet) == norm(draft.poet) &&
-                entry.category == draft.category &&
-                norm(entry.lyrics) == norm(draft.lyrics)
+        // Audit 05 M2: compare the cheap identity fields across the whole
+        // library via a light projection, and load a full row (with its
+        // lyrics) only for an identity match.
+        val candidates = repository.allIdentityRows().filter { row ->
+            norm(row.title) == norm(draft.title) &&
+                norm(row.poet) == norm(draft.poet) &&
+                row.category == draft.category
         }
+        for (candidate in candidates) {
+            val entry = repository.getNaatById(candidate.id) ?: continue
+            if (norm(entry.lyrics) == norm(draft.lyrics)) return entry
+        }
+        return null
     }
     private val _isDeleting = MutableStateFlow(false)
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
