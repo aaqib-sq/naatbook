@@ -1,5 +1,6 @@
 package com.aistudio.mynaatnotebook.viewmodel
 
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import android.content.Context
 import kotlinx.coroutines.channels.Channel
@@ -22,6 +23,19 @@ sealed interface StatusMessage {
     data class Text(val text: String) : StatusMessage
     data class Res(
         @StringRes val resId: Int,
+        val args: List<Any> = emptyList()
+    ) : StatusMessage
+
+    /**
+     * A quantity-bearing message (audit 06 L1): resolved through
+     * `Resources.getQuantityString`, so "1 entry" / "2 entries" (and the
+     * Urdu singular/plural nouns) come from <plurals> instead of one
+     * plural-only string. [args] are the format arguments in order — the
+     * caller includes the quantity itself wherever the text prints it.
+     */
+    data class Plural(
+        @PluralsRes val resId: Int,
+        val quantity: Int,
         val args: List<Any> = emptyList()
     ) : StatusMessage
 }
@@ -56,6 +70,11 @@ class StatusReporter @Inject constructor() {
         queue.trySend(StatusMessage.Res(resId, args.toList()))
     }
 
+    /** Show a quantity-bearing <plurals> resource. */
+    fun showPlural(@PluralsRes resId: Int, quantity: Int, vararg args: Any) {
+        queue.trySend(StatusMessage.Plural(resId, quantity, args.toList()))
+    }
+
     /** Show an already-resolved dynamic string. */
     fun showText(text: String) {
         queue.trySend(StatusMessage.Text(text))
@@ -80,6 +99,11 @@ fun StatusMessage.resolve(context: Context): String = when (this) {
     is StatusMessage.Text -> text
     is StatusMessage.Res -> context.getString(
         resId,
+        *args.map { if (it is StatusMessage) it.resolve(context) else it }.toTypedArray()
+    )
+    is StatusMessage.Plural -> context.resources.getQuantityString(
+        resId,
+        quantity,
         *args.map { if (it is StatusMessage) it.resolve(context) else it }.toTypedArray()
     )
 }
