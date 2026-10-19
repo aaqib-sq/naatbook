@@ -4,7 +4,18 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "naats", indices = [Index(value = ["updatedAt"])])
+@Entity(
+    tableName = "naats",
+    indices = [
+        Index(value = ["updatedAt"]),
+        // Audit 05 M1: the list query orders by createdAt, the folder
+        // filter matches category, and Recents orders by lastOpenedAt —
+        // all three were full table scans on every library change.
+        Index(value = ["createdAt"]),
+        Index(value = ["category"]),
+        Index(value = ["lastOpenedAt"])
+    ]
+)
 data class NaatEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
