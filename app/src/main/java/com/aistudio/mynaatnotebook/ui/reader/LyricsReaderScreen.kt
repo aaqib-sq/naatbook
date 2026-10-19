@@ -51,6 +51,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.ContentCopy
@@ -192,6 +194,8 @@ fun LyricsReaderScreen(
     var immersive by rememberSaveable(naat.id) { mutableStateOf(false) }
     var immersiveChromeVisible by rememberSaveable(naat.id) { mutableStateOf(false) }
     var showImmersiveHint by rememberSaveable(naat.id) { mutableStateOf(false) }
+    // Audit 03 L11: the hint teaches once per entry, not on every hide.
+    var immersiveHintShown by rememberSaveable(naat.id) { mutableStateOf(false) }
     var topChromeHeightPx by remember { mutableIntStateOf(0) }
     var hasMeasuredTopChrome by remember { mutableStateOf(false) }
     var bottomChromeHeightPx by remember { mutableIntStateOf(0) }
@@ -201,6 +205,9 @@ fun LyricsReaderScreen(
     // state above: an unkeyed rememberSaveable leaked "auto-scroll ON at
     // A's speed" into the next entry on an in-place switch (reader audit H2).
     var autoScrollActive by rememberSaveable(naat.id) { mutableStateOf(false) }
+    // Audit 03 L12: while a finger is on the lyrics, the auto-scroll
+    // engine must not fight the reader's own drag.
+    var viewportPressed by remember { mutableStateOf(false) }
     var scrollSpeed by rememberSaveable(naat.id) { mutableFloatStateOf(1f) }
 
     // Sizing controls.
@@ -238,7 +245,10 @@ fun LyricsReaderScreen(
         if (immersive) return
         immersive = true
         immersiveChromeVisible = false
-        showImmersiveHint = true
+        if (!immersiveHintShown) {
+            showImmersiveHint = true
+            immersiveHintShown = true
+        }
     }
 
     fun exitImmersive() {
@@ -260,7 +270,7 @@ fun LyricsReaderScreen(
         // Inside immersive mode the content padding never changes (the
         // chrome floats over a constant gap), so this flip moves no text.
         immersiveChromeVisible = !immersiveChromeVisible
-        showImmersiveHint = !immersiveChromeVisible
+        showImmersiveHint = false
     }
 
     fun updateTopChromeHeight(heightPx: Int) {
@@ -282,7 +292,7 @@ fun LyricsReaderScreen(
         if (autoScrollActive) {
             while (isActive) {
                 val stepPx = with(density) { (1.5f * scrollSpeed).dp.toPx() }
-                scrollState.scrollBy(stepPx)
+                if (!viewportPressed) scrollState.scrollBy(stepPx)
                 delay(30)
                 if (scrollState.value >= scrollState.maxValue) autoScrollActive = false
             }
@@ -357,6 +367,7 @@ fun LyricsReaderScreen(
             immersive = immersive,
             onIntentionalTap = ::toggleImmersiveChrome,
             onDoubleTap = ::toggleImmersiveMode,
+            onPressChanged = { viewportPressed = it },
             readerFontChoice = effectiveReaderChoice,
             customFamilies = customFamilies
         )
@@ -587,12 +598,23 @@ private fun ReaderTopBar(
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             )
+                            // Audit 03 L13: the slider had no readout —
+                            // name the speed it is set to.
+                            Text(
+                                text = "${scrollSpeed}x",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = secondaryTextColor()
+                            )
                         }
                     }
                 }
             }
+        }
 
-            // Overflow menu: favorite, copy, share, share-audio, edit.
+            // Overflow menu: favorite, auto-scroll, copy, share, share-audio,
+            // edit. Audit 03 M8: unlike the "Aa" panel above, this menu also
+            // renders in immersive mode, so auto-scroll stays reachable
+            // without leaving full screen first.
             var overflowOpen by remember { mutableStateOf(false) }
             Box {
                 IconButton(
@@ -609,6 +631,18 @@ private fun ReaderTopBar(
                     expanded = overflowOpen,
                     onDismissRequest = { overflowOpen = false }
                 ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.reader_autoscroll_label)) },
+                        leadingIcon = {
+                            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                                if (autoScrollActive) {
+                                    Icon(Icons.Default.Check, contentDescription = null)
+                                }
+                            }
+                        },
+                        onClick = { onAutoScrollToggle() },
+                        modifier = Modifier.testTag("reader_autoscroll_item")
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.reader_favorite_cd)) },
                         leadingIcon = {
@@ -669,7 +703,6 @@ private fun ReaderTopBar(
                     )
                 }
             }
-        }
 
         IconButton(
             onClick = if (immersive) onExitImmersive else onEnterImmersive,
@@ -752,6 +785,7 @@ private fun ReaderLyricsViewport(
     immersive: Boolean,
     onIntentionalTap: () -> Unit,
     onDoubleTap: () -> Unit,
+    onPressChanged: (Boolean) -> Unit,
     readerFontChoice: String,
     customFamilies: Map<String, FontFamily>
 ) {
@@ -762,7 +796,8 @@ private fun ReaderLyricsViewport(
     val tapLabel = if (immersive) stringResource(R.string.reader_tap_label) else ""
     val tapModifier = Modifier.toggleReaderImmersiveOnTap(
         onTap = onIntentionalTap,
-        onDoubleTap = onDoubleTap
+        onDoubleTap = onDoubleTap,
+        onPressChanged = onPressChanged
     )
 
     if (naat.lyrics.isNullOrBlank()) {
@@ -1159,44 +1194,53 @@ private fun ApplyImmersiveSystemBars(enabled: Boolean) {
  */
 private fun Modifier.toggleReaderImmersiveOnTap(
     onTap: () -> Unit,
-    onDoubleTap: () -> Unit
-): Modifier = pointerInput(onTap, onDoubleTap) {
+    onDoubleTap: () -> Unit,
+    onPressChanged: (Boolean) -> Unit = {}
+): Modifier = pointerInput(onTap, onDoubleTap, onPressChanged) {
     var lastTapReleaseMs = 0L
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
-        val origin = down.position
-        val startedAt = down.uptimeMillis
-        var maxTravel = 0f
-        var maxPointers = 1
-        var released = false
-        var releasedAt = startedAt
+        // Audit 03 L12: report the press so auto-scroll can yield to the
+        // reader's finger; the finally keeps the flag honest even when
+        // the gesture is cancelled mid-drag.
+        onPressChanged(true)
+        try {
+            val origin = down.position
+            val startedAt = down.uptimeMillis
+            var maxTravel = 0f
+            var maxPointers = 1
+            var released = false
+            var releasedAt = startedAt
 
-        do {
-            val event = awaitPointerEvent()
-            maxPointers = maxOf(maxPointers, event.changes.count { it.pressed })
-            event.changes.firstOrNull { it.id == down.id }?.let { change ->
-                maxTravel = maxOf(maxTravel, (change.position - origin).getDistance())
-                if (change.changedToUpIgnoreConsumed()) {
-                    released = true
-                    releasedAt = change.uptimeMillis
+            do {
+                val event = awaitPointerEvent()
+                maxPointers = maxOf(maxPointers, event.changes.count { it.pressed })
+                event.changes.firstOrNull { it.id == down.id }?.let { change ->
+                    maxTravel = maxOf(maxTravel, (change.position - origin).getDistance())
+                    if (change.changedToUpIgnoreConsumed()) {
+                        released = true
+                        releasedAt = change.uptimeMillis
+                    }
+                }
+            } while (event.changes.any { it.pressed })
+
+            if (released && ReaderImmersivePolicy.isIntentionalSingleTap(
+                    travelPx = maxTravel,
+                    touchSlopPx = viewConfiguration.touchSlop,
+                    pointerCount = maxPointers,
+                    durationMs = releasedAt - startedAt
+                )
+            ) {
+                if (ReaderImmersivePolicy.isDoubleTap(lastTapReleaseMs, releasedAt)) {
+                    lastTapReleaseMs = 0L
+                    onDoubleTap()
+                } else {
+                    lastTapReleaseMs = releasedAt
+                    onTap()
                 }
             }
-        } while (event.changes.any { it.pressed })
-
-        if (released && ReaderImmersivePolicy.isIntentionalSingleTap(
-                travelPx = maxTravel,
-                touchSlopPx = viewConfiguration.touchSlop,
-                pointerCount = maxPointers,
-                durationMs = releasedAt - startedAt
-            )
-        ) {
-            if (ReaderImmersivePolicy.isDoubleTap(lastTapReleaseMs, releasedAt)) {
-                lastTapReleaseMs = 0L
-                onDoubleTap()
-            } else {
-                lastTapReleaseMs = releasedAt
-                onTap()
-            }
+        } finally {
+            onPressChanged(false)
         }
     }
 }
