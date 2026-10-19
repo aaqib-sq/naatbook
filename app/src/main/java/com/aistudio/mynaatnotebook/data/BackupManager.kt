@@ -191,13 +191,7 @@ class BackupManager @Inject constructor(
             val zip = ZipOutputStream(buffered)
             try {
                 zip.putNextEntry(ZipEntry(DATA_ENTRY))
-                // Audit 05 M3: stream the manifest into the zip instead
-                // of materializing the whole (uncapped) JSON string in
-                // memory first — a large library's export used to hold
-                // the entire text plus its byte copy at once.
-                val manifestWriter = java.io.OutputStreamWriter(zip, Charsets.UTF_8)
-                root.write(manifestWriter)
-                manifestWriter.flush()
+                zip.write(root.toString(4).toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
                 val audioList = if (entriesOnly) emptyList() else audioIndex.uniqueFiles.toList()
                 audioList.forEachIndexed { index, packed ->
@@ -1068,30 +1062,7 @@ class BackupManager @Inject constructor(
     private fun safeExtension(extension: String): String =
         extension.lowercase().takeIf { it.matches(Regex("[a-z0-9]{1,8}")) } ?: "bin"
 
-    /**
-     * Audit 05 M4: import/export hash the same audio files repeatedly
-     * (dedupe, signature, verify, plan) — each pass used to re-read the
-     * whole file from disk. Digests are memoized by file identity
-     * (path + length + mtime); a changed file invalidates itself.
-     */
-    private val shaCache = java.util.concurrent.ConcurrentHashMap<String, Triple<Long, Long, String>>()
-
     private fun File.sha256(): String {
-        if (isFile) {
-            val key = absolutePath
-            val length = length()
-            val modified = lastModified()
-            shaCache[key]?.let { (len, mod, hash) ->
-                if (len == length && mod == modified) return hash
-            }
-            val computed = computeSha256()
-            shaCache[key] = Triple(length, modified, computed)
-            return computed
-        }
-        return computeSha256()
-    }
-
-    private fun File.computeSha256(): String {
         val digest = MessageDigest.getInstance("SHA-256")
         FileInputStream(this).use { input ->
             val buffer = ByteArray(BUFFER_SIZE)
