@@ -362,8 +362,7 @@ class CustomFontStore @Inject constructor(
      * stream with ZipInputStream and died midway with the generic
      * "could not import" error and nothing imported: provider streams
      * and streaming-ZIP quirks are a fragile combination. A failure
-     * after some fonts landed keeps those fonts, and the failure itself
-     * is surfaced with its real reason instead of the generic message.
+     * after some fonts landed keeps those fonts.
      */
     suspend fun importFontsFromZip(uri: Uri): ZipFontImportResult =
         withContext(Dispatchers.IO) {
@@ -464,10 +463,7 @@ class CustomFontStore @Inject constructor(
                 // Fonts that already landed stay landed — a dead archive
                 // must not take the successful imports down with it.
                 if (imported > 0) writeRegistry(current)
-                throw FontImportException(
-                    R.string.settings_font_zip_failed,
-                    listOf(e.message ?: e.javaClass.simpleName)
-                )
+                throw FontImportException(R.string.settings_font_zip_failed)
             } finally {
                 stagedZip.delete()
             }
