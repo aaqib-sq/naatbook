@@ -104,9 +104,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             customFontStore.fonts.collect { fonts ->
                 _customFonts.value = fonts
-                _customFamilies.value = fonts.mapNotNull { font ->
-                    customFontStore.familyFor(font)?.let { font.id to it }
-                }.toMap()
+                // Audit 05 H1: family building touches the disk (typeface
+                // parsing) — keep it off the main thread.
+                _customFamilies.value = kotlinx.coroutines.withContext(
+                    kotlinx.coroutines.Dispatchers.Default
+                ) {
+                    fonts.mapNotNull { font ->
+                        customFontStore.familyFor(font)?.let { font.id to it }
+                    }.toMap()
+                }
             }
         }
         viewModelScope.launch {
