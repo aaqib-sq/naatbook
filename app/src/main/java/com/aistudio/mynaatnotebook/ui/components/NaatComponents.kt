@@ -360,6 +360,9 @@ fun AudioAttachmentPreview(
     val playerIsPlaying by controller.isPlaying.collectAsStateWithLifecycle()
     val currentPos by controller.currentPosition.collectAsStateWithLifecycle()
     val duration by controller.duration.collectAsStateWithLifecycle()
+    // Audit 06 M1: the preview notification title is localized; resolved
+    // here in composition (stringResource cannot run inside onClick).
+    val previewTitle = stringResource(R.string.player_preview_title)
     val ownsPreview = activePreviewPath == path && controller.ownsPreview(path)
     val isPlaying = ownsPreview && playerIsPlaying
 
@@ -369,7 +372,7 @@ fun AudioAttachmentPreview(
                 when {
                     isPlaying -> controller.pause()
                     ownsPreview -> controller.resume()
-                    else -> controller.playPreview(path, stringResource(R.string.player_preview_title))
+                    else -> controller.playPreview(path, previewTitle)
                 }
             },
             modifier = Modifier.testTag("audio_preview_play")
