@@ -53,6 +53,15 @@ interface NaatDao {
     @Query("SELECT * FROM naats WHERE id = :id")
     suspend fun getNaatById(id: Int): NaatEntity?
 
+    /**
+     * Audit 05 M2: the duplicate check used to load EVERY row whole —
+     * lyrics included — just to compare four short fields. This
+     * projection carries only the identity fields; the caller loads the
+     * full row only for the rare title+poet+category candidates.
+     */
+    @Query("SELECT id, title, poet, category FROM naats")
+    suspend fun allIdentityRows(): List<EntryIdentityRow>
+
     @Query("SELECT * FROM naats WHERE id = :id")
     fun getNaatByIdFlow(id: Int): Flow<NaatEntity?>
 
@@ -96,3 +105,11 @@ interface NaatDao {
     @Query("SELECT COUNT(*) FROM naats WHERE audioPath = :audioPath OR secondaryAudioPath = :audioPath")
     suspend fun countByAudioPath(audioPath: String): Int
 }
+
+/** Projection for [NaatDao.allIdentityRows] — identity fields only. */
+data class EntryIdentityRow(
+    val id: Int,
+    val title: String,
+    val poet: String?,
+    val category: String
+)

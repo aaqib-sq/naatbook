@@ -32,6 +32,9 @@ class NaatRepository @Inject constructor(private val naatDao: NaatDao) {
 
     suspend fun getNaatById(id: Int): NaatEntity? = naatDao.getNaatById(id)
 
+    /** Identity-only rows for the duplicate check (audit 05 M2). */
+    suspend fun allIdentityRows(): List<EntryIdentityRow> = naatDao.allIdentityRows()
+
     suspend fun insert(naat: NaatEntity): Long = naatDao.insertNaat(naat)
 
     suspend fun insertAll(naats: List<NaatEntity>): List<Long> = naatDao.insertNaats(naats)
