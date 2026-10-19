@@ -86,15 +86,34 @@ class CustomFontStore @Inject constructor(
 
     fun fileFor(font: CustomFont): File = File(fontsDir, font.fileName)
 
+    /**
+     * Audit 05 H1: parsed families are cached by file identity (path +
+     * length + mtime). The settings collector used to re-run
+     * Typeface.createFromFile for EVERY registered font on EVERY registry
+     * emission — with 50 fonts that is 50 disk reads + parses on the main
+     * thread per settings change, a visible stall. A replaced file (same
+     * path, new bytes) invalidates itself through length/mtime.
+     */
+    private data class CachedFamily(val length: Long, val modified: Long, val family: FontFamily?)
+
+    private val familyCache = java.util.concurrent.ConcurrentHashMap<String, CachedFamily>()
+
     /** Loads (and thereby validates) a font file as a Compose family. */
     fun loadFamily(file: File): FontFamily? {
         if (!file.isFile) return null
-        return try {
-            val typeface = Typeface.createFromFile(file) ?: return null
-            FontFamily(typeface)
+        val key = file.absolutePath
+        val length = file.length()
+        val modified = file.lastModified()
+        familyCache[key]?.let { cached ->
+            if (cached.length == length && cached.modified == modified) return cached.family
+        }
+        val loaded = try {
+            Typeface.createFromFile(file)?.let { FontFamily(it) }
         } catch (e: RuntimeException) {
             null
         }
+        familyCache[key] = CachedFamily(length, modified, loaded)
+        return loaded
     }
 
     fun familyFor(font: CustomFont): FontFamily? = loadFamily(fileFor(font))
