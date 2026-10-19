@@ -43,7 +43,7 @@ class NaatRepository @Inject constructor(private val naatDao: NaatDao) {
     suspend fun replaceLibrary(newNaats: List<NaatEntity>, oldIds: List<Int>): List<Long> =
         naatDao.replaceLibrary(newNaats, oldIds)
 
-    suspend fun update(naat: NaatEntity): Int = naatDao.updateNaat(naat)
+    suspend fun update(naat: NaatEntity) = naatDao.updateNaat(naat)
 
     suspend fun toggleFavorite(id: Int): NaatEntity? {
         naatDao.toggleFavorite(id)

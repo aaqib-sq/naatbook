@@ -47,7 +47,6 @@ private val KEY_DRIVE_AUTO_SYNC = androidx.datastore.preferences.core.booleanPre
 private val KEY_DRIVE_SYNC_INTERVAL = stringPreferencesKey("drive_sync_interval")
 private val KEY_DRIVE_LAST_HASH = stringPreferencesKey("drive_last_hash")
 private val KEY_LAST_PLAYBACK_POSITION_MS = androidx.datastore.preferences.core.longPreferencesKey("last_playback_position_ms")
-private val KEY_LAST_PLAYBACK_AUDIO_PATH = androidx.datastore.preferences.core.stringPreferencesKey("last_playback_audio_path")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -181,28 +180,19 @@ class SettingsStore @Inject constructor(
     }
 
     /** Last entry playback point, for resume-after-process-death (audit #21). */
-    // Audit 03 M7: the saved point also remembers WHICH of the entry's
-    // files was playing — restoring always used to rebuild the session
-    // on the primary file, silently dropping a secondary selection.
-    data class LastPlayback(val naatId: Int, val positionMs: Long, val audioPath: String? = null)
+    data class LastPlayback(val naatId: Int, val positionMs: Long)
 
     val lastPlayback: Flow<LastPlayback?> = context.settingsDataStore.data
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
         .map { prefs ->
             val id = prefs[KEY_LAST_PLAYBACK_NAAT_ID] ?: 0
-            if (id > 0) LastPlayback(
-                id,
-                prefs[KEY_LAST_PLAYBACK_POSITION_MS] ?: 0L,
-                prefs[KEY_LAST_PLAYBACK_AUDIO_PATH]
-            ) else null
+            if (id > 0) LastPlayback(id, prefs[KEY_LAST_PLAYBACK_POSITION_MS] ?: 0L) else null
         }
 
-    suspend fun setLastPlayback(naatId: Int, positionMs: Long, audioPath: String? = null) {
+    suspend fun setLastPlayback(naatId: Int, positionMs: Long) {
         context.settingsDataStore.edit {
             it[KEY_LAST_PLAYBACK_NAAT_ID] = naatId
             it[KEY_LAST_PLAYBACK_POSITION_MS] = positionMs
-            if (audioPath != null) it[KEY_LAST_PLAYBACK_AUDIO_PATH] = audioPath
-            else it.remove(KEY_LAST_PLAYBACK_AUDIO_PATH)
         }
     }
 
@@ -210,7 +200,6 @@ class SettingsStore @Inject constructor(
         context.settingsDataStore.edit {
             it.remove(KEY_LAST_PLAYBACK_NAAT_ID)
             it.remove(KEY_LAST_PLAYBACK_POSITION_MS)
-            it.remove(KEY_LAST_PLAYBACK_AUDIO_PATH)
         }
     }
 
