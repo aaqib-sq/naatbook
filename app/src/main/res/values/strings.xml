@@ -290,6 +290,8 @@
     <string name="settings_import_mode_replace_desc">Everything currently in the library is deleted and replaced by this backup.</string>
     <string name="settings_import_replace_title">Replace the whole library?</string>
     <string name="settings_import_replace_message">This will permanently delete all current entries and their audio, then load the backup. This cannot be undone. Continue?</string>
+    <string name="settings_import_backup_count">This backup contains %1$d entries.</string>
+    <string name="settings_import_backup_empty">Warning: this backup has 0 entries — replacing will empty your whole library.</string>
     <string name="settings_import_replace_confirm">Delete and replace</string>
     <string name="status_import_success_replaced">Library replaced: %1$d entries loaded, %2$d old entries removed.</string>
     <string name="editor_replace_audio_title">Replace existing audio?</string>
@@ -317,6 +319,9 @@
     <string name="settings_drive_disconnect_message">NaatBook will stop syncing with this account. Backups already saved in Drive are not deleted.</string>
     <string name="status_drive_connected">Google account connected: %1$s</string>
     <string name="status_drive_sign_in_failed">Google sign-in failed</string>
+    <string name="status_drive_check_failed">Connected, but checking Drive for backups failed</string>
+    <string name="status_drive_reconnect_needed">Session expired — connect Google Drive again</string>
+    <string name="status_drive_consent_declined">Permission not granted — action cancelled</string>
     <string name="status_drive_syncing">Syncing with Google Drive...</string>
     <string name="status_drive_sync_success">Drive backup updated! %1$d entries.</string>
     <string name="status_drive_sync_failed">Drive sync failed: %1$s</string>
