@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -152,7 +153,9 @@ fun OnboardingScreen(onDone: () -> Unit) {
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 30.dp)
-                    .height(56.dp)
+                    // Audit 06 H-C: a minimum, not a fixed height — large
+                    // font/display scaling may grow the label past 56dp.
+                    .defaultMinSize(minHeight = 56.dp)
                     .testTag(if (page < 3) "onboarding_next" else "onboarding_start")
             ) {
                 Text(
