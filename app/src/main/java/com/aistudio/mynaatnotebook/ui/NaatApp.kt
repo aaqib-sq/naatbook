@@ -114,7 +114,6 @@ fun NaatApp(
     val titleFontChoice by settingsViewModel.titleFont.collectAsStateWithLifecycle()
     val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
     val titleFontFamily = FontChoices.resolveTitle(titleFontChoice, urduScript = false, customFamilies)
-    val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val isAttaching by viewModel.isAttachingFile.collectAsStateWithLifecycle()
 
@@ -142,10 +141,11 @@ fun NaatApp(
         else -> isSystemInDarkTheme()
     }
 
-    LaunchedEffect(statusMessage) {
-        statusMessage?.let {
-            Toast.makeText(context, it.resolve(context), Toast.LENGTH_LONG).show()
-            viewModel.clearStatusMessage()
+    // Audit 03 M13: status messages arrive on a queue — every receipt is
+    // shown, even when two land back to back.
+    LaunchedEffect(Unit) {
+        viewModel.statusMessages.collect { message ->
+            Toast.makeText(context, message.resolve(context), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -162,6 +162,10 @@ fun NaatApp(
         currentRoute,
         currentTab,
         showAddModal,
+        // Audit 03 L2: while the intro overlay is up (first run or a
+        // Settings replay), Back belongs to the intro — the handler used
+        // to reset the library state underneath it.
+        overlayVisible = onboardingSeen == false || introRequested,
         viewModel,
         onReaderBack = {
             viewModel.selectNaat(null)
@@ -227,7 +231,12 @@ fun NaatApp(
     }
 
     fun requestEditorClose() {
-        if (isSaving) return
+        if (isSaving) {
+            // Audit 03 L7: a back press during save used to be swallowed
+            // without a trace, reading as a frozen app.
+            Toast.makeText(context, R.string.status_busy_wait, Toast.LENGTH_SHORT).show()
+            return
+        }
         // Audit #18: an in-progress attach no longer traps the editor —
         // closing cancels the attach and proceeds as usual.
         if (isAttaching) viewModel.cancelAttach()
@@ -532,13 +541,14 @@ private fun AppBackHandler(
     currentRoute: String?,
     currentTab: Int,
     editorModalVisible: Boolean,
+    overlayVisible: Boolean,
     viewModel: NaatViewModel,
     onReaderBack: () -> Unit
 ) {
     val selectedFolder by viewModel.selectedFolder.collectAsStateWithLifecycle()
     val favoritesOnly by viewModel.showFavoritesOnly.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val canHandleAppBack = !editorModalVisible && (
+    val canHandleAppBack = !editorModalVisible && !overlayVisible && (
         currentRoute == NaatRoutes.READER ||
             (currentRoute == NaatRoutes.HOME && currentTab == 2) ||
             (currentRoute == NaatRoutes.HOME && currentTab == 0 &&

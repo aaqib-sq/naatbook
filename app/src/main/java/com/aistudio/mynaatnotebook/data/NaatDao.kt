@@ -29,15 +29,19 @@ interface NaatDao {
     @Query("SELECT category, COUNT(*) AS count FROM naats GROUP BY category")
     fun getCategoryCounts(): Flow<List<CategoryCount>>
 
+    // Audit 03 M2: the stored columns are folded in SQL with exactly the
+    // rules normalizeSearchText applies to the query (harakat stripped,
+    // variant letters folded, ASCII lowered) — a query typed with
+    // diacritics or Arabic yeh/kaf used to match nothing at all.
     @Query("""
         SELECT id, title, poet, category, audioType, audioPath, isFavorite, createdAt,
                secondaryAudioType, secondaryAudioPath
         FROM naats
         WHERE (:folder IS NULL OR category = :folder COLLATE NOCASE)
           AND (:favoritesOnly = 0 OR isFavorite = 1)
-          AND (:query = '' OR title LIKE '%' || :query || '%' ESCAPE '\' COLLATE NOCASE
-               OR poet LIKE '%' || :query || '%' ESCAPE '\' COLLATE NOCASE
-               OR lyrics LIKE '%' || :query || '%' ESCAPE '\' COLLATE NOCASE)
+          AND (:query = '' OR lower(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(title, 'ـ', ''), 'ً', ''), 'ٌ', ''), 'ٍ', ''), 'َ', ''), 'ُ', ''), 'ِ', ''), 'ّ', ''), 'ْ', ''), 'ٰ', ''), 'آ', 'ا'), 'أ', 'ا'), 'إ', 'ا'), 'ٱ', 'ا'), 'ؤ', 'و'), 'ئ', 'ی'), 'ي', 'ی'), 'ى', 'ی'), 'ك', 'ک'), 'ة', 'ہ'), 'ھ', 'ہ')) LIKE '%' || :query || '%' ESCAPE '\'
+               OR lower(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(poet, 'ـ', ''), 'ً', ''), 'ٌ', ''), 'ٍ', ''), 'َ', ''), 'ُ', ''), 'ِ', ''), 'ّ', ''), 'ْ', ''), 'ٰ', ''), 'آ', 'ا'), 'أ', 'ا'), 'إ', 'ا'), 'ٱ', 'ا'), 'ؤ', 'و'), 'ئ', 'ی'), 'ي', 'ی'), 'ى', 'ی'), 'ك', 'ک'), 'ة', 'ہ'), 'ھ', 'ہ')) LIKE '%' || :query || '%' ESCAPE '\'
+               OR lower(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(lyrics, 'ـ', ''), 'ً', ''), 'ٌ', ''), 'ٍ', ''), 'َ', ''), 'ُ', ''), 'ِ', ''), 'ّ', ''), 'ْ', ''), 'ٰ', ''), 'آ', 'ا'), 'أ', 'ا'), 'إ', 'ا'), 'ٱ', 'ا'), 'ؤ', 'و'), 'ئ', 'ی'), 'ي', 'ی'), 'ى', 'ی'), 'ك', 'ک'), 'ة', 'ہ'), 'ھ', 'ہ')) LIKE '%' || :query || '%' ESCAPE '\')
         ORDER BY createdAt DESC
     """)
     fun getFilteredSummaries(
@@ -73,7 +77,7 @@ interface NaatDao {
     }
 
     @Update
-    suspend fun updateNaat(naat: NaatEntity)
+    suspend fun updateNaat(naat: NaatEntity): Int
 
     /** Toggles from the value currently stored in Room, never from a stale UI snapshot. */
     @Query("UPDATE naats SET isFavorite = NOT isFavorite WHERE id = :id")

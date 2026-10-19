@@ -91,7 +91,7 @@
     <string name="settings_identity_sub">%1$s · 100%% Offline | Zero Data Tracking</string>
 
     <!-- Reader -->
-    <string name="reader_tap_hint">Tap once to show controls</string>
+    <string name="reader_tap_hint">Tap once to show controls · Double-tap or Back to exit fullscreen</string>
     <string name="reader_close_cd">Close Reader</string>
     <string name="onboarding_skip">Skip</string>
     <string name="onboarding_next">Next</string>
@@ -368,4 +368,11 @@
     <string name="privacy_b_perm_mic">Microphone — used only when you record audio inside the app, at your request.</string>
     <string name="privacy_h_contact">Contact</string>
     <string name="privacy_p_contact">For any question about this policy, contact the developer at %1$s.</string>
+    <string name="status_entry_no_changes">No changes to save</string>
+    <string name="status_busy_wait">Please wait — the previous action is still finishing</string>
+    <string name="status_previous_delete_finalized">The earlier deletion is now permanent</string>
+    <string name="status_playback_file_missing">Audio file not found on this device</string>
+    <string name="editor_draft_keep_failed">Could not save the draft for later</string>
+    <string name="editor_recording_lost">An unfinished recording could not be recovered</string>
+    <string name="reader_switched_audio">Switched to %1$s</string>
 </resources>

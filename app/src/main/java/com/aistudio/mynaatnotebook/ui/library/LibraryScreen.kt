@@ -256,18 +256,17 @@ fun LibraryScreen(
                 }
 
                 if (recentNaats.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.library_empty_folders),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = secondaryTextColor()
-                        )
-                    }
+                    // Audit 03 L4: a fresh install's home used to be a
+                    // wall of zero-count folder cards under a bare "no
+                    // entries" line, with no next action. The guided
+                    // empty state is the root's call to action.
+                    EmptyStateGuide(
+                        titleText = stringResource(R.string.empty_guide_title),
+                        bodyText = stringResource(R.string.library_empty_folder),
+                        buttonText = stringResource(R.string.empty_guide_add),
+                        onAddEntry = onAddEntry,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                 } else {
                     // Room already applies updatedAt DESC and strict LIMIT 10,
                     // so this strip stays bounded however large the library gets.
@@ -394,6 +393,43 @@ fun LibraryScreen(
                     color = secondaryTextColor(),
                     modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
                 )
+                // Audit 03 M1: at the root, the favorites filter hid its
+                // own off-switch (the chip lives in the home branch that
+                // this view replaces). Same removable indicator the
+                // folder view already had.
+                if (favoritesOnly) {
+                    Row(
+                        modifier = Modifier
+                            .padding(bottom = 8.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { viewModel.setFavoritesOnly(false) }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .testTag("root_favorites_chip"),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Favorite,
+                            contentDescription = null,
+                            tint = HighContrastRed,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = stringResource(R.string.library_favorites_title),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.library_favorites_filter_off_cd),
+                            tint = secondaryTextColor(),
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
                 if (filteredNaats.isEmpty()) {
                     Box(
                         modifier = Modifier
