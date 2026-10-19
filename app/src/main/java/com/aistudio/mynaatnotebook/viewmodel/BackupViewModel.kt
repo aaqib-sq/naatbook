@@ -132,6 +132,10 @@ class BackupViewModel @Inject constructor(
         }
     }
 
+    /** Manifest entry count for the import confirmation dialog (audit 02 M1). */
+    suspend fun peekEntryCount(uri: Uri): Int? =
+        backupManager.peekEntryCount(uri).getOrNull()
+
     fun restoreNotebook(uri: Uri, mode: ImportMode = ImportMode.MERGE) {
         if (_isWorking.value) return
         _isWorking.value = true
