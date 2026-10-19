@@ -38,6 +38,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -52,7 +57,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.mynaatnotebook.R
-import com.aistudio.mynaatnotebook.ui.reader.ThinSeekBar
 import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import kotlinx.coroutines.launch
@@ -68,9 +72,23 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(onDone: () -> Unit) {
-    val pagerState = rememberPagerState(pageCount = { 4 })
+    // Audit 03 L5: the page survives rotation/process recreation.
+    var savedPage by rememberSaveable { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(initialPage = savedPage, pageCount = { 4 })
     val scope = rememberCoroutineScope()
     val page = pagerState.currentPage
+    LaunchedEffect(page) { savedPage = page }
+    // Audit 03 L3: Back used to quit the app mid-intro (and the intro
+    // then reappeared on relaunch, since "seen" is only set on Skip /
+    // Get Started). Back steps back a page; on the first page it means
+    // the same as Skip.
+    BackHandler {
+        if (page > 0) {
+            scope.launch { pagerState.animateScrollToPage(page - 1) }
+        } else {
+            onDone()
+        }
+    }
     val fg = MaterialTheme.colorScheme.onBackground
 
     Box(
@@ -373,13 +391,31 @@ private fun ReaderScene() {
                 style = MaterialTheme.typography.labelSmall,
                 color = secondaryTextColor()
             )
-            ThinSeekBar(
-                fraction = 0.34f,
-                onFractionChange = {},
+            // Audit 03 L1: a REAL ThinSeekBar here consumed horizontal
+            // drags, eating pager swipes that started on the strip. The
+            // mock scene is a picture of a seek bar, not a control.
+            Box(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 8.dp)
-            )
+                    .height(20.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.34f)
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onBackground)
+                )
+            }
             Text(
                 text = "4:10",
                 style = MaterialTheme.typography.labelSmall,
