@@ -225,7 +225,6 @@
     <string name="player_preview_pause_cd">Pause preview</string>
     <string name="player_preview_play_cd">Play preview</string>
     <string name="player_preview_label">Preview</string>
-    <string name="player_preview_title">Audio preview</string>
 
     <!-- Discard dialog -->
     <string name="discard_title">Discard unsaved entry?</string>
@@ -254,32 +253,17 @@
     <string name="status_entry_lookup_failed">Unable to open entry</string>
     <string name="status_open_playing_failed">Unable to open the playing entry: %1$s</string>
     <string name="status_exporting">Exporting backup, please wait...</string>
-    <plurals name="status_export_success">
-        <item quantity="one">Library Backup Exported Successfully! %1$d entry.</item>
-        <item quantity="other">Library Backup Exported Successfully! %1$d entries.</item>
-    </plurals>
+    <string name="status_export_success">Library Backup Exported Successfully! %1$d entries.</string>
     <string name="status_export_failed">Export Failed: %1$s</string>
     <string name="status_importing">Importing backup, please wait...</string>
     <string name="settings_progress_exporting">Exporting backup</string>
     <string name="settings_progress_importing">Importing backup</string>
     <string name="settings_progress_syncing">Syncing with Drive</string>
     <string name="settings_progress_downloading">Downloading from Drive</string>
-    <plurals name="status_import_success">
-        <item quantity="one">Library Restored Successfully! Loaded %1$d entry.</item>
-        <item quantity="other">Library Restored Successfully! Loaded %1$d entries.</item>
-    </plurals>
-    <plurals name="status_import_fonts_restored">
-        <item quantity="one">Also restored %1$d imported font from the backup</item>
-        <item quantity="other">Also restored %1$d imported fonts from the backup</item>
-    </plurals>
-    <plurals name="status_import_fonts_failed">
-        <item quantity="one">%1$d font from the backup could not be restored</item>
-        <item quantity="other">%1$d fonts from the backup could not be restored</item>
-    </plurals>
-    <plurals name="status_import_success_skipped">
-        <item quantity="one">Import complete: %1$d new entry added, %2$d already existed (skipped).</item>
-        <item quantity="other">Import complete: %1$d new entries added, %2$d already existed (skipped).</item>
-    </plurals>
+    <string name="status_import_success">Library Restored Successfully! Loaded %1$d entries.</string>
+    <string name="status_import_fonts_restored">Also restored %1$d imported fonts from the backup</string>
+    <string name="status_import_fonts_failed">%1$d fonts from the backup could not be restored</string>
+    <string name="status_import_success_skipped">Import complete: %1$d new entries added, %2$d already existed (skipped).</string>
     <string name="status_import_failed">Import Failed: %1$s</string>
     <string name="status_error_database">database error</string>
     <string name="status_error_storage">storage error</string>
@@ -339,10 +323,7 @@
     <string name="status_drive_reconnect_needed">Session expired — connect Google Drive again</string>
     <string name="status_drive_consent_declined">Permission not granted — action cancelled</string>
     <string name="status_drive_syncing">Syncing with Google Drive...</string>
-    <plurals name="status_drive_sync_success">
-        <item quantity="one">Drive backup updated! %1$d entry.</item>
-        <item quantity="other">Drive backup updated! %1$d entries.</item>
-    </plurals>
+    <string name="status_drive_sync_success">Drive backup updated! %1$d entries.</string>
     <string name="status_drive_sync_failed">Drive sync failed: %1$s</string>
     <string name="status_drive_downloading">Downloading the Drive backup...</string>
     <string name="status_drive_download_failed">Drive download failed: %1$s</string>
