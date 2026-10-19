@@ -80,6 +80,7 @@
     <string name="settings_font_zip_skipped">%1$d فائلیں چھوڑ دی گئیں (ڈپلیکٹ، درست فونٹ نہیں، یا بہت بڑی)</string>
     <string name="settings_font_zip_limit">%1$d مزید فونٹ رہ گئے — درآمد شدہ فونٹ کی حد %2$d پوری ہو گئی</string>
     <string name="settings_font_zip_none">اس زپ میں کوئی فونٹ فائل (.ttf / .otf) نہیں ملی</string>
+    <string name="settings_font_zip_failed">زپ درآمد ناکام — %1$s</string>
     <string name="settings_typography_title">حروف کی ترتیب</string>
     <string name="settings_font_size_label">کلام کے متن کا طے شدہ سائز: %1$d sp</string>
     <string name="settings_backup_title">بیک اپ</string>
