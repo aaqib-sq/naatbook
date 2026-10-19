@@ -58,6 +58,7 @@
     <string name="settings_font_nastaliq">Nastaliq</string>
     <string name="settings_font_custom_missing">Imported font</string>
     <string name="settings_import_font">+ Import font</string>
+    <string name="settings_font_imported_count">Imported fonts · %1$d</string>
     <string name="settings_font_delete_cd">Delete font %1$s</string>
     <string name="settings_font_delete_title">Delete this font?</string>
     <string name="settings_font_delete_message">“%1$s” will be removed from the app.</string>
@@ -80,7 +81,7 @@
     <string name="settings_font_zip_skipped">%1$d files were skipped (duplicate, not a valid font, or too large)</string>
     <string name="settings_font_zip_limit">%1$d more fonts were left out — the limit of %2$d imported fonts was reached</string>
     <string name="settings_font_zip_none">No font files (.ttf / .otf) were found in that ZIP</string>
-    <string name="settings_font_zip_failed">ZIP import failed — %1$s</string>
+    <string name="settings_font_zip_failed">That ZIP could not be read.</string>
     <string name="settings_typography_title">Typography Adjustment</string>
     <string name="settings_font_size_label">Lyrics Default Text Size: %1$d sp</string>
     <string name="settings_backup_title">Backup</string>
