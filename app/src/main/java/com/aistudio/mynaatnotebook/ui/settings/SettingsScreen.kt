@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -542,7 +543,9 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .verticalScroll(rememberScrollState())
+            // Audit 03 L17: a language switch recreates the activity;
+            // a saveable scroll state keeps the user's place through it.
+            .verticalScroll(rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) })
     ) {
         // Identity zone (top of page): the app's Noon mark + name +
         // version/tagline. The bottom footer block was removed — this is the
