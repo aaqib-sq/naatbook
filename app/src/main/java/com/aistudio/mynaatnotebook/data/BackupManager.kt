@@ -191,7 +191,14 @@ class BackupManager @Inject constructor(
             val zip = ZipOutputStream(buffered)
             try {
                 zip.putNextEntry(ZipEntry(DATA_ENTRY))
-                zip.write(root.toString(4).toByteArray(Charsets.UTF_8))
+                // Audit 05 M3: write the manifest through a Writer in one
+                // pass instead of holding the whole JSON text AND its
+                // UTF-8 byte copy at once (the old toString(4).toByteArray
+                // doubled the peak). Full token streaming is not available:
+                // Android's org.json JSONObject has no write(Writer).
+                val manifestWriter = java.io.OutputStreamWriter(zip, Charsets.UTF_8)
+                manifestWriter.write(root.toString(4))
+                manifestWriter.flush()
                 zip.closeEntry()
                 val audioList = if (entriesOnly) emptyList() else audioIndex.uniqueFiles.toList()
                 audioList.forEachIndexed { index, packed ->
