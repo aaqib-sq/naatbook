@@ -885,6 +885,7 @@ private fun ReaderAudioControls(
     modifier: Modifier = Modifier
 ) {
     val controller = viewModel.playbackController
+    val switchContext = LocalContext.current
     val nowPlaying by controller.nowPlaying.collectAsStateWithLifecycle()
     val hasSession by controller.hasActiveSession.collectAsStateWithLifecycle()
     val playerIsPlaying by controller.isPlaying.collectAsStateWithLifecycle()
@@ -894,11 +895,16 @@ private fun ReaderAudioControls(
         listOfNotNull(
             naat.audioPath?.let { naat.audioType to it },
             naat.secondaryAudioPath?.let { naat.secondaryAudioType to it }
-        ).filter { it.first != "none" }
+        ).filter { (type, path) ->
+            // Audit 03 H2: a path whose file was deleted outside the app
+            // used to render a complete player that could only fail with a
+            // generic toast. Only attachments present on disk get a card.
+            type != "none" && (path.startsWith("content://") || File(path).isFile)
+        }
     }
     if (attachments.isEmpty()) return
 
-    var selectedPath by remember(naat.id) { mutableStateOf(attachments.first().second) }
+    var selectedPath by rememberSaveable(naat.id) { mutableStateOf(attachments.first().second) }
     LaunchedEffect(attachments, nowPlaying?.audioPath) {
         if (nowPlaying?.naatId == naat.id) selectedPath = nowPlaying?.audioPath ?: selectedPath
         else if (attachments.none { it.second == selectedPath }) selectedPath = attachments.first().second
@@ -945,25 +951,51 @@ private fun ReaderAudioControls(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (attachments.size > 1) {
-                IconButton(
-                    onClick = {
-                        val next = attachments.firstOrNull { it.second != selectedPath }
-                        if (next != null) {
-                            if (nowPlaying?.naatId == naat.id &&
-                                nowPlaying?.audioPath != next.second
-                            ) {
-                                controller.stop()
+                // Audit 03 H1: the bare type icon never read as a switch.
+                // A small swap badge marks it as tappable, and the switch
+                // names what is now selected (its display name when it has
+                // one — two files of the same type are otherwise identical).
+                Box {
+                    IconButton(
+                        onClick = {
+                            val next = attachments.firstOrNull { it.second != selectedPath }
+                            if (next != null) {
+                                if (nowPlaying?.naatId == naat.id &&
+                                    nowPlaying?.audioPath != next.second
+                                ) {
+                                    controller.stop()
+                                }
+                                selectedPath = next.second
+                                val nextName = when (next.second) {
+                                    naat.audioPath -> naat.audioDisplayName
+                                    naat.secondaryAudioPath -> naat.secondaryAudioDisplayName
+                                    else -> null
+                                }?.takeIf { it.isNotBlank() }
+                                    ?: switchContext.getString(
+                                        if (next.first == "recorded") R.string.reader_voice_note
+                                        else R.string.reader_linked_audio
+                                    )
+                                Toast.makeText(
+                                    switchContext,
+                                    switchContext.getString(R.string.reader_switched_audio, nextName),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
-                            selectedPath = next.second
-                        }
-                    },
-                    modifier = Modifier.size(40.dp).testTag("reader_audio_switch")
-                ) {
+                        },
+                        modifier = Modifier.size(40.dp).testTag("reader_audio_switch")
+                    ) {
+                        Icon(
+                            if (selectedType == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
+                            contentDescription = stringResource(R.string.reader_switch_audio_cd),
+                            tint = secondaryTextColor(),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     Icon(
-                        if (selectedType == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
-                        contentDescription = stringResource(R.string.reader_switch_audio_cd),
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = null,
                         tint = secondaryTextColor(),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(12.dp).align(Alignment.BottomEnd)
                     )
                 }
             } else {
