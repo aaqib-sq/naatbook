@@ -915,7 +915,7 @@ private fun ReaderAudioControls(
     // Audit 03 M10: when a track ends, the session clears and the length
     // used to vanish with it ("0:00 / 0:00"). Keep the last known length
     // for the file it belonged to.
-    var lastDuration by remember(naat.id) { mutableStateOf(0) }
+    var lastDuration by remember(naat.id) { mutableStateOf(0L) }
     var lastDurationPath by remember(naat.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(playerDuration, nowPlaying?.audioPath) {
         if (playerDuration > 0 && nowPlaying?.naatId == naat.id) {
