@@ -1324,6 +1324,7 @@ class NaatViewModel @Inject constructor(
         _isDeleting.value = true
         viewModelScope.launch {
             try {
+                var supersededPendingDelete = false
                 val (deleted, undoToken) = audioFiles.exclusive {
                     // Resolve the row inside the lifecycle lock so a concurrent save
                     // cannot make cleanup decisions from stale attachment paths.
@@ -1333,7 +1334,7 @@ class NaatViewModel @Inject constructor(
                     // Audit 03 L20: that used to happen with no signal at
                     // all — the user never learned the first entry's undo
                     // window had closed early.
-                    val supersededPendingDelete = pendingDelete != null
+                    supersededPendingDelete = pendingDelete != null
                     finalizePendingDelete()
                     repository.delete(current)
                     withContext(Dispatchers.Main.immediate) {
