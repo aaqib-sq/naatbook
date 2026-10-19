@@ -197,7 +197,10 @@ class CustomFontStore @Inject constructor(
         val sourceName = queryDisplayName(uri) ?: "font"
         val ext = sourceName.substringAfterLast('.', "").lowercase()
         if (ext != "ttf" && ext != "otf") {
-            throw IOException("Only .ttf or .otf font files can be imported.")
+            // Audit 03 M11: this used to be a plain IOException, so the UI
+            // fell back to the generic "could not import" message even
+            // though the specific "not a valid font" string existed.
+            throw FontImportException(R.string.settings_font_error_invalid)
         }
         val temp = File(context.cacheDir, "font-import-${UUID.randomUUID()}.$ext")
         try {
