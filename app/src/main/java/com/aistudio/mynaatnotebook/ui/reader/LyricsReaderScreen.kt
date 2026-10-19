@@ -51,6 +51,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.ContentCopy
@@ -192,6 +194,8 @@ fun LyricsReaderScreen(
     var immersive by rememberSaveable(naat.id) { mutableStateOf(false) }
     var immersiveChromeVisible by rememberSaveable(naat.id) { mutableStateOf(false) }
     var showImmersiveHint by rememberSaveable(naat.id) { mutableStateOf(false) }
+    // Audit 03 L11: the hint teaches once per entry, not on every hide.
+    var immersiveHintShown by rememberSaveable(naat.id) { mutableStateOf(false) }
     var topChromeHeightPx by remember { mutableIntStateOf(0) }
     var hasMeasuredTopChrome by remember { mutableStateOf(false) }
     var bottomChromeHeightPx by remember { mutableIntStateOf(0) }
@@ -201,6 +205,9 @@ fun LyricsReaderScreen(
     // state above: an unkeyed rememberSaveable leaked "auto-scroll ON at
     // A's speed" into the next entry on an in-place switch (reader audit H2).
     var autoScrollActive by rememberSaveable(naat.id) { mutableStateOf(false) }
+    // Audit 03 L12: while a finger is on the lyrics, the auto-scroll
+    // engine must not fight the reader's own drag.
+    var viewportPressed by remember { mutableStateOf(false) }
     var scrollSpeed by rememberSaveable(naat.id) { mutableFloatStateOf(1f) }
 
     // Sizing controls.
@@ -238,7 +245,10 @@ fun LyricsReaderScreen(
         if (immersive) return
         immersive = true
         immersiveChromeVisible = false
-        showImmersiveHint = true
+        if (!immersiveHintShown) {
+            showImmersiveHint = true
+            immersiveHintShown = true
+        }
     }
 
     fun exitImmersive() {
@@ -260,7 +270,7 @@ fun LyricsReaderScreen(
         // Inside immersive mode the content padding never changes (the
         // chrome floats over a constant gap), so this flip moves no text.
         immersiveChromeVisible = !immersiveChromeVisible
-        showImmersiveHint = !immersiveChromeVisible
+        showImmersiveHint = false
     }
 
     fun updateTopChromeHeight(heightPx: Int) {
@@ -282,7 +292,7 @@ fun LyricsReaderScreen(
         if (autoScrollActive) {
             while (isActive) {
                 val stepPx = with(density) { (1.5f * scrollSpeed).dp.toPx() }
-                scrollState.scrollBy(stepPx)
+                if (!viewportPressed) scrollState.scrollBy(stepPx)
                 delay(30)
                 if (scrollState.value >= scrollState.maxValue) autoScrollActive = false
             }
@@ -357,6 +367,7 @@ fun LyricsReaderScreen(
             immersive = immersive,
             onIntentionalTap = ::toggleImmersiveChrome,
             onDoubleTap = ::toggleImmersiveMode,
+            onPressChanged = { viewportPressed = it },
             readerFontChoice = effectiveReaderChoice,
             customFamilies = customFamilies
         )
@@ -587,12 +598,23 @@ private fun ReaderTopBar(
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             )
+                            // Audit 03 L13: the slider had no readout —
+                            // name the speed it is set to.
+                            Text(
+                                text = "${scrollSpeed}x",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = secondaryTextColor()
+                            )
                         }
                     }
                 }
             }
+        }
 
-            // Overflow menu: favorite, copy, share, share-audio, edit.
+            // Overflow menu: favorite, auto-scroll, copy, share, share-audio,
+            // edit. Audit 03 M8: unlike the "Aa" panel above, this menu also
+            // renders in immersive mode, so auto-scroll stays reachable
+            // without leaving full screen first.
             var overflowOpen by remember { mutableStateOf(false) }
             Box {
                 IconButton(
@@ -609,6 +631,18 @@ private fun ReaderTopBar(
                     expanded = overflowOpen,
                     onDismissRequest = { overflowOpen = false }
                 ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.reader_autoscroll_label)) },
+                        leadingIcon = {
+                            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                                if (autoScrollActive) {
+                                    Icon(Icons.Default.Check, contentDescription = null)
+                                }
+                            }
+                        },
+                        onClick = { onAutoScrollToggle() },
+                        modifier = Modifier.testTag("reader_autoscroll_item")
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.reader_favorite_cd)) },
                         leadingIcon = {
@@ -669,7 +703,6 @@ private fun ReaderTopBar(
                     )
                 }
             }
-        }
 
         IconButton(
             onClick = if (immersive) onExitImmersive else onEnterImmersive,
@@ -752,6 +785,7 @@ private fun ReaderLyricsViewport(
     immersive: Boolean,
     onIntentionalTap: () -> Unit,
     onDoubleTap: () -> Unit,
+    onPressChanged: (Boolean) -> Unit,
     readerFontChoice: String,
     customFamilies: Map<String, FontFamily>
 ) {
@@ -762,7 +796,8 @@ private fun ReaderLyricsViewport(
     val tapLabel = if (immersive) stringResource(R.string.reader_tap_label) else ""
     val tapModifier = Modifier.toggleReaderImmersiveOnTap(
         onTap = onIntentionalTap,
-        onDoubleTap = onDoubleTap
+        onDoubleTap = onDoubleTap,
+        onPressChanged = onPressChanged
     )
 
     if (naat.lyrics.isNullOrBlank()) {
@@ -850,6 +885,7 @@ private fun ReaderAudioControls(
     modifier: Modifier = Modifier
 ) {
     val controller = viewModel.playbackController
+    val switchContext = LocalContext.current
     val nowPlaying by controller.nowPlaying.collectAsStateWithLifecycle()
     val hasSession by controller.hasActiveSession.collectAsStateWithLifecycle()
     val playerIsPlaying by controller.isPlaying.collectAsStateWithLifecycle()
@@ -859,11 +895,16 @@ private fun ReaderAudioControls(
         listOfNotNull(
             naat.audioPath?.let { naat.audioType to it },
             naat.secondaryAudioPath?.let { naat.secondaryAudioType to it }
-        ).filter { it.first != "none" }
+        ).filter { (type, path) ->
+            // Audit 03 H2: a path whose file was deleted outside the app
+            // used to render a complete player that could only fail with a
+            // generic toast. Only attachments present on disk get a card.
+            type != "none" && (path.startsWith("content://") || File(path).isFile)
+        }
     }
     if (attachments.isEmpty()) return
 
-    var selectedPath by remember(naat.id) { mutableStateOf(attachments.first().second) }
+    var selectedPath by rememberSaveable(naat.id) { mutableStateOf(attachments.first().second) }
     LaunchedEffect(attachments, nowPlaying?.audioPath) {
         if (nowPlaying?.naatId == naat.id) selectedPath = nowPlaying?.audioPath ?: selectedPath
         else if (attachments.none { it.second == selectedPath }) selectedPath = attachments.first().second
@@ -871,7 +912,22 @@ private fun ReaderAudioControls(
     val ownsSelected = nowPlaying?.naatId == naat.id && nowPlaying?.audioPath == selectedPath && hasSession
     val playing = ownsSelected && playerIsPlaying
     val position = if (ownsSelected) playerPosition else 0
-    val duration = if (ownsSelected) playerDuration else 0
+    // Audit 03 M10: when a track ends, the session clears and the length
+    // used to vanish with it ("0:00 / 0:00"). Keep the last known length
+    // for the file it belonged to.
+    var lastDuration by remember(naat.id) { mutableStateOf(0) }
+    var lastDurationPath by remember(naat.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(playerDuration, nowPlaying?.audioPath) {
+        if (playerDuration > 0 && nowPlaying?.naatId == naat.id) {
+            lastDuration = playerDuration
+            lastDurationPath = nowPlaying?.audioPath
+        }
+    }
+    val duration = when {
+        ownsSelected && playerDuration > 0 -> playerDuration
+        lastDurationPath == selectedPath -> lastDuration
+        else -> 0
+    }
     val selectedType = attachments.firstOrNull { it.second == selectedPath }?.first ?: attachments.first().first
 
     val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
@@ -910,25 +966,51 @@ private fun ReaderAudioControls(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (attachments.size > 1) {
-                IconButton(
-                    onClick = {
-                        val next = attachments.firstOrNull { it.second != selectedPath }
-                        if (next != null) {
-                            if (nowPlaying?.naatId == naat.id &&
-                                nowPlaying?.audioPath != next.second
-                            ) {
-                                controller.stop()
+                // Audit 03 H1: the bare type icon never read as a switch.
+                // A small swap badge marks it as tappable, and the switch
+                // names what is now selected (its display name when it has
+                // one — two files of the same type are otherwise identical).
+                Box {
+                    IconButton(
+                        onClick = {
+                            val next = attachments.firstOrNull { it.second != selectedPath }
+                            if (next != null) {
+                                if (nowPlaying?.naatId == naat.id &&
+                                    nowPlaying?.audioPath != next.second
+                                ) {
+                                    controller.stop()
+                                }
+                                selectedPath = next.second
+                                val nextName = when (next.second) {
+                                    naat.audioPath -> naat.audioDisplayName
+                                    naat.secondaryAudioPath -> naat.secondaryAudioDisplayName
+                                    else -> null
+                                }?.takeIf { it.isNotBlank() }
+                                    ?: switchContext.getString(
+                                        if (next.first == "recorded") R.string.reader_voice_note
+                                        else R.string.reader_linked_audio
+                                    )
+                                Toast.makeText(
+                                    switchContext,
+                                    switchContext.getString(R.string.reader_switched_audio, nextName),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
-                            selectedPath = next.second
-                        }
-                    },
-                    modifier = Modifier.size(40.dp).testTag("reader_audio_switch")
-                ) {
+                        },
+                        modifier = Modifier.size(40.dp).testTag("reader_audio_switch")
+                    ) {
+                        Icon(
+                            if (selectedType == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
+                            contentDescription = stringResource(R.string.reader_switch_audio_cd),
+                            tint = secondaryTextColor(),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     Icon(
-                        if (selectedType == "recorded") Icons.Default.Mic else Icons.Default.MusicNote,
-                        contentDescription = stringResource(R.string.reader_switch_audio_cd),
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = null,
                         tint = secondaryTextColor(),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(12.dp).align(Alignment.BottomEnd)
                     )
                 }
             } else {
@@ -1159,44 +1241,53 @@ private fun ApplyImmersiveSystemBars(enabled: Boolean) {
  */
 private fun Modifier.toggleReaderImmersiveOnTap(
     onTap: () -> Unit,
-    onDoubleTap: () -> Unit
-): Modifier = pointerInput(onTap, onDoubleTap) {
+    onDoubleTap: () -> Unit,
+    onPressChanged: (Boolean) -> Unit = {}
+): Modifier = pointerInput(onTap, onDoubleTap, onPressChanged) {
     var lastTapReleaseMs = 0L
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
-        val origin = down.position
-        val startedAt = down.uptimeMillis
-        var maxTravel = 0f
-        var maxPointers = 1
-        var released = false
-        var releasedAt = startedAt
+        // Audit 03 L12: report the press so auto-scroll can yield to the
+        // reader's finger; the finally keeps the flag honest even when
+        // the gesture is cancelled mid-drag.
+        onPressChanged(true)
+        try {
+            val origin = down.position
+            val startedAt = down.uptimeMillis
+            var maxTravel = 0f
+            var maxPointers = 1
+            var released = false
+            var releasedAt = startedAt
 
-        do {
-            val event = awaitPointerEvent()
-            maxPointers = maxOf(maxPointers, event.changes.count { it.pressed })
-            event.changes.firstOrNull { it.id == down.id }?.let { change ->
-                maxTravel = maxOf(maxTravel, (change.position - origin).getDistance())
-                if (change.changedToUpIgnoreConsumed()) {
-                    released = true
-                    releasedAt = change.uptimeMillis
+            do {
+                val event = awaitPointerEvent()
+                maxPointers = maxOf(maxPointers, event.changes.count { it.pressed })
+                event.changes.firstOrNull { it.id == down.id }?.let { change ->
+                    maxTravel = maxOf(maxTravel, (change.position - origin).getDistance())
+                    if (change.changedToUpIgnoreConsumed()) {
+                        released = true
+                        releasedAt = change.uptimeMillis
+                    }
+                }
+            } while (event.changes.any { it.pressed })
+
+            if (released && ReaderImmersivePolicy.isIntentionalSingleTap(
+                    travelPx = maxTravel,
+                    touchSlopPx = viewConfiguration.touchSlop,
+                    pointerCount = maxPointers,
+                    durationMs = releasedAt - startedAt
+                )
+            ) {
+                if (ReaderImmersivePolicy.isDoubleTap(lastTapReleaseMs, releasedAt)) {
+                    lastTapReleaseMs = 0L
+                    onDoubleTap()
+                } else {
+                    lastTapReleaseMs = releasedAt
+                    onTap()
                 }
             }
-        } while (event.changes.any { it.pressed })
-
-        if (released && ReaderImmersivePolicy.isIntentionalSingleTap(
-                travelPx = maxTravel,
-                touchSlopPx = viewConfiguration.touchSlop,
-                pointerCount = maxPointers,
-                durationMs = releasedAt - startedAt
-            )
-        ) {
-            if (ReaderImmersivePolicy.isDoubleTap(lastTapReleaseMs, releasedAt)) {
-                lastTapReleaseMs = 0L
-                onDoubleTap()
-            } else {
-                lastTapReleaseMs = releasedAt
-                onTap()
-            }
+        } finally {
+            onPressChanged(false)
         }
     }
 }
