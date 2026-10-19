@@ -338,7 +338,10 @@ fun LibraryScreen(
                 val wavesPainter = painterResource(R.drawable.ic_cat_waves)
                 val editPainter = rememberVectorPainter(Icons.Default.Edit)
                 val folderStockPainter = rememberVectorPainter(Icons.Default.Folder)
-                val folderIcons: Map<String, Painter> = mapOf(
+                // Audit 05 L3: the icon map is stable — don't rebuild
+                // it on every recomposition of the home list.
+                val folderIcons: Map<String, Painter> = remember {
+                    mapOf(
                     NaatCategories.NAAT to domePainter,
                     NaatCategories.HAMD to kaabaPainter,
                     NaatCategories.MANQABAT to zulfiqarPainter,
@@ -347,7 +350,8 @@ fun LibraryScreen(
                     NaatCategories.NASHEED to wavesPainter,
                     NaatCategories.MY_KALAM to editPainter,
                     NaatCategories.OTHERS to folderStockPainter
-                )
+                    )
+                }
 
                 // Grid layout (using nested Rows to avoid nested scrolling parent errors)
                 val folderRows = NaatCategories.ALL.chunked(2)
@@ -839,7 +843,7 @@ fun RecentNaatCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                firstLyricsLine(naat.lyrics)?.let { preview ->
+                remember(naat.id, naat.lyrics) { firstLyricsLine(naat.lyrics) }?.let { preview ->
                     Text(
                         text = preview,
                         style = MaterialTheme.typography.bodySmall,
