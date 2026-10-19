@@ -821,7 +821,9 @@ fun SettingsScreen(
                     testTag = "reader_font_btn",
                     onClick = { fontPickerTarget = "reader" }
                 )
-                SettingsRowDivider(72.dp)
+                // Audit 04 L2: 70dp lines the divider up with the
+                // font rows' text start (16 padding + 40 icon + 14 gap).
+                SettingsRowDivider(70.dp)
                 FontChoiceRow(
                     title = stringResource(R.string.settings_title_font),
                     choiceLabel = fontChoiceLabel(titleFont, customFonts),

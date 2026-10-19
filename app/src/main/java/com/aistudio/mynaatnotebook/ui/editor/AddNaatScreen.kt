@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -361,7 +362,10 @@ private fun EntryFontRowView(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = secondaryTextColor()
+                tint = secondaryTextColor(),
+                // Audit 04 M4: settings rows use a 20dp chevron; this one
+                // silently took the 24dp default for the same grammar.
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -402,7 +406,12 @@ private fun EditorSectionCard(content: @Composable ColumnScope.() -> Unit) {
             .fillMaxWidth()
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+            // Audit 04 L5: at 20% the dark surfaceVariant (#121212) all but
+            // vanishes on the black background, leaving the card's boundary
+            // to the outline alone. Dark schemes get a stronger fill.
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) 0.6f else 0.2f
+            )
         ),
         shape = RoundedCornerShape(8.dp)
     ) {

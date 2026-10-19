@@ -29,7 +29,20 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = DarkText,
     surfaceVariant = DarkSurface,
     onSurfaceVariant = DarkAccent,
-    outline = DarkBorder
+    outline = DarkBorder,
+    // Audit 04 H1/M1/M2: pin every tonal role Material3 would otherwise
+    // fill with its purple-grey defaults (dialogs = surfaceContainerHigh,
+    // menus = surfaceContainer, snackbar/hint = inverseSurface).
+    surfaceContainerLowest = DarkBg,
+    surfaceContainerLow = DarkContainerLow,
+    surfaceContainer = DarkSurface,
+    surfaceContainerHigh = DarkContainerHigh,
+    surfaceContainerHighest = DarkContainerHighest,
+    surfaceDim = DarkBg,
+    surfaceBright = DarkBright,
+    inverseSurface = DarkAccent,
+    inverseOnSurface = DarkSurface,
+    inversePrimary = DarkBg
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -43,7 +56,19 @@ private val LightColorScheme = lightColorScheme(
     onSurface = LightText,
     surfaceVariant = LightSurface,
     onSurfaceVariant = LightAccent,
-    outline = LightBorder
+    outline = LightBorder,
+    // Audit 04 H1/M1/M2: same pinning as the dark scheme — neutral greys
+    // only, so dialogs, menus and the snackbar stay monochrome.
+    surfaceContainerLowest = LightBg,
+    surfaceContainerLow = LightContainerLow,
+    surfaceContainer = LightContainer,
+    surfaceContainerHigh = LightContainerHigh,
+    surfaceContainerHighest = LightContainerHighest,
+    surfaceDim = LightContainerHighest,
+    surfaceBright = LightBg,
+    inverseSurface = LightAccent,
+    inverseOnSurface = LightBg,
+    inversePrimary = LightBg
 )
 
 @Composable
