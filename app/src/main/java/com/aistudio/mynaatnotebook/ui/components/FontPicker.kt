@@ -115,6 +115,16 @@ fun FontPickerDialog(
                         onClick = { onPick(key) }
                     )
                 }
+                if (customFonts.isNotEmpty()) {
+                    Text(
+                        text = stringResource(
+                            R.string.settings_font_imported_count, customFonts.size
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                    )
+                }
                 customFonts.forEach { font ->
                     val key = FontChoices.customKey(font.id)
                     FontPickerRow(
