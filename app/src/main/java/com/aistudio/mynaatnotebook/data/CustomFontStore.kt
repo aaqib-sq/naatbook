@@ -356,6 +356,14 @@ class CustomFontStore @Inject constructor(
      * duplicate guard, the registry limit — and is named from its file
      * name (uniquified like a hand-named import). The registry is
      * written once, at the end.
+     *
+     * The archive is staged to a local file and read through ZipFile
+     * (central directory). The first device attempt walked the picked
+     * stream with ZipInputStream and died midway with the generic
+     * "could not import" error and nothing imported: provider streams
+     * and streaming-ZIP quirks are a fragile combination. A failure
+     * after some fonts landed keeps those fonts, and the failure itself
+     * is surfaced with its real reason instead of the generic message.
      */
     suspend fun importFontsFromZip(uri: Uri): ZipFontImportResult =
         withContext(Dispatchers.IO) {
@@ -366,80 +374,102 @@ class CustomFontStore @Inject constructor(
             var tooLarge = 0
             var limitSkipped = 0
             var fontsFound = 0
-            val input = context.contentResolver.openInputStream(uri)
-                ?: throw IOException("Could not open the selected file.")
-            java.util.zip.ZipInputStream(java.io.BufferedInputStream(input)).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    if (!entry.isDirectory) {
+            val stagedZip = File(context.cacheDir, "font-zip-${UUID.randomUUID()}.zip")
+            try {
+                val input = context.contentResolver.openInputStream(uri)
+                    ?: throw IOException("Could not open the selected file.")
+                input.use { stream ->
+                    FileOutputStream(stagedZip).use { output -> stream.copyTo(output) }
+                }
+                java.util.zip.ZipFile(stagedZip).use { zip ->
+                    val entries = zip.entries()
+                    while (entries.hasMoreElements()) {
+                        val entry = entries.nextElement()
+                        if (entry.isDirectory) continue
                         val baseName = entry.name.replace('\\', '/').substringAfterLast('/')
                         val ext = baseName.substringAfterLast('.', "").lowercase()
-                        if (ext == "ttf" || ext == "otf") {
-                            fontsFound++
-                            if (current.size >= MAX_FONTS) {
-                                limitSkipped++
-                            } else {
-                                val temp = File(
-                                    context.cacheDir,
-                                    "font-zip-${UUID.randomUUID()}.$ext"
-                                )
-                                try {
-                                    var overflow = false
-                                    FileOutputStream(temp).use { output ->
-                                        val buffer = ByteArray(64 * 1024)
-                                        var total = 0L
-                                        while (true) {
-                                            val count = zip.read(buffer)
-                                            if (count < 0) break
-                                            total += count
-                                            if (total > MAX_FONT_BYTES) {
-                                                overflow = true
-                                                break
-                                            }
-                                            output.write(buffer, 0, count)
+                        if (ext != "ttf" && ext != "otf") continue
+                        fontsFound++
+                        if (current.size >= MAX_FONTS) {
+                            limitSkipped++
+                            continue
+                        }
+                        if (entry.size > MAX_FONT_BYTES) {
+                            tooLarge++
+                            continue
+                        }
+                        val temp = File(
+                            context.cacheDir,
+                            "font-zip-entry-${UUID.randomUUID()}.$ext"
+                        )
+                        try {
+                            var overflow = false
+                            zip.getInputStream(entry).use { stream ->
+                                FileOutputStream(temp).use { output ->
+                                    val buffer = ByteArray(64 * 1024)
+                                    var total = 0L
+                                    while (true) {
+                                        val count = stream.read(buffer)
+                                        if (count < 0) break
+                                        total += count
+                                        if (total > MAX_FONT_BYTES) {
+                                            overflow = true
+                                            break
                                         }
+                                        output.write(buffer, 0, count)
                                     }
-                                    when {
-                                        overflow -> {
-                                            tooLarge++
-                                            temp.delete()
-                                        }
-                                        !validateFontFile(temp) -> {
-                                            invalid++
-                                            temp.delete()
-                                        }
-                                        isDuplicate(temp, current) -> {
-                                            duplicates++
-                                            temp.delete()
-                                        }
-                                        else -> {
-                                            val id = UUID.randomUUID().toString()
-                                            val fileName = "$id.$ext"
-                                            val destination = File(fontsDir, fileName)
-                                            if (!temp.renameTo(destination)) {
-                                                temp.copyTo(destination, overwrite = true)
-                                                temp.delete()
-                                            }
-                                            val display = baseName.substringBeforeLast('.')
-                                                .replace(Regex("[-_]+"), " ").trim()
-                                                .ifBlank { "My Font" }
-                                            current += CustomFont(
-                                                id,
-                                                uniqueName(display, current),
-                                                fileName
-                                            )
-                                            imported++
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    temp.delete()
-                                    invalid++
                                 }
                             }
+                            when {
+                                overflow -> {
+                                    tooLarge++
+                                    temp.delete()
+                                }
+                                !validateFontFile(temp) -> {
+                                    invalid++
+                                    temp.delete()
+                                }
+                                isDuplicate(temp, current) -> {
+                                    duplicates++
+                                    temp.delete()
+                                }
+                                else -> {
+                                    val id = UUID.randomUUID().toString()
+                                    val fileName = "$id.$ext"
+                                    val destination = File(fontsDir, fileName)
+                                    if (!temp.renameTo(destination)) {
+                                        temp.copyTo(destination, overwrite = true)
+                                        temp.delete()
+                                    }
+                                    val display = baseName.substringBeforeLast('.')
+                                        .replace(Regex("[-_]+"), " ").trim()
+                                        .ifBlank { "My Font" }
+                                    current += CustomFont(
+                                        id,
+                                        uniqueName(display, current),
+                                        fileName
+                                    )
+                                    imported++
+                                }
+                            }
+                        } catch (e: Exception) {
+                            temp.delete()
+                            invalid++
                         }
                     }
-                    entry = zip.nextEntry
                 }
+            } catch (e: FontImportException) {
+                throw e
+            } catch (e: Exception) {
+                // Fonts that already landed stay landed — a dead archive
+                // must not take the successful imports down with it.
+                if (imported > 0) writeRegistry(current)
+                throw FontImportException(
+                    R.string.settings_font_zip_failed,
+                    listOf(e.message ?: e.javaClass.simpleName)
+                )
+            } finally {
+                stagedZip.delete()
             }
             if (imported > 0) writeRegistry(current)
             ZipFontImportResult(
