@@ -362,12 +362,47 @@ class BackupManager @Inject constructor(
             append(naats.size).append('|')
             append(naats.maxOfOrNull { it.updatedAt } ?: 0L).append('|')
             append(naats.sumOf { it.updatedAt }).append('|')
-            append(fonts.joinToString(",") { it.id })
+            // Audit 02 L1: the plain sum let an edit and a delete cancel
+            // each other out. A weighted mix plus the lyrics footprint and
+            // the font files' sizes makes a silent collision practically
+            // impossible for a change signal (it is not a security hash).
+            append(naats.sumOf { it.updatedAt * 31L + it.id }).append('|')
+            append(naats.sumOf { (it.lyrics?.length ?: 0).toLong() }).append('|')
+            append(fonts.joinToString(",") { font ->
+                val file = customFontStore.fileFor(font)
+                "${font.id}:${file.length()}:${file.lastModified()}"
+            })
         }
         val digest = MessageDigest.getInstance("SHA-256")
             .digest(raw.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") {
             (it.toInt() and 0xff).toString(16).padStart(2, '0')
+        }
+    }
+
+    /**
+     * Entry count of a backup file, for the import confirmation dialog
+     * (audit 02 M1): the REPLACE warning used to be static, so an empty
+     * backup looked exactly like a full one. Reads only the manifest
+     * entry; nothing is extracted.
+     */
+    suspend fun peekEntryCount(inputUri: Uri): Result<Int> = withContext(Dispatchers.IO) {
+        runCatching {
+            val input = context.contentResolver.openInputStream(inputUri)
+                ?: throw IOException("Could not open input stream")
+            val budget = ExtractionBudget()
+            var count: Int? = null
+            ZipInputStream(BufferedInputStream(input)).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    if (entry.name == DATA_ENTRY) {
+                        count = parseBackupDocument(readJsonEntry(zip, budget)).second.length()
+                        break
+                    }
+                    zip.closeEntry()
+                }
+            }
+            count ?: throw IOException("Invalid backup file: $DATA_ENTRY not found")
         }
     }
 
@@ -452,22 +487,85 @@ class BackupManager @Inject constructor(
             val existingEntries = repository.allNaats.first()
             val newEntries: List<PlannedEntry>
             val skipped: Int
+            // Audit 02 M3: rows adopted in place during a MERGE (metadata
+            // refresh / audio re-attach) are applied after the main commit.
+            var metadataUpdates: List<NaatEntity> = emptyList()
+            val reattachArchivePaths = mutableListOf<String?>()
             if (mode == ImportMode.REPLACE) {
                 newEntries = planEntries
                 skipped = 0
                 onProgress(0.65f)
             } else {
                 // Smart import: skip entries that already exist (same content).
-                val existingSignatures = loadExistingSignatures(existingEntries) { p ->
+                val existingMatches = loadExistingMatches(existingEntries) { p ->
                     onProgress(0.55f + p * 0.1f)
                 }
-                newEntries = planEntries.filter { it.signature !in existingSignatures }
+                val exactBySignature = existingMatches.associateBy { it.exactSignature }
+                val byTextSignature = existingMatches.groupBy { it.textSignature }
+                val usedExistingIds = mutableSetOf<Int>()
+                val updates = mutableListOf<NaatEntity>()
+                newEntries = planEntries.filter { planned ->
+                    val plannedPrimary = planned.primaryArchivePath
+                        ?.let { plan.audioByArchivePath[it]?.digest }
+                    val plannedSecondary = planned.secondaryArchivePath
+                        ?.let { plan.audioByArchivePath[it]?.digest }
+                    val exact = exactBySignature[planned.signature]
+                    if (exact != null && usedExistingIds.add(exact.entry.id)) {
+                        // Same content already in the library: keep the row,
+                        // but adopt the backup's favorite flag, font
+                        // overrides and audio names — they used to be
+                        // dropped silently on a skip (audit 02 M3).
+                        mergeMetadata(exact.entry, planned.entity)?.let { updates += it }
+                        false
+                    } else {
+                        // Re-attach case (audit 02 M3): same text, but the
+                        // existing row's audio file is missing from disk,
+                        // so its digest could never match and the entry was
+                        // imported as a duplicate row. When the backup
+                        // carries that audio, point the existing row at the
+                        // restored file instead.
+                        val plannedText = entrySignature(
+                            planned.entity.title, planned.entity.poet,
+                            planned.entity.category, planned.entity.lyrics, null, null
+                        )
+                        val candidate = byTextSignature[plannedText]?.firstOrNull { match ->
+                            match.entry.id !in usedExistingIds &&
+                                slotRematchable(match.primaryDigest, match.entry.audioPath, plannedPrimary) &&
+                                slotRematchable(match.secondaryDigest, match.entry.secondaryAudioPath, plannedSecondary) &&
+                                (slotMissing(match.primaryDigest, match.entry.audioPath) ||
+                                    slotMissing(match.secondaryDigest, match.entry.secondaryAudioPath))
+                        }
+                        if (candidate == null) {
+                            true
+                        } else {
+                            usedExistingIds += candidate.entry.id
+                            var merged = candidate.entry
+                            if (slotMissing(candidate.primaryDigest, candidate.entry.audioPath)) {
+                                merged = merged.copy(
+                                    audioPath = planned.entity.audioPath,
+                                    audioType = planned.entity.audioType
+                                )
+                                reattachArchivePaths += planned.primaryArchivePath
+                            }
+                            if (slotMissing(candidate.secondaryDigest, candidate.entry.secondaryAudioPath)) {
+                                merged = merged.copy(
+                                    secondaryAudioPath = planned.entity.secondaryAudioPath,
+                                    secondaryAudioType = planned.entity.secondaryAudioType
+                                )
+                                reattachArchivePaths += planned.secondaryArchivePath
+                            }
+                            updates += mergeMetadata(merged, planned.entity) ?: merged
+                            false
+                        }
+                    }
+                }
+                metadataUpdates = updates
                 skipped = plan.entries.size - newEntries.size
             }
             onProgress(0.68f)
-            val neededArchivePaths = newEntries.flatMap {
+            val neededArchivePaths = (newEntries.flatMap {
                 listOfNotNull(it.primaryArchivePath, it.secondaryArchivePath)
-            }.toSet()
+            } + reattachArchivePaths.filterNotNull()).toSet()
             val neededAudio = plan.audioByArchivePath.filterKeys { it in neededArchivePaths }
             // Audit fix (stage 1): files commit first (rollback unchanged);
             // the database insert and — in REPLACE — the old-row deletes then
@@ -497,6 +595,12 @@ class BackupManager @Inject constructor(
             } else {
                 committed = repository.insertAll(entities).size
             }
+            // MERGE adoptions (audit 02 M3): favorite/override refresh and
+            // audio re-attaches land only after the main commit succeeded;
+            // each is best-effort so one bad row cannot fail the import.
+            metadataUpdates.forEach { updated ->
+                runCatching { repository.update(updated) }
+            }
             onProgress(0.96f)
             // Adopt the backup's imported fonts (new ids only, cap applies;
             // each file is re-validated by the font store before adoption).
@@ -521,6 +625,7 @@ class BackupManager @Inject constructor(
                 }
             }
             onProgress(1f)
+            sweepOrphanImportedAudio()
             ImportResult(committed, skipped, removedExisting, fontsAdded, fontsFailed)
             }.onFailure { Log.e("BackupManager", "Import failed", it) }
                 .also { stagingDir.deleteRecursively() }
@@ -544,27 +649,99 @@ class BackupManager @Inject constructor(
         secondaryDigest.orEmpty()
     ).joinToString("|")
 
-    private suspend fun loadExistingSignatures(
+    private data class ExistingEntryMatch(
+        val entry: NaatEntity,
+        val exactSignature: String,
+        val textSignature: String,
+        val primaryDigest: String?,
+        val secondaryDigest: String?
+    )
+
+    /** A slot whose row records a path but whose file is gone from disk. */
+    private fun slotMissing(existingDigest: String?, existingPath: String?): Boolean =
+        existingPath != null && existingDigest == null
+
+    /**
+     * A slot can take part in a re-attach match when both sides agree, or
+     * when the existing file is missing and the backup brings a digest.
+     */
+    private fun slotRematchable(
+        existingDigest: String?,
+        existingPath: String?,
+        plannedDigest: String?
+    ): Boolean =
+        existingDigest == plannedDigest ||
+            (slotMissing(existingDigest, existingPath) && plannedDigest != null)
+
+    /**
+     * Metadata a MERGE skip adopts from the backup (audit 02 M3): the
+     * favorite flag comes from the backup; font overrides and audio names
+     * only fill/replace when the backup actually carries them. Returns
+     * null when nothing would change.
+     */
+    private fun mergeMetadata(existing: NaatEntity, incoming: NaatEntity): NaatEntity? {
+        val merged = existing.copy(
+            isFavorite = incoming.isFavorite,
+            readerFontOverride = incoming.readerFontOverride ?: existing.readerFontOverride,
+            titleFontOverride = incoming.titleFontOverride ?: existing.titleFontOverride,
+            audioDisplayName = incoming.audioDisplayName?.takeIf { it.isNotBlank() }
+                ?: existing.audioDisplayName,
+            secondaryAudioDisplayName = incoming.secondaryAudioDisplayName
+                ?.takeIf { it.isNotBlank() } ?: existing.secondaryAudioDisplayName
+        )
+        return merged.takeIf { it != existing }
+    }
+
+    private suspend fun loadExistingMatches(
         existing: List<NaatEntity>,
         onProgress: (Float) -> Unit = {}
-    ): Set<String> {
+    ): List<ExistingEntryMatch> {
         return existing.mapIndexed { index, entry ->
             currentCoroutineContext().ensureActive()
-            entrySignature(
-                entry.title,
-                entry.poet,
-                entry.category,
-                entry.lyrics,
-                entry.audioPath?.let { path ->
-                    File(path).takeIf { it.isFile }?.sha256()
-                },
-                entry.secondaryAudioPath?.let { path ->
-                    File(path).takeIf { it.isFile }?.sha256()
-                }
+            val primaryDigest = entry.audioPath?.let { path ->
+                File(path).takeIf { it.isFile }?.sha256()
+            }
+            val secondaryDigest = entry.secondaryAudioPath?.let { path ->
+                File(path).takeIf { it.isFile }?.sha256()
+            }
+            ExistingEntryMatch(
+                entry = entry,
+                exactSignature = entrySignature(
+                    entry.title, entry.poet, entry.category, entry.lyrics,
+                    primaryDigest, secondaryDigest
+                ),
+                textSignature = entrySignature(
+                    entry.title, entry.poet, entry.category, entry.lyrics, null, null
+                ),
+                primaryDigest = primaryDigest,
+                secondaryDigest = secondaryDigest
             ).also {
                 onProgress((index + 1f) / existing.size.coerceAtLeast(1))
             }
-        }.toSet()
+        }
+    }
+
+    /**
+     * Audit 02 L4: REPLACE's per-row file cleanup is post-commit and
+     * best-effort, so a crash in between used to strand orphan files
+     * forever. The imported-audio store is content-addressed and only
+     * import commits and library rows ever reference it — anything in it
+     * that no row points at is an orphan and can go. (Legacy recordings/
+     * and linked/ folders are NOT swept: an unsaved editor draft's take
+     * can legitimately sit there unreferenced.)
+     */
+    private suspend fun sweepOrphanImportedAudio() {
+        runCatching {
+            val referenced = repository.allNaats.first()
+                .flatMap { listOfNotNull(it.audioPath, it.secondaryAudioPath) }
+                .map { File(it).canonicalPath }
+                .toSet()
+            File(context.filesDir, "audio").listFiles()?.forEach { file ->
+                if (file.isFile && file.canonicalPath !in referenced) {
+                    runCatching { file.delete() }
+                }
+            }
+        }
     }
 
     private suspend fun extractAndValidateArchive(

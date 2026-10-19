@@ -290,6 +290,8 @@
     <string name="settings_import_mode_replace_desc">لائبریری کی موجودہ ہر چیز حذف ہو کر اس بیک اپ سے بدل جاتی ہے۔</string>
     <string name="settings_import_replace_title">پوری لائبریری تبدیل کریں؟</string>
     <string name="settings_import_replace_message">اس سے تمام موجودہ اندراجات اور ان کی آڈیو مستقل طور پر حذف ہو جائے گی اور بیک اپ شامل ہو جائے گا۔ یہ عمل واپس نہیں ہو سکتا۔ جاری رکھیں؟</string>
+    <string name="settings_import_backup_count">اس بیک اپ میں %1$d اندراجات ہیں۔</string>
+    <string name="settings_import_backup_empty">خبردار: اس بیک اپ میں 0 اندراجات ہیں — بدلنے سے آپ کی پوری لائبریری خالی ہو جائے گی۔</string>
     <string name="settings_import_replace_confirm">حذف کر کے تبدیل کریں</string>
     <string name="status_import_success_replaced">لائبریری تبدیل ہو گئی: %1$d اندراجات شامل ہوئے، %2$d پرانے اندراجات ہٹ گئے۔</string>
     <string name="editor_replace_audio_title">موجودہ آڈیو تبدیل کریں؟</string>
@@ -317,6 +319,9 @@
     <string name="settings_drive_disconnect_message">نات بُک اس اکاؤنٹ پر بیک اپ بھیجنا بند کر دے گی۔ ڈرائیو میں پہلے سے محفوظ بیک اپ حذف نہیں ہوں گے۔</string>
     <string name="status_drive_connected">گوگل اکاؤنٹ جُڑ گیا: %1$s</string>
     <string name="status_drive_sign_in_failed">گوگل سائن ان ناکام رہا</string>
+    <string name="status_drive_check_failed">اکاؤنٹ جڑ گیا، مگر Drive پر بیک اپ کی جانچ ناکام رہی</string>
+    <string name="status_drive_reconnect_needed">سیشن ختم ہو گیا — Google Drive دوبارہ جوڑیں</string>
+    <string name="status_drive_consent_declined">اجازت نہیں ملی — کارروائی منسوخ کر دی گئی</string>
     <string name="status_drive_syncing">گوگل ڈرائیو پر بھیجا جا رہا ہے...</string>
     <string name="status_drive_sync_success">ڈرائیو بیک اپ تازہ ہو گیا! %1$d اندراجات۔</string>
     <string name="status_drive_sync_failed">ڈرائیو پر بھیجنا ناکام: %1$s</string>

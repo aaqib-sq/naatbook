@@ -138,6 +138,13 @@ class DriveViewModel @Inject constructor(
                         statusReporter.show(R.string.status_drive_restore_available)
                     }
                 }
+                .onFailure { error ->
+                    // Audit 03 H3: the check failing used to be silent —
+                    // the user saw "connected" and assumed a backup ran.
+                    if (error !is CancellationException) {
+                        statusReporter.show(R.string.status_drive_check_failed)
+                    }
+                }
         }
     }
 
@@ -234,7 +241,10 @@ class DriveViewModel @Inject constructor(
     fun onConsentResult(granted: Boolean) {
         val action = pendingAction
         pendingAction = PendingAction.NONE
-        if (!granted) return
+        if (!granted) {
+            statusReporter.show(R.string.status_drive_consent_declined)
+            return
+        }
         when (action) {
             PendingAction.SYNC -> runSync(manual = true)
             PendingAction.DOWNLOAD -> restoreLatest()
@@ -297,7 +307,7 @@ class DriveViewModel @Inject constructor(
                 statusReporter.show(R.string.status_drive_no_backup)
             driveError?.needsReconnect == true -> {
                 viewModelScope.launch { settingsStore.clearDriveState() }
-                statusReporter.show(R.string.status_drive_sign_in_failed)
+                statusReporter.show(R.string.status_drive_reconnect_needed)
             }
             action == PendingAction.DOWNLOAD -> statusReporter.show(
                 R.string.status_drive_download_failed,

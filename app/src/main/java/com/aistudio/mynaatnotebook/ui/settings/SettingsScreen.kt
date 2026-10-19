@@ -173,7 +173,13 @@ fun SettingsScreen(
     // the chosen account (or the failure) from the result intent.
     val driveSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
-        onResult = { result -> driveViewModel.onSignInResult(result.data) }
+        onResult = { result ->
+            // Audit 03 M12: backing out of the account picker is a cancel,
+            // not a failure — only a completed result reaches the ViewModel.
+            if (result.resultCode == Activity.RESULT_OK) {
+                driveViewModel.onSignInResult(result.data)
+            }
+        }
     )
 
     // Google permission screen shown when a sync/download needs fresh
@@ -290,6 +296,12 @@ fun SettingsScreen(
     pendingImportUri?.let { uri ->
         var importMode by remember(uri) { mutableStateOf(ImportMode.MERGE) }
         var confirmReplace by remember(uri) { mutableStateOf(false) }
+        // Audit 02 M1: the dialogs name the backup's entry count, so an
+        // empty backup can never look identical to a full one.
+        var backupEntryCount by remember(uri) { mutableStateOf<Int?>(null) }
+        LaunchedEffect(uri) {
+            backupEntryCount = backupViewModel.peekEntryCount(uri)
+        }
         if (!confirmReplace) {
             AlertDialog(
                 onDismissRequest = { pendingImportUri = null },
@@ -297,6 +309,21 @@ fun SettingsScreen(
                 text = {
                     Column {
                         Text(stringResource(R.string.settings_import_confirm_message))
+                        backupEntryCount?.let { count ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                stringResource(R.string.settings_import_backup_count, count),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (count == 0) {
+                                Text(
+                                    stringResource(R.string.settings_import_backup_empty),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = HighContrastRed
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.height(12.dp))
                         listOf(
                             ImportMode.MERGE to (R.string.settings_import_mode_merge to R.string.settings_import_mode_merge_desc),
@@ -361,7 +388,25 @@ fun SettingsScreen(
             AlertDialog(
                 onDismissRequest = { pendingImportUri = null },
                 title = { Text(stringResource(R.string.settings_import_replace_title)) },
-                text = { Text(stringResource(R.string.settings_import_replace_message)) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.settings_import_replace_message))
+                        backupEntryCount?.let { count ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                stringResource(R.string.settings_import_backup_count, count),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            if (count == 0) {
+                                Text(
+                                    stringResource(R.string.settings_import_backup_empty),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = HighContrastRed
+                                )
+                            }
+                        }
+                    }
+                },
                 confirmButton = {
                     TextButton(
                         onClick = {
