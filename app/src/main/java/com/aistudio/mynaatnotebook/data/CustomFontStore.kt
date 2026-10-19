@@ -311,17 +311,42 @@ class CustomFontStore @Inject constructor(
     }
 
     /**
-     * Entry point for the font picker: a .zip pick becomes a batch import
+     * Entry point for the font picker: a ZIP pick becomes a batch import
      * (every font inside, named from its file name — no per-font naming
      * step); anything else keeps the single-file validate-then-name flow.
+     *
+     * Detection must not trust the display name alone: some pickers hand
+     * back a name without its ".zip" suffix, and the file was then fed to
+     * the single-font flow and rejected as "not a valid font" (device
+     * report, 2026-10-19). A ZIP is recognized by its PK magic bytes —
+     * the name is only a second signal.
      */
     suspend fun importPicked(uri: Uri): FontPickOutcome {
         val sourceName = queryDisplayName(uri) ?: "font"
-        return if (sourceName.lowercase().endsWith(".zip")) {
+        return if (sourceName.lowercase().endsWith(".zip") || hasZipMagic(uri)) {
             FontPickOutcome.Batch(importFontsFromZip(uri))
         } else {
             FontPickOutcome.Single(beginImport(uri))
         }
+    }
+
+    /** True when the picked content starts with the ZIP local-header magic. */
+    private fun hasZipMagic(uri: Uri): Boolean = try {
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            val header = ByteArray(4)
+            var read = 0
+            while (read < header.size) {
+                val n = stream.read(header, read, header.size - read)
+                if (n < 0) break
+                read += n
+            }
+            read == header.size &&
+                header[0] == 0x50.toByte() && header[1] == 0x4B.toByte() &&
+                (header[2] == 0x03.toByte() || header[2] == 0x05.toByte()) &&
+                (header[3] == 0x04.toByte() || header[3] == 0x06.toByte())
+        } ?: false
+    } catch (e: Exception) {
+        false
     }
 
     /**
