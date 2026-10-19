@@ -24,6 +24,10 @@ class MediaPlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
 
+    /** Latest startId, so a foreground-start denial can retire exactly
+     * the start that failed to promote (audit 05 L9). */
+    private var latestStartId: Int = 0
+
     override fun onCreate() {
         super.onCreate()
         val session = MediaSession.Builder(this, engine.player)
@@ -47,12 +51,15 @@ class MediaPlaybackService : MediaSessionService() {
             override fun onForegroundServiceStartNotAllowedException() {
                 Log.e(TAG, "System rejected media foreground-service promotion")
                 engine.stop()
-                stopSelf()
+                // Audit 05 L9: stopSelfResult retires this service only
+                // when no newer start has superseded the denied one.
+                if (latestStartId != 0) stopSelfResult(latestStartId) else stopSelf()
             }
         })
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        latestStartId = startId
         val result = super.onStartCommand(intent, flags, startId)
         if (intent?.action == ACTION_PLAY_ENTRY) {
             val request = playbackRequests.consume(intent.getStringExtra(EXTRA_REQUEST_TOKEN))
@@ -61,6 +68,10 @@ class MediaPlaybackService : MediaSessionService() {
                 // never cross that boundary. An external explicit intent has no valid
                 // one-time in-process token and cannot start playback or stop a session.
                 Log.w(TAG, "Rejected unauthorized playback request")
+                // Audit 05 L10: if nothing of ours is running, this bogus
+                // start is the only reason the service exists — retire it
+                // instead of lingering. A live session is never touched.
+                if (engine.isIdle()) stopSelfResult(startId)
                 return result
             }
             try {
@@ -99,7 +110,12 @@ class MediaPlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = mediaSession?.player
-        if (player != null && isPlaybackOngoing() && player.playWhenReady &&
+        // Audit 05 M9: a session that is buffering with playWhenReady set
+        // is ongoing playback, not a dead one — isPlaybackOngoing() alone
+        // could read it as finished and kill a stream mid-buffer.
+        val bufferingToPlay = player != null && player.playWhenReady &&
+            player.mediaItemCount > 0 && player.playbackState == Player.STATE_BUFFERING
+        if (player != null && (isPlaybackOngoing() || bufferingToPlay) && player.playWhenReady &&
             player.mediaItemCount > 0 && player.playbackState != Player.STATE_ENDED
         ) {
             // Deliberately do not call super: its fallback stops non-registered/non-foreground
