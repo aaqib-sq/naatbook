@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1183,13 +1184,18 @@ private fun SleepTimerDialog(
                 options.forEach { minutes ->
                     val label = if (minutes == 0) stringResource(R.string.player_sleep_timer_off)
                                 else stringResource(R.string.player_sleep_timer_minutes, minutes)
-                    TextButton(
-                        onClick = { onSelect(minutes) },
-                        modifier = Modifier.fillMaxWidth()
+                    // Audit 04 L1: options are start-aligned rows, like
+                    // every other picker list in the app — a TextButton's
+                    // centered content read as a centered list.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(minutes) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = label,
-                            modifier = Modifier.fillMaxWidth(),
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
@@ -1207,7 +1213,14 @@ private fun SleepTimerDialog(
                 }
             }
         },
-        confirmButton = { }
+        // Audit 04 L1: an empty confirmButton still rendered the buttons
+        // row's padding, leaving a dead gap under the options. A real
+        // Cancel fills the slot honestly.
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
     )
 }
 
