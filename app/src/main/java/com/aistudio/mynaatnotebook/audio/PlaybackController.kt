@@ -5,6 +5,7 @@ import com.aistudio.mynaatnotebook.viewmodel.StatusMessage
 import com.aistudio.mynaatnotebook.viewmodel.StatusReporter
 
 import android.content.Context
+import androidx.media3.common.PlaybackException
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -67,8 +68,14 @@ class PlaybackController @Inject constructor(
         // Async failures (file deleted outside the app, corrupt audio) must
         // reach the user — previously they only hit the log and the controls
         // silently reverted, so the play tap looked dead.
-        engine.onPlaybackError = {
-            statusReporter.show(R.string.status_playback_failed)
+        engine.onPlaybackError = { error ->
+            // Audit 03 L14: a vanished file must not read like every other
+            // failure — the remedy (re-link the file) is different.
+            if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) {
+                statusReporter.show(R.string.status_playback_file_missing)
+            } else {
+                statusReporter.show(R.string.status_playback_failed)
+            }
         }
         // Restore the persisted playback speed (if any) onto the fresh player.
         // The engine is process-lifetime, so in-process track changes keep the
@@ -117,7 +124,7 @@ class PlaybackController @Inject constructor(
         // Audit #21: the new entry becomes the resume point from position 0;
         // the saver below then keeps it current while it plays.
         lastSavedPositionMs = 0L
-        timerScope.launch { settingsStore.setLastPlayback(naat.id, 0L) }
+        timerScope.launch { settingsStore.setLastPlayback(naat.id, 0L, path) }
         val requestToken = playbackRequests.register(
             PlaybackRequest(path, naat.id, naat.title, naat.poet)
         )
@@ -140,8 +147,12 @@ class PlaybackController @Inject constructor(
      * the session gets its notification and lock-screen controls; nothing
      * plays until the user taps play.
      */
-    fun restoreEntry(naat: NaatEntity, positionMs: Long) {
-        val path = naat.audioPath ?: return
+    fun restoreEntry(naat: NaatEntity, positionMs: Long, savedPath: String? = null) {
+        // Audit 03 M7: rebuild the session on the file that was actually
+        // playing (often the secondary one), not always the primary.
+        val path = savedPath?.takeIf {
+            it == naat.audioPath || it == naat.secondaryAudioPath
+        } ?: naat.audioPath ?: return
         cancelPendingServiceShutdown()
         _previewPath.value = null
         _nowPlaying.value = NowPlaying(naat.id, naat.title, naat.poet, path, naat.titleFontOverride)
@@ -187,7 +198,7 @@ class PlaybackController @Inject constructor(
         if (np != null && _previewPath.value == null) {
             val pos = engine.currentPosition.value.toLong()
             lastSavedPositionMs = pos
-            timerScope.launch { settingsStore.setLastPlayback(np.naatId, pos) }
+            timerScope.launch { settingsStore.setLastPlayback(np.naatId, pos, np.audioPath) }
         }
     }
     fun resume() = engine.resume()
@@ -212,9 +223,10 @@ class PlaybackController @Inject constructor(
     fun cyclePlaybackSpeed() {
         val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
         val current = _playbackSpeed.value
-        val nextIndex = (speeds.indexOfFirst { it > current + 0.01f }.takeIf { it >= 0 }
-            ?: 0)
-        setPlaybackSpeed(speeds[nextIndex])
+        // Audit 03 L15: wrapping from the fastest speed straight to the
+        // slowest was a jolt — from the top the cycle returns to normal.
+        val next = speeds.firstOrNull { it > current + 0.01f } ?: 1.0f
+        setPlaybackSpeed(next)
     }
 
     // --- Sleep timer ---
@@ -247,7 +259,7 @@ class PlaybackController @Inject constructor(
                     kotlin.math.abs(pos - lastSavedPositionMs) >= 5_000L
                 ) {
                     lastSavedPositionMs = pos
-                    settingsStore.setLastPlayback(np.naatId, pos)
+                    settingsStore.setLastPlayback(np.naatId, pos, np.audioPath)
                 }
             }
         }
