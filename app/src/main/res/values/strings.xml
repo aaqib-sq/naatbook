@@ -73,6 +73,13 @@
     <string name="settings_font_name_label">Font name</string>
     <string name="settings_font_sample_caption">Sample — this is how the font looks</string>
     <string name="settings_font_save">Save font</string>
+    <plurals name="settings_font_zip_done">
+        <item quantity="one">Imported %1$d font from the ZIP</item>
+        <item quantity="other">Imported %1$d fonts from the ZIP</item>
+    </plurals>
+    <string name="settings_font_zip_skipped">%1$d files were skipped (duplicate, not a valid font, or too large)</string>
+    <string name="settings_font_zip_limit">%1$d more fonts were left out — the limit of %2$d imported fonts was reached</string>
+    <string name="settings_font_zip_none">No font files (.ttf / .otf) were found in that ZIP</string>
     <string name="settings_typography_title">Typography Adjustment</string>
     <string name="settings_font_size_label">Lyrics Default Text Size: %1$d sp</string>
     <string name="settings_backup_title">Backup</string>
