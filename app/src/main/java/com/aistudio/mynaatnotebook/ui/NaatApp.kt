@@ -118,6 +118,8 @@ fun NaatApp(
     val titleFontFamily = FontChoices.resolveTitle(titleFontChoice, urduScript = false, customFamilies)
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val isAttaching by viewModel.isAttachingFile.collectAsStateWithLifecycle()
+    // Arena E1: the parked-draft prompt names the draft it asks about.
+    val keptDraftInfo by viewModel.keptDraftInfo.collectAsStateWithLifecycle()
 
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     // Audit TOP 3: which parked-draft resume prompt is showing, if any. Not
@@ -229,7 +231,11 @@ fun NaatApp(
         }
         // A FAB press always represents a deliberately fresh new entry, never a
         // dormant edit draft. startAddDraft handles recorder/file cleanup off-main.
-        viewModel.startAddDraft(forceFresh = true)
+        // Arena L1: started from inside a folder, the entry is pre-filed there.
+        viewModel.startAddDraft(
+            forceFresh = true,
+            initialCategory = viewModel.selectedFolder.value
+        )
     }
 
     fun requestEditorClose() {
@@ -452,7 +458,16 @@ fun NaatApp(
                     AlertDialog(
                         onDismissRequest = { keptDraftPrompt = null },
                         title = { Text(stringResource(R.string.editor_kept_draft_title)) },
-                        text = { Text(stringResource(R.string.editor_kept_draft_message)) },
+                        text = {
+                            val label = keptDraftInfo?.label
+                            Text(
+                                if (label != null) {
+                                    stringResource(R.string.editor_kept_draft_message, label)
+                                } else {
+                                    stringResource(R.string.editor_kept_draft_message_unnamed)
+                                }
+                            )
+                        },
                         confirmButton = {
                             TextButton(
                                 onClick = {
@@ -467,7 +482,10 @@ fun NaatApp(
                                     keptDraftPrompt = null
                                     when (prompt) {
                                         is KeptDraftPrompt.NewEntry ->
-                                            viewModel.startAddDraft(forceFresh = true)
+                                            viewModel.startAddDraft(
+                                                forceFresh = true,
+                                                initialCategory = viewModel.selectedFolder.value
+                                            )
                                         is KeptDraftPrompt.EditEntry ->
                                             viewModel.startEditNaat(prompt.naat)
                                     }

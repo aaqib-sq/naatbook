@@ -175,6 +175,8 @@
     <string name="library_favorites_title">FAVORITES</string>
     <string name="library_results_title">RESULTS FOR \"%1$s\"</string>
     <string name="library_search_in_folder">Searching in %1$s</string>
+    <string name="library_draft_banner">Saved draft: %1$s</string>
+    <string name="library_draft_banner_untitled">You have a saved draft</string>
     <string name="library_empty_favorites">No favorites yet.\nStar any entry with the heart icon to see it here.</string>
     <string name="library_empty_search">No matches found.\nTry a different title, poet, or lyric phrase.</string>
     <string name="library_back_cd">Back to folders</string>
@@ -221,6 +223,7 @@
     <string name="editor_finish">Finish</string>
     <string name="editor_tap_to_record">Tap to Record</string>
     <string name="editor_recording_ready">Recording ready: %1$s</string>
+    <string name="editor_recording_label">Recording</string>
     <string name="editor_rerecord_cd">Re-record</string>
     <string name="editor_title_required">Please enter a valid notebook title</string>
     <string name="editor_saving">Saving…</string>
@@ -243,7 +246,8 @@
     <string name="editor_keep_draft">Save draft for later</string>
     <string name="editor_draft_kept">Draft saved for later</string>
     <string name="editor_kept_draft_title">Saved draft</string>
-    <string name="editor_kept_draft_message">You have a draft you saved for later. Continue working on it?</string>
+    <string name="editor_kept_draft_message">You have a draft you saved for later: \"%1$s\". Continue working on it?</string>
+    <string name="editor_kept_draft_message_unnamed">You have a draft you saved for later. Continue working on it?</string>
     <string name="editor_kept_draft_continue">Continue draft</string>
     <string name="editor_kept_draft_fresh">Start fresh</string>
     <string name="editor_kept_draft_edit_anyway">Edit anyway</string>

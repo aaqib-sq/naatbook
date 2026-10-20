@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -105,6 +106,9 @@ import com.aistudio.mynaatnotebook.ui.components.FontPickerLeadChoice
 import com.aistudio.mynaatnotebook.ui.components.fontChoiceLabel
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** Keyed lazy editor: only visible sections are composed and high-frequency media state is local. */
 @Composable
@@ -272,7 +276,9 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
                         modifier = Modifier.testTag("lyrics_dictate_mic")
                     ) { Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.editor_dictate_cd), tint = secondaryTextColor()) }
                 },
-                modifier = Modifier.fillMaxWidth().height(180.dp).testTag("add_naat_lyrics"),
+                // Audit E2: the field grows with the kalam up to a cap
+                // instead of trapping long lyrics in a fixed 180dp slit.
+                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 420.dp).testTag("add_naat_lyrics"),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 enabled = !isSaving,
                 colors = borderlessFieldColors()
@@ -788,11 +794,28 @@ private fun RecorderControls(
                     )
                 }
             } else {
+                // Arena E4: takes are stored as record_<epoch>.m4a — show a
+                // human label ("Recording · 12 Oct, 4:30 PM"), never the raw
+                // file name.
+                val recordingLabel = remember(finishedFile) {
+                    val epoch = Regex("""record_(\d+)\.m4a""")
+                        .matchEntire(finishedFile.name)
+                        ?.groupValues?.get(1)
+                        ?.toLongOrNull()
+                    val label = context.getString(R.string.editor_recording_label)
+                    if (epoch != null) {
+                        val formatted = SimpleDateFormat("d MMM, h:mm a", Locale.getDefault())
+                            .format(Date(epoch))
+                        "$label · $formatted"
+                    } else {
+                        label
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        context.getString(R.string.editor_recording_ready, finishedFile.name),
+                        context.getString(R.string.editor_recording_ready, recordingLabel),
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

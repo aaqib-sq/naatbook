@@ -49,6 +49,16 @@ internal fun pendingDeleteFileName(entryId: Int, index: Int, originalName: Strin
     return "entry${entryId}_${index}_$safe"
 }
 
+/** Display label for a parked draft: its title, else its first lyrics line, else null. */
+private fun keptDraftLabel(draft: EditorDraft): String? {
+    val title = draft.title.trim()
+    if (title.isNotEmpty()) return title
+    return draft.lyrics.lineSequence()
+        .firstOrNull { it.isNotBlank() }
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+}
+
 @HiltViewModel
 class NaatViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -209,7 +219,9 @@ class NaatViewModel @Inject constructor(
     private val _currentTab = MutableStateFlow(0) // 0: Library, 2: Settings
     val currentTab: StateFlow<Int> = _currentTab.asStateFlow()
 
-    private val _showAddModal = MutableStateFlow(initialDraft.active)
+    // Arena E8: a deliberately parked draft must not spring the editor open
+    // on cold start — only a crash-recovery draft reopens it directly.
+    private val _showAddModal = MutableStateFlow(initialDraft.active && !initialDraft.parked)
     val showAddModal: StateFlow<Boolean> = _showAddModal.asStateFlow()
 
     private val _selectedNaat = MutableStateFlow<NaatEntity?>(null)
@@ -342,7 +354,15 @@ class NaatViewModel @Inject constructor(
                                 repository.getNaatById(editId)
                             }.getOrNull()
                         }
-                        _showAddModal.value = true
+                        if (cleaned.parked) {
+                            // Arena E8: a parked draft waits behind the
+                            // Library banner / resume prompt instead of
+                            // reopening the editor on every cold start.
+                            keptDraftPending = true
+                            refreshKeptDraftInfo()
+                        } else {
+                            _showAddModal.value = true
+                        }
                     }
                     if (staleFile != null) {
                         // Audit 03 L9: the dropped take used to vanish
@@ -447,14 +467,16 @@ class NaatViewModel @Inject constructor(
 
     private fun clearDraft() {
         keptDraftPending = false
+        _keptDraftInfo.value = null
         persistDraft(EditorDraft(), immediate = true)
     }
 
-    fun startAddDraft(forceFresh: Boolean = false) {
+    fun startAddDraft(forceFresh: Boolean = false, initialCategory: String? = null) {
         if (_editorDraft.value.active && !forceFresh) return
         if (forceFresh) {
             // A parked "keep for later" draft is deliberately abandoned here.
             keptDraftPending = false
+            _keptDraftInfo.value = null
             // Detach ownership immediately for responsive navigation. Native capture
             // stops now; all file cleanup is serialized and runs on IO afterwards.
             val old = _editorDraft.value
@@ -466,7 +488,16 @@ class NaatViewModel @Inject constructor(
             playbackController.stopPreview()
             cleanupDraftFilesAsync(old, activePath)
         }
-        persistDraft(EditorDraft(active = true), immediate = true)
+        // Arena L1: a new entry started from inside a folder is pre-filed in
+        // that folder, not silently dropped into the default category.
+        persistDraft(
+            EditorDraft(
+                active = true,
+                category = initialCategory?.let { NaatCategories.normalize(it) }
+                    ?: NaatCategories.DEFAULT
+            ),
+            immediate = true
+        )
         _editingNaat.value = null
         _showAddModal.value = true
     }
@@ -506,6 +537,23 @@ class NaatViewModel @Inject constructor(
         _showAddModal.value = false
     }
 
+    /** Label + kind of the parked draft, for the Library banner and the resume prompt. */
+    data class KeptDraftInfo(val label: String?, val isEdit: Boolean)
+
+    private val _keptDraftInfo = MutableStateFlow(
+        if (initialDraft.active && initialDraft.parked) {
+            KeptDraftInfo(keptDraftLabel(initialDraft), initialDraft.editingId != null)
+        } else null
+    )
+    val keptDraftInfo: StateFlow<KeptDraftInfo?> = _keptDraftInfo.asStateFlow()
+
+    private fun refreshKeptDraftInfo() {
+        _keptDraftInfo.value = if (keptDraftPending) {
+            val draft = _editorDraft.value
+            KeptDraftInfo(keptDraftLabel(draft), draft.editingId != null)
+        } else null
+    }
+
     /**
      * True while a draft the user deliberately parked with "Save draft for
      * later" is dormant (editor closed, draft + files intact on disk). The
@@ -514,7 +562,7 @@ class NaatViewModel @Inject constructor(
      * discard), by resume, and by any open path that replaces the draft.
      * Main-thread only.
      */
-    internal var keptDraftPending = false
+    internal var keptDraftPending = initialDraft.active && initialDraft.parked
 
     /**
      * Audit TOP 3: close the editor WITHOUT discarding. The draft (text, font
@@ -538,8 +586,11 @@ class NaatViewModel @Inject constructor(
                 _activeRecordingFile.value = null
                 _editingNaat.value = null
                 keptDraftPending = true
-                persistDraft(_editorDraft.value.copy(active = true), immediate = true)
+                // Arena E8: mark the draft parked so a cold start restores
+                // it behind the banner/prompt instead of reopening the editor.
+                persistDraft(_editorDraft.value.copy(active = true, parked = true), immediate = true)
                 _showAddModal.value = false
+                refreshKeptDraftInfo()
                 withContext(Dispatchers.Main.immediate) {
                     statusReporter.show(R.string.editor_draft_kept)
                 }
@@ -561,9 +612,15 @@ class NaatViewModel @Inject constructor(
         val draft = _editorDraft.value
         if (!draft.active) {
             keptDraftPending = false
+            _keptDraftInfo.value = null
             return
         }
         keptDraftPending = false
+        _keptDraftInfo.value = null
+        // Un-park on resume: from here the draft is a live editor draft
+        // again, so a later crash must restore it as a crash draft (editor
+        // reopens), not as a parked one.
+        persistDraft(draft.copy(parked = false))
         val editingId = draft.editingId
         if (editingId != null) {
             viewModelScope.launch {
@@ -578,6 +635,24 @@ class NaatViewModel @Inject constructor(
         } else {
             _showAddModal.value = true
         }
+    }
+
+    /**
+     * Throws the parked draft away from the Library banner, without the
+     * editor ever opening. Mirrors the discard path; no recorder can be
+     * live for a parked draft, so there is nothing to finalize — only the
+     * draft's staged files are cleaned up.
+     */
+    fun discardKeptDraft() {
+        if (!_editorDraft.value.active) {
+            keptDraftPending = false
+            _keptDraftInfo.value = null
+            return
+        }
+        playbackController.stopPreview()
+        cleanupDraftFilesAsync(_editorDraft.value, null)
+        _editingNaat.value = null
+        clearDraft()
     }
 
     fun selectNaat(naat: NaatEntity?) {
@@ -870,6 +945,7 @@ class NaatViewModel @Inject constructor(
         // The draft is live in the editor now (resumed or freshly built) —
         // a parked-draft prompt must not fire again for it.
         keptDraftPending = false
+        _keptDraftInfo.value = null
     }
 
     /** The picker's original file name, for display only (never a storage path). */
