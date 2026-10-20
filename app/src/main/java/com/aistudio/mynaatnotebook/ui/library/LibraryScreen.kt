@@ -88,6 +88,9 @@ fun LibraryScreen(
     val categoryCounts by viewModel.categoryCounts.collectAsStateWithLifecycle()
     val favoritesOnly by viewModel.showFavoritesOnly.collectAsStateWithLifecycle()
     val isDeleting by viewModel.isDeleting.collectAsStateWithLifecycle()
+    // Arena E8: a deliberately parked draft waits here as a banner instead
+    // of reopening the editor on every cold start.
+    val keptDraftInfo by viewModel.keptDraftInfo.collectAsStateWithLifecycle()
     // Now-playing highlight: the entry whose audio is currently loaded.
     val nowPlaying by viewModel.playbackController.nowPlaying.collectAsStateWithLifecycle()
     val hasPlaybackSession by viewModel.playbackController.hasActiveSession.collectAsStateWithLifecycle()
@@ -235,6 +238,52 @@ fun LibraryScreen(
                     .fillMaxSize()
                     .verticalScroll(viewModel.libraryHomeScrollState)
             ) {
+                // Parked-draft banner: the draft the user deliberately saved
+                // for later stays reachable (and discardable) from Home.
+                keptDraftInfo?.let { info ->
+                    val draftLabel = info.label
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 4.dp, end = 4.dp, bottom = 16.dp)
+                            .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline,
+                                RoundedCornerShape(12.dp)
+                            ),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = if (draftLabel != null) {
+                                    stringResource(R.string.library_draft_banner, draftLabel)
+                                } else {
+                                    stringResource(R.string.library_draft_banner_untitled)
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Row {
+                                TextButton(onClick = { viewModel.resumeKeptDraft() }) {
+                                    Text(stringResource(R.string.editor_kept_draft_continue))
+                                }
+                                TextButton(onClick = { viewModel.discardKeptDraft() }) {
+                                    Text(
+                                        stringResource(R.string.common_discard),
+                                        color = HighContrastRed
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Recents first (approved design): the entries a user returns
                 // to most sit at the top as swipeable cards; the full lists
                 // stay inside the folder cards below.
@@ -497,7 +546,9 @@ fun LibraryScreen(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = selectedFolder ?: "",
+                    // Audit T1: the folder heading follows the app language,
+                    // like the folder cards on Home already do.
+                    text = stringResource(CategoryDisplay.displayNameRes(selectedFolder ?: "")),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -507,7 +558,10 @@ fun LibraryScreen(
             // the results are scoped and not global.
             if (searchQuery.isNotBlank()) {
                 Text(
-                    text = stringResource(R.string.library_search_in_folder, selectedFolder ?: ""),
+                    text = stringResource(
+                        R.string.library_search_in_folder,
+                        stringResource(CategoryDisplay.displayNameRes(selectedFolder ?: ""))
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = secondaryTextColor(),
                     modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)

@@ -175,6 +175,8 @@
     <string name="library_favorites_title">پسندیدہ</string>
     <string name="library_results_title">\"%1$s\" کے نتائج</string>
     <string name="library_search_in_folder">%1$s میں تلاش ہو رہی ہے</string>
+    <string name="library_draft_banner">محفوظ ڈرافٹ: %1$s</string>
+    <string name="library_draft_banner_untitled">آپ کا ایک ڈرافٹ محفوظ ہے</string>
     <string name="library_empty_favorites">ابھی کوئی پسندیدہ نہیں۔\nکسی اندراج کو دل کے نشان سے پسندیدہ بنائیں، وہ یہاں نظر آئے گا۔</string>
     <string name="library_empty_search">کوئی نتیجہ نہیں ملا۔\nکوئی اور عنوان، شاعر یا شعر آزمائیں۔</string>
     <string name="library_back_cd">فولڈرز پر واپس</string>
@@ -221,6 +223,7 @@
     <string name="editor_finish">مکمل کریں</string>
     <string name="editor_tap_to_record">ریکارڈ کرنے کے لیے تھپتھپائیں</string>
     <string name="editor_recording_ready">ریکارڈنگ تیار: %1$s</string>
+    <string name="editor_recording_label">ریکارڈنگ</string>
     <string name="editor_rerecord_cd">دوبارہ ریکارڈ کریں</string>
     <string name="editor_title_required">براہ کرم درست عنوان درج کریں</string>
     <string name="editor_saving">محفوظ ہو رہا ہے…</string>
@@ -243,7 +246,8 @@
     <string name="editor_keep_draft">ڈرافٹ بعد کے لیے محفوظ کریں</string>
     <string name="editor_draft_kept">ڈرافٹ بعد کے لیے محفوظ ہو گیا</string>
     <string name="editor_kept_draft_title">محفوظ شدہ ڈرافٹ</string>
-    <string name="editor_kept_draft_message">آپ کا ایک ڈرافٹ بعد کے لیے محفوظ ہے۔ کیا اس پر کام جاری رکھیں؟</string>
+    <string name="editor_kept_draft_message">آپ کا ایک ڈرافٹ بعد کے لیے محفوظ ہے: \"%1$s\"۔ کیا اس پر کام جاری رکھیں؟</string>
+    <string name="editor_kept_draft_message_unnamed">آپ کا ایک ڈرافٹ بعد کے لیے محفوظ ہے۔ کیا اس پر کام جاری رکھیں؟</string>
     <string name="editor_kept_draft_continue">ڈرافٹ جاری رکھیں</string>
     <string name="editor_kept_draft_fresh">نیا شروع کریں</string>
     <string name="editor_kept_draft_edit_anyway">بہر حال ترمیم کریں</string>

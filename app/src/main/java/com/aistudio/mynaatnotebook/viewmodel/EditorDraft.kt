@@ -32,6 +32,8 @@ data class EditorAttachmentDraft(
 
 data class EditorDraft(
     val active: Boolean = false,
+    /** True only for a draft the user deliberately parked via "Save draft for later" (Arena E8). */
+    val parked: Boolean = false,
     val editingId: Int? = null,
     val title: String = "",
     val poet: String = "",

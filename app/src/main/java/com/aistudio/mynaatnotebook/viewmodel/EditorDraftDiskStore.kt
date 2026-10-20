@@ -15,6 +15,7 @@ internal class EditorDraftDiskStore(context: Context) {
         fun optional(key: String) = if (json.isNull(key)) null else json.optString(key)
         return EditorDraft(
             active = json.optBoolean("active", false),
+            parked = json.optBoolean("parked", false),
             editingId = if (json.isNull("editingId")) null else json.optInt("editingId"),
             title = json.optString("title"),
             poet = json.optString("poet"),
@@ -41,6 +42,7 @@ internal class EditorDraftDiskStore(context: Context) {
     fun write(draft: EditorDraft) {
         val json = JSONObject().apply {
             put("active", draft.active)
+            put("parked", draft.parked)
             put("editingId", draft.editingId ?: JSONObject.NULL)
             put("title", draft.title)
             put("poet", draft.poet)

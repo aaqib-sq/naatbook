@@ -9,6 +9,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
 
     fun restore(): EditorDraft = EditorDraft(
         active = handle[ACTIVE] ?: false,
+        parked = handle[PARKED] ?: false,
         editingId = handle[EDITING_ID],
         title = handle[TITLE] ?: "",
         poet = handle[POET] ?: "",
@@ -35,6 +36,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
 
     fun save(draft: EditorDraft) {
         handle[ACTIVE] = draft.active
+        handle[PARKED] = draft.parked
         handle[EDITING_ID] = draft.editingId
         handle[TITLE] = draft.title
         handle[POET] = draft.poet
@@ -61,6 +63,7 @@ internal class EditorDraftStore(private val handle: SavedStateHandle) {
 
     private companion object {
         const val ACTIVE = "draft.active"
+        const val PARKED = "draft.parked"
         const val EDITING_ID = "draft.editingId"
         const val TITLE = "draft.title"
         const val POET = "draft.poet"
