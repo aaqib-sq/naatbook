@@ -250,6 +250,27 @@ class SettingsStore @Inject constructor(
         context.settingsDataStore.edit { it.remove(readerScrollKey(naatId)) }
     }
 
+    /**
+     * Per-entry reader text-size memory (audit R1): the Aa size the user last
+     * chose for this entry, or null when they never sized it — the Settings
+     * default then applies. Same per-entry DataStore pattern as the scroll
+     * memory above: never in the DB, and deleted entries' keys are dropped
+     * when the delete finalizes.
+     */
+    private fun readerFontSizeKey(naatId: Int) = floatPreferencesKey("reader_font_$naatId")
+
+    fun readerFontSize(naatId: Int): Flow<Float?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[readerFontSizeKey(naatId)] }
+
+    suspend fun setReaderFontSize(naatId: Int, size: Float) {
+        context.settingsDataStore.edit { it[readerFontSizeKey(naatId)] = size.coerceIn(12f, 36f) }
+    }
+
+    suspend fun clearReaderFontSize(naatId: Int) {
+        context.settingsDataStore.edit { it.remove(readerFontSizeKey(naatId)) }
+    }
+
     // --- Google Drive sync state ---
 
     /** Connected Google account email for Drive sync; null = not connected. */

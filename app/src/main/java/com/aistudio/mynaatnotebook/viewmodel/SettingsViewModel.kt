@@ -191,6 +191,16 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
+     * Reader text-size memory (audit R1): the Aa size is remembered per
+     * entry; the global default only seeds entries never sized.
+     */
+    fun readerFontSize(naatId: Int): Flow<Float?> = settingsStore.readerFontSize(naatId)
+
+    fun saveReaderFontSize(naatId: Int, size: Float) {
+        viewModelScope.launch { settingsStore.setReaderFontSize(naatId, size) }
+    }
+
+    /**
      * A picked file: a ZIP imports every font inside it in one batch
      * (summary messages follow); anything else starts phase 1 of the
      * single-file import — validate, then await a name.

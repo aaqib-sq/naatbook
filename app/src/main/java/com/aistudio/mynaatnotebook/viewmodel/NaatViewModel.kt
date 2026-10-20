@@ -248,6 +248,11 @@ class NaatViewModel @Inject constructor(
     private val _showFavoritesOnly = MutableStateFlow(false)
     val showFavoritesOnly: StateFlow<Boolean> = _showFavoritesOnly.asStateFlow()
 
+    private val _searchWholeLibrary = MutableStateFlow(false)
+    /** Search-scope escape: while true, an active search ignores the folder. */
+    val searchWholeLibrary: StateFlow<Boolean> = _searchWholeLibrary.asStateFlow()
+    fun setSearchWholeLibrary(enabled: Boolean) { _searchWholeLibrary.value = enabled }
+
     fun toggleFavoritesOnly() {
         _showFavoritesOnly.value = !_showFavoritesOnly.value
     }
@@ -261,6 +266,7 @@ class NaatViewModel @Inject constructor(
         _selectedFolder.value = null
         _showFavoritesOnly.value = false
         _searchQuery.value = ""
+        _searchWholeLibrary.value = false
     }
 
     // Lightweight Library state: lyrics are never materialized for cards/folder counts.
@@ -278,23 +284,39 @@ class NaatViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    /** The library filter's live inputs, with the folder already resolved. */
+    private data class LibraryFilter(
+        val query: String,
+        val folder: String?,
+        val favoritesOnly: Boolean
+    )
+
     @OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val filteredSummaries: StateFlow<List<NaatSummary>> = combine(
         _searchQuery.debounce(160).distinctUntilChanged(),
         _selectedFolder,
-        _showFavoritesOnly
-    ) { query, folder, favoritesOnly ->
+        _showFavoritesOnly,
+        _searchWholeLibrary
+    ) { query, folder, favoritesOnly, wholeLibrary ->
         // Audit 03 M2: fold Arabic-script variants/harakat on the query
         // side; the DAO folds the stored columns with the same rules.
-        Triple(normalizeSearchText(query), folder, favoritesOnly)
+        // Audit S1: the whole-library escape drops the folder scope, but
+        // only while a query is actually typed — with a blank query the
+        // folder view must keep its own scope.
+        val normalizedQuery = normalizeSearchText(query)
+        LibraryFilter(
+            query = normalizedQuery,
+            folder = if (wholeLibrary && normalizedQuery.isNotBlank()) null else folder,
+            favoritesOnly = favoritesOnly
+        )
     }
         .distinctUntilChanged()
-        .flatMapLatest { (query, folder, favoritesOnly) ->
+        .flatMapLatest { filter ->
             // Room executes title/poet/lyrics matching on its query executor and returns only
             // summary columns, avoiding full-lyrics scans and allocations on the UI thread.
             // Stage-2 UX audit: rank the matches (title > poet > lyrics-only) on the way out.
-            repository.filteredSummaries(query, folder, favoritesOnly)
-                .map { rankSearchResults(it, query) }
+            repository.filteredSummaries(filter.query, filter.folder, filter.favoritesOnly)
+                .map { rankSearchResults(it, filter.query) }
         }
         // Audit 03 H-b: a Room failure used to leave the list silently
         // stale or empty with no trace anywhere.
@@ -736,6 +758,8 @@ class NaatViewModel @Inject constructor(
     fun selectFolder(folder: String?) {
         if (_selectedFolder.value == folder) return
         _selectedFolder.value = folder
+        // Audit S1: changing folder ends any whole-library search escape.
+        _searchWholeLibrary.value = false
         // Audit 03 M3: the folder list state is shared across folders, so
         // a new folder used to open mid-scroll wherever the last one left
         // it. (Returning from an entry keeps the position — only an
@@ -745,6 +769,8 @@ class NaatViewModel @Inject constructor(
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
+        // Audit S1: clearing the search also ends the whole-library escape.
+        if (query.isBlank()) _searchWholeLibrary.value = false
     }
 
     // --- Audio recording and app-owned file lifecycle ---
@@ -1584,6 +1610,7 @@ class NaatViewModel @Inject constructor(
                 runCatching { File(stagedPath).takeIf { it.isFile }?.delete() }
             }
             runCatching { settingsStore.clearReaderScrollOffset(pending.entity.id) }
+            runCatching { settingsStore.clearReaderFontSize(pending.entity.id) }
         }
     }
 

@@ -60,6 +60,7 @@ import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
@@ -87,6 +88,7 @@ fun LibraryScreen(
     val recentNaats by viewModel.recentSummaries.collectAsStateWithLifecycle()
     val categoryCounts by viewModel.categoryCounts.collectAsStateWithLifecycle()
     val favoritesOnly by viewModel.showFavoritesOnly.collectAsStateWithLifecycle()
+    val searchWholeLibrary by viewModel.searchWholeLibrary.collectAsStateWithLifecycle()
     val isDeleting by viewModel.isDeleting.collectAsStateWithLifecycle()
     // Arena E8: a deliberately parked draft waits here as a banner instead
     // of reopening the editor on every cold start.
@@ -444,6 +446,20 @@ fun LibraryScreen(
                     color = secondaryTextColor(),
                     modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
                 )
+                // Audit L7: the results say how many they are, not just
+                // what was typed.
+                if (searchQuery.isNotBlank() && filteredNaats.isNotEmpty()) {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.library_results_count,
+                            filteredNaats.size,
+                            filteredNaats.size
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondaryTextColor(),
+                        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                    )
+                }
                 // Audit 03 M1: at the root, the favorites filter hid its
                 // own off-switch (the chip lives in the home branch that
                 // this view replaces). Same removable indicator the
@@ -555,17 +571,35 @@ fun LibraryScreen(
                 )
             }
             // Show when search is active inside a folder, so the user knows
-            // the results are scoped and not global.
+            // the results are scoped and not global. Audit S1: once the
+            // whole-library escape is active the caption says so instead.
             if (searchQuery.isNotBlank()) {
                 Text(
-                    text = stringResource(
-                        R.string.library_search_in_folder,
-                        stringResource(CategoryDisplay.displayNameRes(selectedFolder ?: ""))
-                    ),
+                    text = if (searchWholeLibrary) {
+                        stringResource(R.string.library_search_whole)
+                    } else {
+                        stringResource(
+                            R.string.library_search_in_folder,
+                            stringResource(CategoryDisplay.displayNameRes(selectedFolder ?: ""))
+                        )
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = secondaryTextColor(),
                     modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
                 )
+                // Audit L7: the results say how many they are.
+                if (filteredNaats.isNotEmpty()) {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.library_results_count,
+                            filteredNaats.size,
+                            filteredNaats.size
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondaryTextColor(),
+                        modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
+                    )
+                }
             }
 
             // Audit #8: the favorites filter used to stay silently active
@@ -627,7 +661,15 @@ fun LibraryScreen(
                             bodyText = stringResource(R.string.library_empty_search),
                             buttonText = stringResource(R.string.library_clear_search),
                             onAddEntry = onAddEntry,
-                            onButtonClick = { viewModel.setSearchQuery("") }
+                            onButtonClick = { viewModel.setSearchQuery("") },
+                            // Audit S1: the match may live in another folder —
+                            // offer the escape right where the dead end is.
+                            secondaryButtonText = if (!searchWholeLibrary) {
+                                stringResource(R.string.library_search_whole_action)
+                            } else {
+                                null
+                            },
+                            onSecondaryButtonClick = { viewModel.setSearchWholeLibrary(true) }
                         )
                     } else {
                         EmptyStateGuide(
@@ -942,7 +984,9 @@ private fun EmptyStateGuide(
     buttonText: String?,
     onAddEntry: () -> Unit,
     modifier: Modifier = Modifier,
-    onButtonClick: (() -> Unit)? = null
+    onButtonClick: (() -> Unit)? = null,
+    secondaryButtonText: String? = null,
+    onSecondaryButtonClick: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier.padding(24.dp),
@@ -991,6 +1035,11 @@ private fun EmptyStateGuide(
                     text = if (onButtonClick == null) "+ " + buttonText else buttonText,
                     fontWeight = FontWeight.Bold
                 )
+            }
+            if (secondaryButtonText != null && onSecondaryButtonClick != null) {
+                TextButton(onClick = onSecondaryButtonClick) {
+                    Text(secondaryButtonText)
+                }
             }
             Spacer(modifier = Modifier.height(10.dp))
             Text(

@@ -213,8 +213,13 @@ fun LyricsReaderScreen(
 
     // Sizing controls.
     val defaultFontSize by settingsViewModel.globalFontSize.collectAsStateWithLifecycle()
-    var localFontSize by remember { mutableStateOf(defaultFontSize) }
-    LaunchedEffect(defaultFontSize) { localFontSize = defaultFontSize }
+    // Audit R1: the Aa size is remembered per entry (same pattern as the
+    // reader scroll memory) — the Settings default only seeds entries the
+    // user has never sized.
+    val savedEntryFontSize by settingsViewModel.readerFontSize(naat.id)
+        .collectAsStateWithLifecycle(initialValue = null)
+    var localFontSize by remember(naat.id) { mutableStateOf<Float?>(null) }
+    val effectiveFontSize = localFontSize ?: savedEntryFontSize ?: defaultFontSize
 
     // Font choices (Settings → Typography): reader lyrics + header title.
     val readerFontChoice by settingsViewModel.readerFont.collectAsStateWithLifecycle()
@@ -362,7 +367,7 @@ fun LyricsReaderScreen(
         ReaderLyricsViewport(
             naat = naat,
             scrollState = scrollState,
-            fontSize = localFontSize,
+            fontSize = effectiveFontSize,
             topChromePaddingPx = topContentPaddingPx,
             bottomChromePaddingPx = bottomContentPaddingPx,
             immersive = immersive,
@@ -393,8 +398,11 @@ fun LyricsReaderScreen(
                     onEnterImmersive = ::enterImmersive,
                     onExitImmersive = ::exitImmersive,
                     titleFontFamily = perEntryTitleFamily,
-                    fontSize = localFontSize,
-                    onFontSizeChange = { localFontSize = it },
+                    fontSize = effectiveFontSize,
+                    onFontSizeChange = { size ->
+                        localFontSize = size
+                        settingsViewModel.saveReaderFontSize(naat.id, size)
+                    },
                     autoScrollActive = autoScrollActive,
                     onAutoScrollToggle = { autoScrollActive = !autoScrollActive },
                     scrollSpeed = scrollSpeed,
