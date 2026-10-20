@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -211,6 +212,44 @@ class SettingsStore @Inject constructor(
             it.remove(KEY_LAST_PLAYBACK_NAAT_ID)
             it.remove(KEY_LAST_PLAYBACK_POSITION_MS)
             it.remove(KEY_LAST_PLAYBACK_AUDIO_PATH)
+        }
+    }
+
+    /**
+     * Per-entry audio position memory (UX batch 4, Arena A14): where this
+     * entry's audio was last stopped, per attached file. The single-slot
+     * [lastPlayback] above only remembers the most recent entry (for the
+     * process-death restore); this map covers every entry, so returning to
+     * a half-heard kalam weeks later resumes it where it stopped. Same
+     * per-entry DataStore pattern as the reader scroll memory: never in
+     * the DB, and deleted entries' keys are dropped when the delete
+     * finalizes.
+     */
+    private fun audioPositionKey(naatId: Int) = longPreferencesKey("audio_pos_$naatId")
+
+    private fun audioPositionPathKey(naatId: Int) = stringPreferencesKey("audio_pos_path_$naatId")
+
+    /** The saved (positionMs, audioPath) for [naatId], or null when unset. */
+    suspend fun getAudioPosition(naatId: Int): Pair<Long, String?>? =
+        context.settingsDataStore.data
+            .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+            .map { prefs ->
+                val pos = prefs[audioPositionKey(naatId)] ?: 0L
+                if (pos > 0L) pos to prefs[audioPositionPathKey(naatId)] else null
+            }
+            .first()
+
+    suspend fun setAudioPosition(naatId: Int, audioPath: String, positionMs: Long) {
+        context.settingsDataStore.edit {
+            it[audioPositionKey(naatId)] = positionMs.coerceAtLeast(0L)
+            it[audioPositionPathKey(naatId)] = audioPath
+        }
+    }
+
+    suspend fun clearAudioPosition(naatId: Int) {
+        context.settingsDataStore.edit {
+            it.remove(audioPositionKey(naatId))
+            it.remove(audioPositionPathKey(naatId))
         }
     }
 

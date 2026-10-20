@@ -699,6 +699,33 @@ class NaatViewModel @Inject constructor(
         playbackController.playEntry(naat, path)
     }
 
+    /**
+     * Reader play tap (UX batch 4, Arena A14): when this entry's file has a
+     * remembered position, the session is rebuilt at that point (the same
+     * paused-at-position restore the process-death path uses) and then
+     * started; otherwise playback simply begins from the top.
+     */
+    fun startEntryPlaybackResuming(naat: NaatEntity, path: String) {
+        viewModelScope.launch {
+            val saved = runCatching { settingsStore.getAudioPosition(naat.id) }.getOrNull()
+            if (saved != null && saved.second == path && saved.first > 5_000L) {
+                playbackController.restoreEntry(naat, saved.first, path)
+                playbackController.resume()
+            } else {
+                playbackController.playEntry(naat, path)
+            }
+        }
+    }
+
+    /** Per-entry audio position memory (UX batch 4): see SettingsStore. */
+    fun saveAudioPosition(naatId: Int, audioPath: String, positionMs: Long) {
+        viewModelScope.launch { settingsStore.setAudioPosition(naatId, audioPath, positionMs) }
+    }
+
+    fun clearAudioPosition(naatId: Int) {
+        viewModelScope.launch { settingsStore.clearAudioPosition(naatId) }
+    }
+
     /** Mini-player tap: resolve through Room; the list flow may still hold its initial empty value. */
     private var playbackRestoreAttempted = false
 
@@ -1611,6 +1638,7 @@ class NaatViewModel @Inject constructor(
             }
             runCatching { settingsStore.clearReaderScrollOffset(pending.entity.id) }
             runCatching { settingsStore.clearReaderFontSize(pending.entity.id) }
+            runCatching { settingsStore.clearAudioPosition(pending.entity.id) }
         }
     }
 

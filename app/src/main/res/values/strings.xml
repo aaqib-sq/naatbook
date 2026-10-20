@@ -154,6 +154,8 @@
     <string name="reader_autoscroll_off">AutoScroll</string>
     <string name="reader_text_size_label">Text size</string>
     <string name="reader_autoscroll_label">Auto scroll</string>
+    <string name="reader_previous_entry">Previous entry</string>
+    <string name="reader_next_entry">Next entry</string>
     <string name="reader_scroll_speed_label">Scroll speed</string>
     <string name="reader_tap_label">Show or hide reader controls</string>
     <string name="reader_no_lyrics">No written lyrics provided.\nReady to recite with attached media!</string>
