@@ -4,13 +4,13 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -20,9 +20,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -90,76 +95,119 @@ fun FontPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                leadChoices.forEach { lead ->
-                    FontPickerRow(
-                        label = lead.label,
-                        sample = lead.sample,
-                        family = lead.family,
-                        selected = currentChoice == lead.choiceKey,
-                        testTag = lead.testTag,
-                        onClick = { onPick(lead.choiceKey) }
+            // Audit F1: the old body was one eagerly-composed scrolling
+            // Column — with up to 100 imported fonts, picking one meant a
+            // long scroll-hunt through near-identical samples. The list is
+            // lazy now, and 10+ custom fonts get a search field (which
+            // targets the imported fonts, so built-ins step aside while
+            // a query is typed).
+            var fontQuery by remember { mutableStateOf("") }
+            val searching = fontQuery.isNotBlank()
+            val visibleCustomFonts = if (!searching) {
+                customFonts
+            } else {
+                customFonts.filter { it.name.contains(fontQuery.trim(), ignoreCase = true) }
+            }
+            val importAction = onImport
+            Column {
+                if (customFonts.size >= 10) {
+                    OutlinedTextField(
+                        value = fontQuery,
+                        onValueChange = { fontQuery = it },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.settings_font_search_hint)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
                     )
                 }
-                builtinKeys.forEach { key ->
-                    FontPickerRow(
-                        label = fontChoiceLabel(key, customFonts),
-                        sample = when (key) {
-                            FontChoices.AUTO -> stringResource(R.string.settings_font_auto_desc)
-                            FontChoices.NASTALIQ -> "مدینہ کا سفر"
-                            else -> "Madina ka Safar"
-                        },
-                        family = FontChoices.builtinFamily(key),
-                        selected = currentChoice == key,
-                        testTag = "font_picker_row_$key",
-                        onClick = { onPick(key) }
-                    )
-                }
-                if (customFonts.isNotEmpty()) {
-                    Text(
-                        text = stringResource(
-                            R.string.settings_font_imported_count, customFonts.size
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
-                    )
-                }
-                customFonts.forEach { font ->
-                    val key = FontChoices.customKey(font.id)
-                    FontPickerRow(
-                        label = font.name,
-                        sample = "مدینہ کا سفر",
-                        family = customFamilies[font.id] ?: FontFamily.Default,
-                        selected = currentChoice == key,
-                        testTag = "font_picker_row_$key",
-                        onClick = { onPick(key) },
-                        onDelete = onDeleteRequest?.let { req -> { req(font) } },
-                        deleteTestTag = "font_picker_delete_${font.id}"
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                if (onImport != null) {
-                OutlinedButton(
-                    onClick = onImport,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("import_font_btn"),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(
-                        1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onBackground
-                    )
-                ) {
-                    Text(
-                        stringResource(R.string.settings_import_font),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                LazyColumn(modifier = Modifier.heightIn(max = 440.dp)) {
+                    if (!searching) {
+                        items(leadChoices, key = { "lead_${it.choiceKey}" }) { lead ->
+                            FontPickerRow(
+                                label = lead.label,
+                                sample = lead.sample,
+                                family = lead.family,
+                                selected = currentChoice == lead.choiceKey,
+                                testTag = lead.testTag,
+                                onClick = { onPick(lead.choiceKey) }
+                            )
+                        }
+                        items(builtinKeys, key = { "builtin_$it" }) { key ->
+                            FontPickerRow(
+                                label = fontChoiceLabel(key, customFonts),
+                                sample = when (key) {
+                                    FontChoices.AUTO -> stringResource(R.string.settings_font_auto_desc)
+                                    FontChoices.NASTALIQ -> "مدینہ کا سفر"
+                                    else -> "Madina ka Safar"
+                                },
+                                family = FontChoices.builtinFamily(key),
+                                selected = currentChoice == key,
+                                testTag = "font_picker_row_$key",
+                                onClick = { onPick(key) }
+                            )
+                        }
+                        if (visibleCustomFonts.isNotEmpty()) {
+                            item(key = "imported_header") {
+                                Text(
+                                    text = stringResource(
+                                        R.string.settings_font_imported_count, customFonts.size
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                    items(visibleCustomFonts, key = { it.id }) { font ->
+                        val key = FontChoices.customKey(font.id)
+                        FontPickerRow(
+                            label = font.name,
+                            sample = "مدینہ کا سفر",
+                            family = customFamilies[font.id] ?: FontFamily.Default,
+                            selected = currentChoice == key,
+                            testTag = "font_picker_row_$key",
+                            onClick = { onPick(key) },
+                            onDelete = onDeleteRequest?.let { req -> { req(font) } },
+                            deleteTestTag = "font_picker_delete_${font.id}"
+                        )
+                    }
+                    if (searching && visibleCustomFonts.isEmpty()) {
+                        item(key = "search_none") {
+                            Text(
+                                text = stringResource(R.string.settings_font_search_none),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
+                        }
+                    }
+                    if (importAction != null) {
+                        item(key = "import_button") {
+                            OutlinedButton(
+                                onClick = importAction,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 12.dp)
+                                    .height(48.dp)
+                                    .testTag("import_font_btn"),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(
+                                    1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                                ),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onBackground
+                                )
+                            ) {
+                                Text(
+                                    stringResource(R.string.settings_import_font),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
         },

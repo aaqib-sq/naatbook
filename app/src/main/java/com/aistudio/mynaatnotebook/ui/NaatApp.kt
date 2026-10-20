@@ -295,10 +295,17 @@ fun NaatApp(
                     contentColor = MaterialTheme.colorScheme.onBackground,
                     snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
                     bottomBar = {
-                        // Mini-player is home-only. The reader has its own audio controls,
-                        // and the anti-bleed rule stops playback when switching entries,
-                        // so a global mini-player on the reader is unnecessary.
-                        if (atHome) {
+                        // The mini player shows on Home and on the Privacy /
+                        // Contact screens (Arena X5): opening those used to
+                        // make the bar vanish while the audio kept playing.
+                        // The bottom navigation stays home-only, and the
+                        // reader is still excluded — it has its own audio
+                        // controls, and the anti-bleed rule stops playback
+                        // when switching entries.
+                        val showMiniPlayer = atHome ||
+                            currentRoute == NaatRoutes.PRIVACY ||
+                            currentRoute == NaatRoutes.CONTACT
+                        if (showMiniPlayer) {
                             Column {
                                 GlobalMiniPlayer(
                                     viewModel = viewModel,

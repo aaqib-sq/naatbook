@@ -59,6 +59,8 @@
     <string name="settings_font_custom_missing">Imported font</string>
     <string name="settings_import_font">+ Import font</string>
     <string name="settings_font_imported_count">Imported fonts · %1$d</string>
+    <string name="settings_font_search_hint">Search fonts</string>
+    <string name="settings_font_search_none">No fonts match your search</string>
     <string name="settings_font_delete_cd">Delete font %1$s</string>
     <string name="settings_font_delete_title">Delete this font?</string>
     <string name="settings_font_delete_message">“%1$s” will be removed from the app.</string>
@@ -177,6 +179,12 @@
     <string name="library_search_in_folder">Searching in %1$s</string>
     <string name="library_draft_banner">Saved draft: %1$s</string>
     <string name="library_draft_banner_untitled">You have a saved draft</string>
+    <string name="library_search_whole">Searching the whole library</string>
+    <string name="library_search_whole_action">Search the whole library</string>
+    <plurals name="library_results_count">
+        <item quantity="one">%1$d result</item>
+        <item quantity="other">%1$d results</item>
+    </plurals>
     <string name="library_empty_favorites">No favorites yet.\nStar any entry with the heart icon to see it here.</string>
     <string name="library_empty_search">No matches found.\nTry a different title, poet, or lyric phrase.</string>
     <string name="library_back_cd">Back to folders</string>

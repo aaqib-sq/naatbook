@@ -59,6 +59,8 @@
     <string name="settings_font_custom_missing">درآمد شدہ فونٹ</string>
     <string name="settings_import_font">+ فونٹ درآمد کریں</string>
     <string name="settings_font_imported_count">درآمد شدہ فونٹس · %1$d</string>
+    <string name="settings_font_search_hint">فونٹ تلاش کریں</string>
+    <string name="settings_font_search_none">آپ کی تلاش سے کوئی فونٹ نہیں ملا</string>
     <string name="settings_font_delete_cd">فونٹ %1$s حذف کریں</string>
     <string name="settings_font_delete_title">یہ فونٹ حذف کریں؟</string>
     <string name="settings_font_delete_message">“%1$s” ایپ سے ہٹا دیا جائے گا۔</string>
@@ -177,6 +179,12 @@
     <string name="library_search_in_folder">%1$s میں تلاش ہو رہی ہے</string>
     <string name="library_draft_banner">محفوظ ڈرافٹ: %1$s</string>
     <string name="library_draft_banner_untitled">آپ کا ایک ڈرافٹ محفوظ ہے</string>
+    <string name="library_search_whole">پوری لائبریری میں تلاش ہو رہی ہے</string>
+    <string name="library_search_whole_action">پوری لائبریری میں تلاش کریں</string>
+    <plurals name="library_results_count">
+        <item quantity="one">%1$d نتیجہ</item>
+        <item quantity="other">%1$d نتائج</item>
+    </plurals>
     <string name="library_empty_favorites">ابھی کوئی پسندیدہ نہیں۔\nکسی اندراج کو دل کے نشان سے پسندیدہ بنائیں، وہ یہاں نظر آئے گا۔</string>
     <string name="library_empty_search">کوئی نتیجہ نہیں ملا۔\nکوئی اور عنوان، شاعر یا شعر آزمائیں۔</string>
     <string name="library_back_cd">فولڈرز پر واپس</string>
