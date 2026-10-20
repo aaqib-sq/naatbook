@@ -63,6 +63,8 @@ import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -235,6 +237,39 @@ fun LyricsReaderScreen(
         customFamilies
     )
 
+    // UX batch 4 (Arena A1): previous / next entry within the list the
+    // user came from — the Library's live filter (folder, search,
+    // favorites) in its display order. An entry reached from outside that
+    // list (e.g. the mini player) simply has no neighbours, and the menu
+    // items stay hidden.
+    val libraryOrder by viewModel.filteredSummaries.collectAsStateWithLifecycle()
+    val currentOrderIndex = libraryOrder.indexOfFirst { it.id == naat.id }
+    val previousEntryId = if (currentOrderIndex > 0) {
+        libraryOrder[currentOrderIndex - 1].id
+    } else {
+        null
+    }
+    val nextEntryId = if (currentOrderIndex >= 0 && currentOrderIndex < libraryOrder.lastIndex) {
+        libraryOrder[currentOrderIndex + 1].id
+    } else {
+        null
+    }
+    // Switching entries while this one is playing carries the listening
+    // over: the neighbour opens and its audio starts (from its own
+    // remembered position); a paused reader just switches, silently.
+    fun openNeighborEntry(entryId: Int) {
+        val keepPlaying = viewModel.playbackController.isPlaying.value &&
+            viewModel.playbackController.nowPlaying.value?.naatId == naat.id
+        viewModel.loadNaat(entryId, onLoaded = { entry ->
+            viewModel.selectNaat(entry)
+            if (keepPlaying) {
+                entry.audioPath?.let { path ->
+                    viewModel.startEntryPlaybackResuming(entry, path)
+                }
+            }
+        })
+    }
+
     val readerChromeVisible = !immersive || immersiveChromeVisible
 
     /*
@@ -406,7 +441,10 @@ fun LyricsReaderScreen(
                     autoScrollActive = autoScrollActive,
                     onAutoScrollToggle = { autoScrollActive = !autoScrollActive },
                     scrollSpeed = scrollSpeed,
-                    onScrollSpeedChange = { scrollSpeed = it }
+                    onScrollSpeedChange = { scrollSpeed = it },
+                    previousEntryId = previousEntryId,
+                    nextEntryId = nextEntryId,
+                    onOpenEntry = { entryId -> openNeighborEntry(entryId) }
                 )
             }
         }
@@ -475,7 +513,10 @@ private fun ReaderTopBar(
     autoScrollActive: Boolean,
     onAutoScrollToggle: () -> Unit,
     scrollSpeed: Float,
-    onScrollSpeedChange: (Float) -> Unit
+    onScrollSpeedChange: (Float) -> Unit,
+    previousEntryId: Int? = null,
+    nextEntryId: Int? = null,
+    onOpenEntry: (Int) -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -648,6 +689,30 @@ private fun ReaderTopBar(
                     expanded = overflowOpen,
                     onDismissRequest = { overflowOpen = false }
                 ) {
+                    // UX batch 4 (Arena A1): walk the list this entry was
+                    // opened from without going back to the Library first.
+                    val prevId = previousEntryId
+                    if (prevId != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.reader_previous_entry)) },
+                            leadingIcon = {
+                                Icon(Icons.Default.SkipPrevious, contentDescription = null)
+                            },
+                            onClick = { overflowOpen = false; onOpenEntry(prevId) },
+                            modifier = Modifier.testTag("reader_previous_item")
+                        )
+                    }
+                    val nextId = nextEntryId
+                    if (nextId != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.reader_next_entry)) },
+                            leadingIcon = {
+                                Icon(Icons.Default.SkipNext, contentDescription = null)
+                            },
+                            onClick = { overflowOpen = false; onOpenEntry(nextId) },
+                            modifier = Modifier.testTag("reader_next_item")
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.reader_autoscroll_label)) },
                         leadingIcon = {
@@ -946,6 +1011,24 @@ private fun ReaderAudioControls(
         lastDurationPath == selectedPath -> lastDuration
         else -> 0
     }
+    // UX batch 4 (Arena A14): per-entry audio position memory. While this
+    // entry's file plays, its stop point is kept current (about every 5 s
+    // of movement, the cadence the controller's own saver uses); reaching
+    // the end forgets the point, so a finished kalam starts from the top.
+    var lastSavedAudioPosition by remember(naat.id, selectedPath) { mutableStateOf(-1) }
+    LaunchedEffect(playerPosition, ownsSelected) {
+        if (ownsSelected &&
+            kotlin.math.abs(playerPosition - lastSavedAudioPosition) >= 5_000
+        ) {
+            lastSavedAudioPosition = playerPosition
+            viewModel.saveAudioPosition(naat.id, selectedPath, playerPosition.toLong())
+        }
+    }
+    LaunchedEffect(playerPosition, duration, ownsSelected) {
+        if (ownsSelected && duration > 0 && playerPosition >= duration - 1_000) {
+            viewModel.clearAudioPosition(naat.id)
+        }
+    }
     val selectedType = attachments.firstOrNull { it.second == selectedPath }?.first ?: attachments.first().first
 
     val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
@@ -1058,9 +1141,15 @@ private fun ReaderAudioControls(
             // Filled play/pause
             IconButton(
                 onClick = {
-                    if (playing) controller.pause()
+                    if (playing) {
+                        controller.pause()
+                        // Pin the exact stop point for this entry (A14).
+                        viewModel.saveAudioPosition(
+                            naat.id, selectedPath, playerPosition.toLong()
+                        )
+                    }
                     else if (ownsSelected) controller.resume()
-                    else viewModel.startEntryPlayback(naat, selectedPath)
+                    else viewModel.startEntryPlaybackResuming(naat, selectedPath)
                 },
                 modifier = Modifier
                     .size(46.dp)

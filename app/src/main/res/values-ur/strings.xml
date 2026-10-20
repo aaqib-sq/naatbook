@@ -154,6 +154,8 @@
     <string name="reader_autoscroll_off">خودکار سکرول</string>
     <string name="reader_text_size_label">حروف کا سائز</string>
     <string name="reader_autoscroll_label">خودکار سکرول</string>
+    <string name="reader_previous_entry">پچھلا اندراج</string>
+    <string name="reader_next_entry">اگلا اندراج</string>
     <string name="reader_scroll_speed_label">اسکرول کی رفتار</string>
     <string name="reader_tap_label">ریڈر کے کنٹرول دکھائیں یا چھپائیں</string>
     <string name="reader_no_lyrics">کوئی تحریری اشعار فراہم نہیں کیے گئے۔\nمنسلک آڈیو کے ساتھ پڑھنے کے لیے تیار!</string>
