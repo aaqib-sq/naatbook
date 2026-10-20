@@ -8,6 +8,7 @@ import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.data.DriveSyncInterval
 import com.aistudio.mynaatnotebook.data.SettingsStore
 import com.aistudio.mynaatnotebook.data.shouldAutoSync
+import com.aistudio.mynaatnotebook.data.drive.DriveBackupInfo
 import com.aistudio.mynaatnotebook.data.drive.DriveException
 import com.aistudio.mynaatnotebook.data.drive.DriveSyncManager
 import com.aistudio.mynaatnotebook.data.drive.SyncOutcome
@@ -68,6 +69,14 @@ class DriveViewModel @Inject constructor(
     private val _pendingRestoreUri = MutableStateFlow<Uri?>(null)
     /** Downloaded Drive backup awaiting the merge/replace choice. */
     val pendingRestoreUri: StateFlow<Uri?> = _pendingRestoreUri.asStateFlow()
+
+    private val _restoreChoices = MutableStateFlow<List<DriveBackupInfo>?>(null)
+    /**
+     * UX batch 1 (audit B1): when Drive holds several backups, restore
+     * shows them (newest first, with dates and entry counts) instead of
+     * silently downloading the newest one.
+     */
+    val restoreChoices: StateFlow<List<DriveBackupInfo>?> = _restoreChoices.asStateFlow()
 
     private val _consentIntent = MutableStateFlow<Intent?>(null)
     /** Google permission screen to show so an interrupted action can retry. */
@@ -203,17 +212,26 @@ class DriveViewModel @Inject constructor(
         }
     }
 
-    /** Download the newest Drive backup and hand it to the import dialog. */
+    /**
+     * Restore entry point (UX batch 1, audit B1): list the Drive backups
+     * first. Exactly one backup downloads straight away; several open the
+     * chooser — restore never silently means "the newest".
+     */
     fun restoreLatest() {
         if (_isSyncing.value) return
         _isSyncing.value = true
         _operation.value = DriveOp.DOWNLOAD
-        _progress.value = 0f
         driveJob = viewModelScope.launch {
             try {
-                statusReporter.show(R.string.status_drive_downloading)
-                driveManager.downloadLatest { p -> _progress.value = p.coerceIn(0f, 1f) }
-                    .onSuccess { file -> _pendingRestoreUri.value = Uri.fromFile(file) }
+                driveManager.remoteBackups()
+                    .onSuccess { backups ->
+                        when {
+                            backups.isEmpty() ->
+                                statusReporter.show(R.string.status_drive_no_backup)
+                            backups.size == 1 -> downloadById(backups.first().fileId)
+                            else -> _restoreChoices.value = backups
+                        }
+                    }
                     .onFailure { error ->
                         if (error is CancellationException) {
                             statusReporter.show(R.string.status_cancelled)
@@ -228,6 +246,44 @@ class DriveViewModel @Inject constructor(
                 driveJob = null
             }
         }
+    }
+
+    /** The user picked one backup in the restore chooser: download it. */
+    fun chooseRestoreBackup(info: DriveBackupInfo) {
+        _restoreChoices.value = null
+        if (_isSyncing.value) return
+        _isSyncing.value = true
+        _operation.value = DriveOp.DOWNLOAD
+        _progress.value = 0f
+        driveJob = viewModelScope.launch {
+            try {
+                downloadById(info.fileId)
+            } finally {
+                _operation.value = null
+                _progress.value = null
+                _isSyncing.value = false
+                driveJob = null
+            }
+        }
+    }
+
+    fun dismissRestoreChoices() {
+        _restoreChoices.value = null
+    }
+
+    /** Download one backup and hand it to the shared import dialog. */
+    private suspend fun downloadById(fileId: String) {
+        _progress.value = 0f
+        statusReporter.show(R.string.status_drive_downloading)
+        driveManager.downloadBackup(fileId) { p -> _progress.value = p.coerceIn(0f, 1f) }
+            .onSuccess { file -> _pendingRestoreUri.value = Uri.fromFile(file) }
+            .onFailure { error ->
+                if (error is CancellationException) {
+                    statusReporter.show(R.string.status_cancelled)
+                } else {
+                    handleDriveError(error, PendingAction.DOWNLOAD)
+                }
+            }
     }
 
     fun consumeRestoreUri() {
@@ -309,13 +365,24 @@ class DriveViewModel @Inject constructor(
                 viewModelScope.launch { settingsStore.clearDriveState() }
                 statusReporter.show(R.string.status_drive_reconnect_needed)
             }
+            // UX batch 1 (audit S3): only DriveException messages — written
+            // in this codebase, in human words — may reach the user. Any
+            // other exception's raw text stays in the logs, not the UI.
             action == PendingAction.DOWNLOAD -> statusReporter.show(
                 R.string.status_drive_download_failed,
-                error.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown)
+                if (error is DriveException) {
+                    error.message ?: StatusMessage.Res(R.string.status_error_unknown)
+                } else {
+                    StatusMessage.Res(R.string.status_error_unknown)
+                }
             )
             else -> statusReporter.show(
                 R.string.status_drive_sync_failed,
-                error.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown)
+                if (error is DriveException) {
+                    error.message ?: StatusMessage.Res(R.string.status_error_unknown)
+                } else {
+                    StatusMessage.Res(R.string.status_error_unknown)
+                }
             )
         }
     }

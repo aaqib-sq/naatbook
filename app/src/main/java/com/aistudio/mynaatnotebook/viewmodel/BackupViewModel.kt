@@ -19,7 +19,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.os.Build
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -63,6 +67,26 @@ class BackupViewModel @Inject constructor(
 
     private fun isCancelled(error: Throwable) = error is CancellationException
 
+    /**
+     * UX batch 1 (audit S3): map a backup failure to a human reason. Raw
+     * exception text — class names, file paths, stack fragments — never
+     * reaches the user; only what happened and what to do about it.
+     */
+    private fun friendlyError(error: Throwable): StatusMessage {
+        val message = error.message.orEmpty()
+        return when {
+            error is java.util.zip.ZipException ||
+                message.contains("Invalid backup", ignoreCase = true) ->
+                StatusMessage.Res(R.string.status_error_bad_backup)
+            message.contains("No space", ignoreCase = true) ||
+                message.contains("ENOSPC", ignoreCase = true) ->
+                StatusMessage.Res(R.string.status_error_no_space)
+            message.contains("Android 10", ignoreCase = true) ->
+                StatusMessage.Res(R.string.status_error_no_folder)
+            else -> StatusMessage.Res(R.string.status_error_unknown)
+        }
+    }
+
     fun backupNotebook(uri: Uri, entriesOnly: Boolean = false) {
         if (_isWorking.value) return
         _isWorking.value = true
@@ -87,7 +111,7 @@ class BackupViewModel @Inject constructor(
                         // by the manager's destinationTouched cleanup.
                         statusReporter.show(R.string.status_cancelled)
                     } else {
-                        statusReporter.show(R.string.status_export_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                        statusReporter.show(R.string.status_export_failed, friendlyError(it))
                     }
                 }
             } finally {
@@ -120,7 +144,7 @@ class BackupViewModel @Inject constructor(
                         // manager's pendingUri cleanup.
                         statusReporter.show(R.string.status_cancelled)
                     } else {
-                        statusReporter.show(R.string.status_export_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                        statusReporter.show(R.string.status_export_failed, friendlyError(it))
                     }
                 }
             } finally {
@@ -148,6 +172,44 @@ class BackupViewModel @Inject constructor(
         backupJob = viewModelScope.launch {
             settingsStore.setLastImportUri(uri.toString())
             try {
+                // UX batch 1 (Arena S4): a REPLACE wipes the current library
+                // with no undo, so a safety copy of it is saved FIRST. If the
+                // copy cannot be made, the replace does not run at all.
+                var safetyPlace: StatusMessage.Res? = null
+                if (mode == ImportMode.REPLACE) {
+                    statusReporter.show(R.string.status_safety_copy_making)
+                    val stamp = SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.US).format(Date())
+                    val safetyName = "NaatBook_safety-copy_$stamp.zip"
+                    val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                    val safety: Result<Int> = if (modern) {
+                        backupManager.exportBackupToAppFolder(safetyName)
+                            .map { (count, _) -> count }
+                    } else {
+                        // The Downloads folder needs Android 10+; older
+                        // phones keep the copy in the app's private folder.
+                        val dir = File(context.filesDir, "safety-copies").apply { mkdirs() }
+                        dir.listFiles()
+                            ?.sortedByDescending { it.lastModified() }
+                            ?.drop(1)
+                            ?.forEach { old -> runCatching { old.delete() } }
+                        backupManager.exportBackupToFile(File(dir, safetyName))
+                    }
+                    val safetyCount = safety.getOrElse { error ->
+                        if (isCancelled(error)) {
+                            statusReporter.show(R.string.status_cancelled)
+                        } else {
+                            statusReporter.show(R.string.status_safety_copy_failed)
+                        }
+                        return@launch
+                    }
+                    if (safetyCount > 0) {
+                        safetyPlace = StatusMessage.Res(
+                            if (modern) R.string.safety_place_downloads
+                            else R.string.safety_place_app
+                        )
+                    }
+                    _progress.value = 0f
+                }
                 statusReporter.show(R.string.status_importing)
                 val result = backupManager.importBackup(uri, mode) { p ->
                     _progress.value = p.coerceIn(0f, 1f)
@@ -165,6 +227,12 @@ class BackupViewModel @Inject constructor(
                         )
                     } else {
                         statusReporter.showPlural(R.plurals.status_import_success, importResult.imported, importResult.imported)
+                    }
+                    // Where the safety copy went — after the main receipt,
+                    // like the font note below.
+                    if (safetyPlace != null) {
+                        delay(2_800)
+                        statusReporter.show(R.string.status_safety_copy_saved, safetyPlace)
                     }
                     // Font outcome was previously invisible: if the backup
                     // carried fonts that could not be restored (or new ones
@@ -190,7 +258,7 @@ class BackupViewModel @Inject constructor(
                         // commit phase), so plainly report the cancellation.
                         statusReporter.show(R.string.status_cancelled)
                     } else {
-                        statusReporter.show(R.string.status_import_failed, it.localizedMessage ?: StatusMessage.Res(R.string.status_error_unknown))
+                        statusReporter.show(R.string.status_import_failed, friendlyError(it))
                     }
                 }
             } finally {

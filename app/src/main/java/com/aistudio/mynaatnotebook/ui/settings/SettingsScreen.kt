@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import com.aistudio.mynaatnotebook.BuildConfig
 import com.aistudio.mynaatnotebook.R
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +69,7 @@ import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.data.CustomFontStore
+import com.aistudio.mynaatnotebook.data.drive.driveBackupEntryCount
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
 import com.aistudio.mynaatnotebook.viewmodel.resolve
@@ -117,6 +119,7 @@ fun SettingsScreen(
     val drivePendingRestoreUri by driveViewModel.pendingRestoreUri.collectAsStateWithLifecycle()
     val driveConsentIntent by driveViewModel.consentIntent.collectAsStateWithLifecycle()
     val driveEmptySyncConfirm by driveViewModel.emptySyncConfirm.collectAsStateWithLifecycle()
+    val driveRestoreChoices by driveViewModel.restoreChoices.collectAsStateWithLifecycle()
     var driveDisconnectConfirm by remember { mutableStateOf(false) }
 
     // Which font picker is open: "reader", "title", or null.
@@ -485,9 +488,13 @@ fun SettingsScreen(
                 TextButton(
                     onClick = {
                         exportChoiceTarget = null
-                        val fileName = "NaatNotebook_backup" +
-                            (if (entriesOnly) "_entries" else "") +
-                            "_${System.currentTimeMillis()}.zip"
+                        // UX batch 1 (audit B4): a human date in the name,
+                        // so the right file can be found months later.
+                        val stamp = java.text.SimpleDateFormat(
+                            "yyyy-MM-dd_HHmm", java.util.Locale.US
+                        ).format(java.util.Date())
+                        val fileName = "NaatBook_backup_$stamp" +
+                            (if (entriesOnly) "_entries" else "") + ".zip"
                         when (target) {
                             ExportTarget.APP_FOLDER ->
                                 backupViewModel.backupNotebookToAppFolder(fileName, entriesOnly)
@@ -980,6 +987,52 @@ fun SettingsScreen(
             )
         }
 
+        // UX batch 1 (audit B1): with several backups in Drive, restore
+        // asks which one — date and entry count per backup, newest first —
+        // instead of blindly downloading the newest.
+        driveRestoreChoices?.let { choices ->
+            AlertDialog(
+                onDismissRequest = { driveViewModel.dismissRestoreChoices() },
+                title = { Text(stringResource(R.string.drive_restore_choose_title)) },
+                text = {
+                    Column {
+                        choices.forEach { info ->
+                            val dateText = info.createdAtMs?.let { ms ->
+                                java.text.SimpleDateFormat(
+                                    "d MMM yyyy, h:mm a", java.util.Locale.getDefault()
+                                ).format(java.util.Date(ms))
+                            } ?: stringResource(R.string.drive_restore_date_unknown)
+                            val count = driveBackupEntryCount(info.name)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { driveViewModel.chooseRestoreBackup(info) }
+                                    .padding(vertical = 10.dp)
+                            ) {
+                                Text(dateText, fontWeight = FontWeight.SemiBold)
+                                if (count != null) {
+                                    Text(
+                                        pluralStringResource(
+                                            R.plurals.drive_restore_backup_count, count, count
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { driveViewModel.dismissRestoreChoices() }) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
+                },
+                modifier = Modifier.testTag("drive_restore_chooser")
+            )
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         // 4. Google Drive Backup (online, opt-in)
@@ -1051,6 +1104,7 @@ fun SettingsScreen(
                         // Pure action row: no trailing glyph (trailing grammar).
                         trailing = {},
                         onClick = { driveViewModel.restoreLatest() }
+                        // (restoreLatest now lists the backups first — see DriveViewModel)
                     )
                     SettingsRowDivider()
                     SettingsActionRow(

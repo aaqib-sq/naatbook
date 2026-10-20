@@ -51,6 +51,13 @@ class DriveException(
 /** One backup file stored in the Drive folder. */
 data class DriveBackupInfo(val fileId: String, val name: String, val createdAtMs: Long?)
 
+/**
+ * Entry count encoded in a Drive backup file name ("...-n42.zip", written
+ * by sync since the count-in-name change); null for older names.
+ */
+fun driveBackupEntryCount(fileName: String): Int? =
+    Regex("""-n(\d+)\.zip$""").find(fileName)?.groupValues?.get(1)?.toIntOrNull()
+
 /** Outcome of a sync attempt (audit round 2, S1/S2). */
 sealed interface SyncOutcome {
     /** A backup was uploaded; [count] entries went up. */
@@ -232,6 +239,18 @@ class DriveSyncManager @Inject constructor(
                         ?: throw DriveException("No backup found in Drive", noBackup = true)
                     val target = File(context.cacheDir, RESTORE_ZIP_NAME)
                     downloadFile(token, newest.fileId, target, onProgress)
+                    target
+                }
+            }
+        }
+
+    /** Download one chosen Drive backup into the cache dir for restore. */
+    suspend fun downloadBackup(fileId: String, onProgress: (Float) -> Unit): Result<File> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                withApi { token ->
+                    val target = File(context.cacheDir, RESTORE_ZIP_NAME)
+                    downloadFile(token, fileId, target, onProgress)
                     target
                 }
             }
