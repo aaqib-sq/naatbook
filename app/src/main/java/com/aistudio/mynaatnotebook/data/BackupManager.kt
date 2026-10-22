@@ -466,6 +466,17 @@ class BackupManager @Inject constructor(
      * transaction). Any pre-commit failure leaves the notebook untouched; a database
      * failure rolls back only files created by this attempt.
      */
+    /**
+     * Audit fix H3: rewrite a "custom:<backupId>" font override to the
+     * local UUID an identical font already has. Non-custom values and
+     * unmapped ids pass through untouched.
+     */
+    private fun remapFontOverride(value: String?, remap: Map<String, String>): String? {
+        if (value == null || !value.startsWith("custom:")) return value
+        val mapped = remap[value.removePrefix("custom:")] ?: return value
+        return "custom:$mapped"
+    }
+
     suspend fun importBackup(
         inputUri: Uri,
         mode: ImportMode = ImportMode.MERGE,
@@ -487,7 +498,44 @@ class BackupManager @Inject constructor(
             // (first occurrence wins). The exporter never produces this;
             // only a hand-made file can. In-archive duplicates stay counted
             // in `skipped` for MERGE so the result stays truthful.
-            val planEntries = plan.entries.distinctBy { it.signature }
+            val dedupedEntries = plan.entries.distinctBy { it.signature }
+            // Audit fix H3: restore the backup's fonts BEFORE the entities
+            // land, so a byte-identical font that already exists locally
+            // under another UUID can be remapped (custom:<backupId> ->
+            // custom:<existingId>) on every restored entry. MERGE
+            // adoptions inherit the remap too — they are derived from
+            // these planned entities below. (Caveat: fonts adopted here
+            // stay adopted even if the later commit fails — same as any
+            // standalone font import, and a retry finds them already
+            // present instead of duplicating them.)
+            var fontsAdded = 0
+            var fontsFailed = 0
+            val fontIdRemap = mutableMapOf<String, String>()
+            staged.fontMeta.forEach { (fontId, fontName) ->
+                val stagedFile = staged.fontsByArchivePath.values
+                    .firstOrNull { it.name.substringBefore('.') == fontId }
+                if (stagedFile == null) {
+                    fontsFailed++
+                } else {
+                    when (val result = runCatching {
+                        customFontStore.restoreFont(fontId, fontName, stagedFile)
+                    }.getOrNull()) {
+                        CustomFontStore.FontRestoreResult.Adopted -> fontsAdded++
+                        is CustomFontStore.FontRestoreResult.Duplicate ->
+                            fontIdRemap[fontId] = result.existingId
+                        CustomFontStore.FontRestoreResult.Rejected -> fontsFailed++
+                        else -> Unit // AlreadyPresent or unexpected: nothing lost
+                    }
+                }
+            }
+            val planEntries = if (fontIdRemap.isEmpty()) dedupedEntries else dedupedEntries.map { planned ->
+                planned.copy(
+                    entity = planned.entity.copy(
+                        readerFontOverride = remapFontOverride(planned.entity.readerFontOverride, fontIdRemap),
+                        titleFontOverride = remapFontOverride(planned.entity.titleFontOverride, fontIdRemap)
+                    )
+                )
+            }
             // Snapshot of the current library: in MERGE it drives duplicate
             // skipping; in REPLACE its rows are removed together with the
             // commit, so any pre-commit failure leaves the library untouched.
@@ -609,28 +657,9 @@ class BackupManager @Inject constructor(
                 runCatching { repository.update(updated) }
             }
             onProgress(0.96f)
-            // Adopt the backup's imported fonts (new ids only, cap applies;
-            // each file is re-validated by the font store before adoption).
-            // Audit fix: count the outcome — fonts used to be dropped
-            // silently (duplicate content, cap, invalid file) while the
-            // success message only ever mentioned entries.
-            var fontsAdded = 0
-            var fontsFailed = 0
-            staged.fontMeta.forEach { (fontId, fontName) ->
-                val stagedFile = staged.fontsByArchivePath.values
-                    .firstOrNull { it.name.substringBefore('.') == fontId }
-                if (stagedFile == null) {
-                    fontsFailed++
-                } else {
-                    when (runCatching {
-                        customFontStore.restoreFont(fontId, fontName, stagedFile)
-                    }.getOrNull()) {
-                        CustomFontStore.FontRestoreResult.ADOPTED -> fontsAdded++
-                        CustomFontStore.FontRestoreResult.REJECTED -> fontsFailed++
-                        else -> Unit // ALREADY_PRESENT or unexpected: nothing lost
-                    }
-                }
-            }
+            // Audit fix H3: fonts were already restored (and overrides
+            // remapped) before the entities landed — see above. Nothing
+            // left to do here; the counters below carry that outcome.
             onProgress(1f)
             sweepOrphanImportedAudio()
             ImportResult(committed, skipped, removedExisting, fontsAdded, fontsFailed)
