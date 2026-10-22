@@ -701,16 +701,17 @@ class NaatViewModel @Inject constructor(
 
     /**
      * Reader play tap (UX batch 4, Arena A14): when this entry's file has a
-     * remembered position, the session is rebuilt at that point (the same
-     * paused-at-position restore the process-death path uses) and then
-     * started; otherwise playback simply begins from the top.
+     * remembered position, playback starts AT that point in one service
+     * round-trip (Audit fix H1). The old restoreEntry (autoplay = false) +
+     * synchronous resume() raced the async service start and left the
+     * track loaded but paused; restoreEntry stays only for the
+     * process-death path, which genuinely wants a paused session.
      */
     fun startEntryPlaybackResuming(naat: NaatEntity, path: String) {
         viewModelScope.launch {
             val saved = runCatching { settingsStore.getAudioPosition(naat.id) }.getOrNull()
             if (saved != null && saved.second == path && saved.first > 5_000L) {
-                playbackController.restoreEntry(naat, saved.first, path)
-                playbackController.resume()
+                playbackController.playEntry(naat, path, startPositionMs = saved.first)
             } else {
                 playbackController.playEntry(naat, path)
             }

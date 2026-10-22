@@ -118,7 +118,8 @@ class Media3PlaybackEngine @Inject constructor(
         mediaId: String,
         title: String,
         artist: String?,
-        notifyPreviousOwner: Boolean = true
+        notifyPreviousOwner: Boolean = true,
+        startPositionMs: Long = 0L
     ) {
         check(!released) { "Playback engine has been released" }
         clear(notifyPreviousOwner)
@@ -140,6 +141,10 @@ class Media3PlaybackEngine @Inject constructor(
         _hasActiveSession.value = true
         _isPreparing.value = true
         player.prepare()
+        // Audit fix H1: a resume must seek BEFORE play() — seeking after
+        // play would race the first published position, and the old
+        // restoreEntry + synchronous resume() path left playback paused.
+        if (startPositionMs > 0L) player.seekTo(startPositionMs.coerceAtLeast(0L))
         player.play()
         publishState()
         startProgressTracking()

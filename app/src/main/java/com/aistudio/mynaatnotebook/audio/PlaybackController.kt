@@ -113,7 +113,13 @@ class PlaybackController @Inject constructor(
         playEntry(naat, path)
     }
 
-    fun playEntry(naat: NaatEntity, path: String) {
+    /**
+     * Audit fix H1: [startPositionMs] lets a resume start playing AT the
+     * saved point in one service round-trip (autoplay = true). The old
+     * restoreEntry (autoplay = false) + synchronous resume() path raced the
+     * async service start and left playback paused.
+     */
+    fun playEntry(naat: NaatEntity, path: String, startPositionMs: Long = 0L) {
         // Invalidate a delayed stop from the previous entry before requesting the
         // service again. This closes the rapid stop → play race.
         cancelPendingServiceShutdown()
@@ -126,7 +132,10 @@ class PlaybackController @Inject constructor(
         lastSavedPositionMs = 0L
         timerScope.launch { settingsStore.setLastPlayback(naat.id, 0L, path) }
         val requestToken = playbackRequests.register(
-            PlaybackRequest(path, naat.id, naat.title, naat.poet)
+            PlaybackRequest(
+                path, naat.id, naat.title, naat.poet,
+                startPositionMs = startPositionMs, autoplay = true
+            )
         )
         try {
             MediaPlaybackService.playEntry(context, requestToken)
@@ -194,15 +203,25 @@ class PlaybackController @Inject constructor(
     fun pause() {
         engine.pause()
         // Audit #21: pin the exact pause point as the resume position.
+        // Audit fix M1: also pin the per-entry audio position — the
+        // mini-player used to pause through the engine directly and skip
+        // this save entirely.
         val np = _nowPlaying.value
         if (np != null && _previewPath.value == null) {
             val pos = engine.currentPosition.value.toLong()
             lastSavedPositionMs = pos
-            timerScope.launch { settingsStore.setLastPlayback(np.naatId, pos, np.audioPath) }
+            timerScope.launch {
+                settingsStore.setLastPlayback(np.naatId, pos, np.audioPath)
+                settingsStore.setAudioPosition(np.naatId, np.audioPath, pos)
+            }
         }
     }
     fun resume() = engine.resume()
-    fun togglePlayPause() = engine.togglePlayPause()
+    /**
+     * Audit fix M1: route through [pause] (not the engine's toggle) so a
+     * mini-player pause persists the per-entry position like any other pause.
+     */
+    fun togglePlayPause() = if (engine.player.playWhenReady) pause() else resume()
     fun seekTo(positionMs: Int) = engine.seekTo(positionMs)
     fun skipForward(seconds: Int = 10) = engine.skipForward(seconds)
     fun skipBackward(seconds: Int = 10) = engine.skipBackward(seconds)
@@ -250,16 +269,30 @@ class PlaybackController @Inject constructor(
         // While an entry session runs, keep its position saved (at most
         // every ~5 s of movement, including seeks) so a system kill loses
         // only a few seconds. Preview playback never touches the point.
+        // Audit fix M1: this collector — not the Reader screen — now owns
+        // the per-entry audio position too, so progress made via the
+        // mini-player or with the screen off is saved, and a track that
+        // finishes outside the Reader forgets its point instead of
+        // resuming mid-way next time.
         timerScope.launch {
             engine.currentPosition.collect { positionMs ->
                 val np = _nowPlaying.value ?: return@collect
                 if (_previewPath.value != null) return@collect
                 val pos = positionMs.toLong()
+                val dur = engine.duration.value.toLong()
+                if (dur > 0L && pos >= dur - 1_000L) {
+                    if (lastSavedPositionMs >= 0L) {
+                        lastSavedPositionMs = -1L
+                        settingsStore.clearAudioPosition(np.naatId)
+                    }
+                    return@collect
+                }
                 if (lastSavedPositionMs < 0L ||
                     kotlin.math.abs(pos - lastSavedPositionMs) >= 5_000L
                 ) {
                     lastSavedPositionMs = pos
                     settingsStore.setLastPlayback(np.naatId, pos, np.audioPath)
+                    settingsStore.setAudioPosition(np.naatId, np.audioPath, pos)
                 }
             }
         }

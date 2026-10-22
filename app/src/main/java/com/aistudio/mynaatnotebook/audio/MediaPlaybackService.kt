@@ -83,7 +83,8 @@ class MediaPlaybackService : MediaSessionService() {
                         mediaId = "naat:${request.naatId}",
                         title = request.title,
                         artist = request.artist,
-                        notifyPreviousOwner = false
+                        notifyPreviousOwner = false,
+                        startPositionMs = request.startPositionMs
                     )
                 } else {
                     // Audit #21 restore: same session, loaded paused at the
