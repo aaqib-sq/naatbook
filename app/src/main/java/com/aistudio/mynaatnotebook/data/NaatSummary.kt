@@ -15,8 +15,9 @@ data class NaatSummary(
     val secondaryAudioPath: String?,
     val lyrics: String? = null,
     /** Per-entry title-font override (null = follow the global Settings
-     *  title font); carried here only where the feed needs per-entry title
-     *  resolution (recents). */
+     *  title font); carried wherever a feed resolves titles per-entry —
+     *  recents, and list rows since Audit fix M7 (NaatRowItem resolves
+     *  its title font from its own title's script). */
     val titleFontOverride: String? = null
 )
 

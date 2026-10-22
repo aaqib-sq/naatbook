@@ -215,6 +215,14 @@ class BackupViewModel @Inject constructor(
                     _progress.value = p.coerceIn(0f, 1f)
                 }
                 result.onSuccess { importResult ->
+                    // Audit fix L4: REPLACE removed these rows — drop
+                    // their per-entry DataStore keys now, so they never
+                    // orphan (the startup prune covers any gap).
+                    if (importResult.removedIds.isNotEmpty()) {
+                        importResult.removedIds.forEach { id ->
+                            runCatching { settingsStore.clearPerEntryKeys(id) }
+                        }
+                    }
                     if (importResult.removedExisting > 0) {
                         statusReporter.show(
                             R.string.status_import_success_replaced,

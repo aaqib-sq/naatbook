@@ -11,13 +11,13 @@ for writing, reading, recording, and organizing Naat, Hamd, and devotional poetr
 See `PRD.md` for product requirements and shipped status.
 
 **Non-negotiables:**
-- Fully offline. No `INTERNET` permission, no analytics, no accounts, no cloud sync.
+- Fully offline-capable; no analytics, no accounts. `INTERNET` exists only for user-opted Drive backup/sync — the notebook itself never needs a network.
 - `android:allowBackup="false"` — the OS must never auto-upload user data.
 - Never commit secrets: no keystores, no passwords, no API keys, no R8 mapping files.
 
 ## 2. Tech stack
 
-Kotlin · Jetpack Compose (Material3) · Hilt (DI) · Room (DB, schema v4) ·
+Kotlin · Jetpack Compose (Material3) · Hilt (DI) · Room (DB, schema v9) ·
 Preferences DataStore (settings) · Media3 (playback) · Coroutines/Flow ·
 Robolectric + JUnit (tests) · Gradle Kotlin DSL · AGP, compileSdk/targetSdk 36, minSdk 24.
 
@@ -38,14 +38,14 @@ app/src/main/java/com/aistudio/mynaatnotebook/
              EditorDraftDiskStore.kt, DraftFileCleanup.kt, OperationGate.kt,
              SettingsViewModel.kt (theme/font size), BackupViewModel.kt (export/import),
              StatusReporter.kt (shared @Singleton status/toast bus)
-  data/      Room: NaatDatabase.kt (migrations 1→4), NaatDao.kt, NaatEntity.kt,
+  data/      Room: NaatDatabase.kt (migrations 1→9), NaatDao.kt, NaatEntity.kt,
              NaatRepository.kt, BackupManager.kt (ZIP export/import, Zip-Slip guards),
              AudioFileLifecycleCoordinator.kt, SettingsStore.kt, NaatCategories.kt
   audio/     Media3PlaybackEngine.kt, MediaPlaybackService.kt (foreground service),
              PlaybackController.kt, AudioRecorder.kt, NativeResourceSafety.kt, …
   di/        DatabaseModule.kt (Hilt; explicit migrations, NO destructive fallback)
-app/src/test/          19 Robolectric/JVM test files (migrations, DAO, backup, drafts, playback)
-app/schemas/           Exported Room schemas (v1–v4), checked in deliberately
+app/src/test/          30 Robolectric/JVM test files (migrations, DAO, backup, drafts, playback)
+app/schemas/           Exported Room schemas (v1–v4 checked in; v5–v9 export skipped — needs a local JDK build, runtime-harmless)
 app/src/main/AndroidManifest.xml   Minimal permissions; exported components only where required
 .github/workflows/    build.yml (CI APK), release.yml (signed release), strix.yml (pentest)
 scripts/verify-p4.sh  Verification gate: tests + both APKs + whitespace + workflow-immutability check
@@ -106,7 +106,7 @@ CI runs the full unit suite; keep it green.
 
 ## 5. Current status (2026-10-08)
 
-- `main` is at **v1.0.0 (versionCode 1)**, DB schema v4. All PRD features shipped.
+- `main` is at **v1.0.0 (versionCode 1)**, DB schema v9. All PRD features shipped.
 - Last feature activity: 2026-09-03 (Strix workflow tuning). The app is in
   maintenance/polish state; next milestone is the **first Play Store release**
   (see PRD §8 for the pre-release checklist).
