@@ -7,7 +7,10 @@ import android.provider.OpenableColumns
 import androidx.annotation.StringRes
 import androidx.compose.ui.text.font.FontFamily
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -75,6 +78,12 @@ class CustomFontStore @Inject constructor(
     companion object {
         const val MAX_FONTS = 100
         const val MAX_FONT_BYTES = 15L * 1024 * 1024
+        /**
+         * Audit fix H4: bound for the staged ZIP copy. 100 fonts × 15 MB
+         * compress far below this; an unbounded pick used to be able to
+         * fill internal storage before any entry was even inspected.
+         */
+        const val MAX_ZIP_BYTES = 1024L * 1024 * 1024
         /**
          * Audit fix (stage 1): a backup-declared font `name` goes straight
          * into the registry and the picker UI — a hostile JSON could store a
@@ -199,6 +208,15 @@ class CustomFontStore @Inject constructor(
     private fun isDuplicate(candidate: File, existing: List<CustomFont>): Boolean {
         val candidateHash = sha256(candidate)
         return existing.any { font ->
+            val file = fileFor(font)
+            file.isFile && sha256(file) == candidateHash
+        }
+    }
+
+    /** The already-imported font whose bytes match [candidate], if any. */
+    private fun findDuplicate(candidate: File, existing: List<CustomFont>): CustomFont? {
+        val candidateHash = sha256(candidate)
+        return existing.firstOrNull { font ->
             val file = fileFor(font)
             file.isFile && sha256(file) == candidateHash
         }
@@ -374,15 +392,37 @@ class CustomFontStore @Inject constructor(
             var limitSkipped = 0
             var fontsFound = 0
             val stagedZip = File(context.cacheDir, "font-zip-${UUID.randomUUID()}.zip")
+            // Audit fix H4: hash each existing font ONCE, not once per ZIP
+            // entry — the old loop re-read every installed font from disk
+            // for every candidate (O(N^2) full-file SHA-256 reads).
+            val knownHashes = current.mapNotNull { font ->
+                fileFor(font).takeIf { it.isFile }?.let(::sha256)
+            }.toMutableSet()
             try {
                 val input = context.contentResolver.openInputStream(uri)
                     ?: throw IOException("Could not open the selected file.")
                 input.use { stream ->
-                    FileOutputStream(stagedZip).use { output -> stream.copyTo(output) }
+                    FileOutputStream(stagedZip).use { output ->
+                        // Audit fix H4: the staged copy is size-capped like
+                        // the single-file flow — an unbounded pick used to
+                        // copy first and ask questions later.
+                        val buffer = ByteArray(64 * 1024)
+                        var total = 0L
+                        while (true) {
+                            val count = stream.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            if (total > MAX_ZIP_BYTES) {
+                                throw FontImportException(R.string.settings_font_error_too_large)
+                            }
+                            output.write(buffer, 0, count)
+                        }
+                    }
                 }
                 java.util.zip.ZipFile(stagedZip).use { zip ->
                     val entries = zip.entries()
                     while (entries.hasMoreElements()) {
+                        currentCoroutineContext().ensureActive()
                         val entry = entries.nextElement()
                         if (entry.isDirectory) continue
                         val baseName = entry.name.replace('\\', '/').substringAfterLast('/')
@@ -419,20 +459,18 @@ class CustomFontStore @Inject constructor(
                                     }
                                 }
                             }
-                            when {
-                                overflow -> {
-                                    tooLarge++
-                                    temp.delete()
-                                }
-                                !validateFontFile(temp) -> {
-                                    invalid++
-                                    temp.delete()
-                                }
-                                isDuplicate(temp, current) -> {
+                            if (overflow) {
+                                tooLarge++
+                                temp.delete()
+                            } else if (!validateFontFile(temp)) {
+                                invalid++
+                                temp.delete()
+                            } else {
+                                val tempHash = sha256(temp)
+                                if (tempHash in knownHashes) {
                                     duplicates++
                                     temp.delete()
-                                }
-                                else -> {
+                                } else {
                                     val id = UUID.randomUUID().toString()
                                     val fileName = "$id.$ext"
                                     val destination = File(fontsDir, fileName)
@@ -448,15 +486,27 @@ class CustomFontStore @Inject constructor(
                                         uniqueName(display, current),
                                         fileName
                                     )
+                                    knownHashes += tempHash
                                     imported++
                                 }
                             }
+                        } catch (e: CancellationException) {
+                            // Audit fix H4: cancellation must propagate —
+                            // swallowing it left the loop running after the
+                            // user cancelled the import.
+                            temp.delete()
+                            throw e
                         } catch (e: Exception) {
                             temp.delete()
                             invalid++
                         }
                     }
                 }
+            } catch (e: CancellationException) {
+                // Audit fix H4: landed fonts stay landed, but the
+                // cancellation itself must still propagate to the caller.
+                if (imported > 0) writeRegistry(current)
+                throw e
             } catch (e: FontImportException) {
                 throw e
             } catch (e: Exception) {
@@ -482,8 +532,22 @@ class CustomFontStore @Inject constructor(
         target
     }
 
-    /** Outcome of a backup font restore, so the caller can report honestly. */
-    enum class FontRestoreResult { ADOPTED, ALREADY_PRESENT, REJECTED }
+    /**
+     * Outcome of a backup font restore, so the caller can report honestly
+     * and remap overrides. Audit fix H3: a byte-identical duplicate used to
+     * return the same ALREADY_PRESENT as an exact-id match, so the caller
+     * could never learn the local UUID to remap "custom:<backupId>" to.
+     */
+    sealed interface FontRestoreResult {
+        /** A new font id was adopted into the registry. */
+        data object Adopted : FontRestoreResult
+        /** This exact id is already in the registry — nothing to do. */
+        data object AlreadyPresent : FontRestoreResult
+        /** Byte-identical content already exists under [existingId]. */
+        data class Duplicate(val existingId: String) : FontRestoreResult
+        /** Rejected (bad staged name, invalid file, or registry full). */
+        data object Rejected : FontRestoreResult
+    }
 
     /**
      * Backup restore hook: adopt a staged font file (already extracted by
@@ -494,21 +558,21 @@ class CustomFontStore @Inject constructor(
      */
     suspend fun restoreFont(id: String, name: String, stagedFile: File): FontRestoreResult =
         withContext(Dispatchers.IO) {
-            if (!stagedFile.name.startsWith(id)) return@withContext FontRestoreResult.REJECTED
+            if (!stagedFile.name.startsWith(id)) return@withContext FontRestoreResult.Rejected
             val current = fonts.first()
-            if (current.any { it.id == id }) return@withContext FontRestoreResult.ALREADY_PRESENT
-            if (!validateFontFile(stagedFile)) return@withContext FontRestoreResult.REJECTED
-            if (isDuplicate(stagedFile, current)) {
-                return@withContext FontRestoreResult.ALREADY_PRESENT
+            if (current.any { it.id == id }) return@withContext FontRestoreResult.AlreadyPresent
+            if (!validateFontFile(stagedFile)) return@withContext FontRestoreResult.Rejected
+            findDuplicate(stagedFile, current)?.let {
+                return@withContext FontRestoreResult.Duplicate(it.id)
             }
-            if (current.size >= MAX_FONTS) return@withContext FontRestoreResult.REJECTED
+            if (current.size >= MAX_FONTS) return@withContext FontRestoreResult.Rejected
             val fileName = stagedFile.name
             val destination = File(fontsDir, fileName)
             if (!stagedFile.renameTo(destination)) {
                 stagedFile.copyTo(destination, overwrite = true)
             }
             writeRegistry(current + CustomFont(id, uniqueName(sanitizeRestoredFontName(name), current), fileName))
-            FontRestoreResult.ADOPTED
+            FontRestoreResult.Adopted
         }
 
     /**
@@ -534,7 +598,12 @@ class CustomFontStore @Inject constructor(
     suspend fun pruneStaleImportTemps() = withContext(Dispatchers.IO) {
         val cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000
         context.cacheDir.listFiles()?.forEach { file ->
-            if (file.name.startsWith("font-import-") && file.lastModified() < cutoff) {
+            // Audit fix H4: the batch path also stages "font-zip-*.zip"
+            // and "font-zip-entry-*" files — the old prefix-only sweep
+            // left those in cache forever after a mid-import process death.
+            if ((file.name.startsWith("font-import-") || file.name.startsWith("font-zip-")) &&
+                file.lastModified() < cutoff
+            ) {
                 file.delete()
             }
         }

@@ -19,6 +19,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -139,6 +140,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val removed = customFontStore.pruneBrokenEntries()
             if (removed.isNotEmpty()) {
+                // Audit fix L6: like deleteCustomFont, an active choice
+                // pointing at a pruned font must fall back to its default
+                // instead of referencing a registry entry that no longer
+                // exists. Stored values are read directly — the StateFlow
+                // collects above may not have emitted yet at this point.
+                val removedKeys = removed.mapTo(mutableSetOf()) { FontChoices.customKey(it.id) }
+                if (settingsStore.readerFont.first() in removedKeys) setReaderFont(FontChoices.AUTO)
+                if (settingsStore.titleFont.first() in removedKeys) setTitleFont(FontChoices.SANS)
                 statusReporter.show(R.string.status_fonts_pruned, removed.size)
             }
             customFontStore.pruneStaleImportTemps()
