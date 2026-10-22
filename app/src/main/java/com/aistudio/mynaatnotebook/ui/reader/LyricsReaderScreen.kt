@@ -262,6 +262,10 @@ fun LyricsReaderScreen(
             viewModel.playbackController.nowPlaying.value?.naatId == naat.id
         viewModel.loadNaat(entryId, onLoaded = { entry ->
             viewModel.selectNaat(entry)
+            // Audit fix L1: a neighbour opened from the Reader counts as
+            // opened, exactly like a normal open — otherwise it never rises
+            // in "Recent Notebooks".
+            viewModel.recordEntryOpened(entry.id)
             if (keepPlaying) {
                 entry.audioPath?.let { path ->
                     viewModel.startEntryPlaybackResuming(entry, path)
@@ -1011,24 +1015,12 @@ private fun ReaderAudioControls(
         lastDurationPath == selectedPath -> lastDuration
         else -> 0
     }
-    // UX batch 4 (Arena A14): per-entry audio position memory. While this
-    // entry's file plays, its stop point is kept current (about every 5 s
-    // of movement, the cadence the controller's own saver uses); reaching
-    // the end forgets the point, so a finished kalam starts from the top.
-    var lastSavedAudioPosition by remember(naat.id, selectedPath) { mutableStateOf(-1) }
-    LaunchedEffect(playerPosition, ownsSelected) {
-        if (ownsSelected &&
-            kotlin.math.abs(playerPosition - lastSavedAudioPosition) >= 5_000
-        ) {
-            lastSavedAudioPosition = playerPosition
-            viewModel.saveAudioPosition(naat.id, selectedPath, playerPosition.toLong())
-        }
-    }
-    LaunchedEffect(playerPosition, duration, ownsSelected) {
-        if (ownsSelected && duration > 0 && playerPosition >= duration - 1_000) {
-            viewModel.clearAudioPosition(naat.id)
-        }
-    }
+    // Audit fix M1: per-entry audio position persistence now lives in
+    // PlaybackController (its position collector + pause()), not in this
+    // screen — the old effects never ran while listening via the
+    // mini-player or with the screen off, so background progress was lost
+    // and finished tracks resumed mid-way. Nothing is needed here anymore;
+    // the controller saves every ~5 s and forgets the point at track end.
     val selectedType = attachments.firstOrNull { it.second == selectedPath }?.first ?: attachments.first().first
 
     val speed by controller.playbackSpeed.collectAsStateWithLifecycle()
