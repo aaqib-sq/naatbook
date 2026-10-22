@@ -215,7 +215,16 @@ fun NaatApp(
         if (!navigationDebouncePassed()) return
         viewModel.loadNaat(
             id = id,
-            onLoaded = { naat -> viewModel.startEditNaat(naat) },
+            // Audit fix H2: the same parked-draft guard as openEditorEntry.
+            // Without it, tapping Edit on a Library row silently destroyed
+            // a parked "Save draft for later" draft and its audio.
+            onLoaded = { naat ->
+                if (viewModel.keptDraftPending && viewModel.editorDraft.value.editingId != naat.id) {
+                    keptDraftPrompt = KeptDraftPrompt.EditEntry(naat)
+                } else {
+                    viewModel.startEditNaat(naat)
+                }
+            },
             onFailure = { /* debounce expires on its own; nothing to reset */ }
         )
     }

@@ -160,8 +160,11 @@ private fun EditorHeader(viewModel: NaatViewModel, onClose: () -> Unit) {
             fontWeight = FontWeight.Bold
         )
         IconButton(
+            // Audit fix L2: closing during an attach is safe — the close
+            // path (Audit #18) cancels the attach first. Disabling X here
+            // trapped the user in the editor for the whole attach.
             onClick = onClose,
-            enabled = !isSaving && !isAttaching,
+            enabled = !isSaving,
             modifier = Modifier.testTag("close_add_modal")
         ) {
             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.editor_close_cd))
