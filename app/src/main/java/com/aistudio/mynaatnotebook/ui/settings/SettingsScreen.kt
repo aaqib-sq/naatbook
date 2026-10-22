@@ -308,7 +308,13 @@ fun SettingsScreen(
         }
         if (!confirmReplace) {
             AlertDialog(
-                onDismissRequest = { pendingImportUri = null },
+                // Audit fix M4: dismissing here must delete the downloaded
+                // drive-restore.zip — the restore path's finally block
+                // never runs when the dialog is dismissed.
+                onDismissRequest = {
+                    backupViewModel.deleteDriveRestoreCopy(uri)
+                    pendingImportUri = null
+                },
                 title = { Text(stringResource(R.string.settings_import_confirm_title)) },
                 text = {
                     Column {
@@ -383,14 +389,24 @@ fun SettingsScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { pendingImportUri = null }) {
+                    // Audit fix M4: cancelling must delete the downloaded
+                    // drive-restore.zip, not just close the dialog.
+                    TextButton(onClick = {
+                        backupViewModel.deleteDriveRestoreCopy(uri)
+                        pendingImportUri = null
+                    }) {
                         Text(stringResource(R.string.action_cancel))
                     }
                 }
             )
         } else {
             AlertDialog(
-                onDismissRequest = { pendingImportUri = null },
+                // Audit fix M4: same cleanup as the first dialog — a
+                // dismissed replace confirmation must not strand the file.
+                onDismissRequest = {
+                    backupViewModel.deleteDriveRestoreCopy(uri)
+                    pendingImportUri = null
+                },
                 title = { Text(stringResource(R.string.settings_import_replace_title)) },
                 text = {
                     Column {
@@ -426,7 +442,12 @@ fun SettingsScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { pendingImportUri = null }) {
+                    // Audit fix M4: cancelling must delete the downloaded
+                    // drive-restore.zip, not just close the dialog.
+                    TextButton(onClick = {
+                        backupViewModel.deleteDriveRestoreCopy(uri)
+                        pendingImportUri = null
+                    }) {
                         Text(stringResource(R.string.action_cancel))
                     }
                 },
@@ -867,7 +888,14 @@ fun SettingsScreen(
                         // One-tap export into Download/NaatBook (approved
                         // design) — no picker for the common case. The type
                         // chooser dialog decides full vs entries-only.
-                        exportChoiceTarget = ExportTarget.APP_FOLDER
+                        // Audit fix M2: the app-folder destination needs
+                        // Android 10+, so older devices go straight to
+                        // the place chooser instead of failing later.
+                        exportChoiceTarget = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                            ExportTarget.APP_FOLDER
+                        } else {
+                            ExportTarget.CHOOSE_PLACE
+                        }
                     },
                     trailing = {
                         // Separate tap target (not part of the row's tap):

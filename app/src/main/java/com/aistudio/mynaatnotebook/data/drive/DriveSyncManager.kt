@@ -527,10 +527,14 @@ class DriveSyncManager @Inject constructor(
                 }
                 output.fd.sync()
             }
-        } catch (e: CancellationException) {
-            // Don't leave a half-downloaded restore file behind.
+        } catch (t: Throwable) {
+            // Audit fix M4: don't leave a half-downloaded restore file
+            // behind on ANY failure — the old code only cleaned up on
+            // cancellation, so a mid-download network error stranded the
+            // partial drive-restore.zip in cache. The error still
+            // propagates, so cancellation semantics are unchanged.
             runCatching { target.delete() }
-            throw e
+            throw t
         }
         onProgress(1f)
     }

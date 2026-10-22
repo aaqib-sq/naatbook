@@ -282,7 +282,15 @@ class BackupViewModel @Inject constructor(
      * import was fed by it. Anything else (a user-picked backup) is left
      * strictly alone.
      */
-    private fun deleteDriveRestoreCopy(uri: Uri) {
+    /**
+     * Audit fix M4: deletes the downloaded drive-restore.zip, but only
+     * when [uri] actually IS that cache file (other schemes/paths are a
+     * no-op). Besides the restore flow's finally block, the import
+     * dialog's dismiss/cancel paths call this — cancelling the
+     * Merge/Replace prompt never reached the finally block, so the file
+     * used to strand in cache.
+     */
+    fun deleteDriveRestoreCopy(uri: Uri) {
         if (uri.scheme != "file") return
         runCatching {
             val file = File(uri.path ?: return)

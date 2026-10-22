@@ -291,10 +291,14 @@ class BackupManager @Inject constructor(
             val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
             var pendingUri: Uri? = null
             runCatching {
-                val entryCount = writeBackupZip(stagedZip, onProgress, entriesOnly)
+                // Audit fix M2: the Android 10 gate must run BEFORE
+                // building the ZIP — on Android 7-9 the old order hashed
+                // and compressed the whole library (up to 85% progress)
+                // and only then failed the check.
                 check(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     "The NaatBook folder needs Android 10 or newer — please use Choose another place"
                 }
+                val entryCount = writeBackupZip(stagedZip, onProgress, entriesOnly)
                 val resolver = context.contentResolver
                 val values = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
@@ -375,6 +379,12 @@ class BackupManager @Inject constructor(
             // impossible for a change signal (it is not a security hash).
             append(naats.sumOf { it.updatedAt * 31L + it.id }).append('|')
             append(naats.sumOf { (it.lyrics?.length ?: 0).toLong() }).append('|')
+            // Audit fix M5: starring/unstarring never touched updatedAt,
+            // and the hash never saw isFavorite — so favorite-only
+            // changes never triggered Drive auto-sync. (A changed
+            // formula simply triggers one fresh sync; it is a change
+            // signal, not a stored format.)
+            append(naats.filter { it.isFavorite }.sumOf { it.id * 17L + 1L }).append('|')
             append(fonts.joinToString(",") { font ->
                 val file = customFontStore.fileFor(font)
                 "${font.id}:${file.length()}:${file.lastModified()}"
