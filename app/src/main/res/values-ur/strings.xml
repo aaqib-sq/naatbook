@@ -369,6 +369,12 @@
     <string name="status_drive_sync_failed">ڈرائیو پر بھیجنا ناکام: %1$s</string>
     <string name="status_drive_downloading">ڈرائیو سے بیک اپ اُتارا جا رہا ہے...</string>
     <string name="status_drive_download_failed">ڈرائیو سے بیک اپ اُتارنا ناکام: %1$s</string>
+    <!-- Audit fix M3: localized Drive error texts — the raw English
+         DriveException message must never reach a toast. -->
+    <string name="status_drive_error_network">نیٹ ورک کی خرابی — اپنا کنکشن چیک کر کے دوبارہ کوشش کریں</string>
+    <string name="status_drive_error_verify">اپ لوڈ کی جانچ ناکام رہی — دوبارہ بھیجیں</string>
+    <string name="status_drive_error_upload">ڈرائیو پر اپ لوڈ ناکام رہا — دوبارہ کوشش کریں</string>
+    <string name="status_drive_error_generic">ڈرائیو کی درخواست ناکام رہی — دوبارہ کوشش کریں</string>
     <string name="status_drive_no_backup">ڈرائیو میں ابھی کوئی بیک اپ نہیں — پہلے بھیجیں</string>
     <string name="status_drive_disconnected">گوگل اکاؤنٹ الگ کر دیا گیا</string>
     <string name="status_drive_consent_needed">جاری رکھنے کے لیے گوگل کو آپ کی اجازت چاہیے</string>

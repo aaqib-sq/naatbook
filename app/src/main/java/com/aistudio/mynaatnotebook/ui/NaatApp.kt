@@ -109,13 +109,12 @@ fun NaatApp(
     val onboardingSeen by settingsViewModel.onboardingSeen.collectAsStateWithLifecycle()
     var introRequested by rememberSaveable { mutableStateOf(false) }
     val foldersWithEntries by settingsViewModel.foldersWithEntries.collectAsStateWithLifecycle()
-    // Title font resolved once here and handed to the surfaces that render
-    // entry titles with the GLOBAL font (library rows, mini player).
-    // The recents strip and the Reader top bar resolve per-entry from the
-    // same choice, so they take the raw choice + custom families as well.
+    // Raw title choice + custom families for the title surfaces. Every
+    // surface resolves per-entry from its title's script (Audit fix M7);
+    // the old single global family (urduScript = false) fell back to
+    // SansSerif for Urdu titles whenever the choice was AUTO.
     val titleFontChoice by settingsViewModel.titleFont.collectAsStateWithLifecycle()
     val customFamilies by settingsViewModel.customFamilies.collectAsStateWithLifecycle()
-    val titleFontFamily = FontChoices.resolveTitle(titleFontChoice, urduScript = false, customFamilies)
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val isAttaching by viewModel.isAttachingFile.collectAsStateWithLifecycle()
     // Arena E1: the parked-draft prompt names the draft it asks about.
@@ -383,7 +382,6 @@ fun NaatApp(
                                         onAddEntry = ::openAdd,
                                         foldersWithEntries = foldersWithEntries,
                                         onFoldersSeen = settingsViewModel::markFoldersWithEntries,
-                                        titleFontFamily = titleFontFamily,
                                         titleFontChoice = titleFontChoice,
                                         customFamilies = customFamilies
                                     )

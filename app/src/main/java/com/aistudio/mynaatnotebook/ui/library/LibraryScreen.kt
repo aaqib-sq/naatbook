@@ -75,9 +75,10 @@ fun LibraryScreen(
     onAddEntry: () -> Unit,
     foldersWithEntries: Set<String>,
     onFoldersSeen: (Set<String>) -> Unit,
-    titleFontFamily: FontFamily,
-    // Raw title choice + custom families: only the recents strip resolves
-    // titles per-entry; list rows keep the global titleFontFamily above.
+    // Raw title choice + custom families: every title surface resolves
+    // per-entry from its own title's script (Audit fix M7). The old
+    // global titleFontFamily (resolved with urduScript = false) fell
+    // back to SansSerif for Urdu titles whenever the choice was AUTO.
     titleFontChoice: String,
     customFamilies: Map<String, FontFamily>
 ) {
@@ -536,7 +537,8 @@ fun LibraryScreen(
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
                             onEditClick = { onEdit(naat.id) },
-                            titleFontFamily = titleFontFamily
+                            titleFontChoice = titleFontChoice,
+                            customFamilies = customFamilies
                         )
                         }
                     }
@@ -566,7 +568,15 @@ fun LibraryScreen(
                     // like the folder cards on Home already do.
                     text = stringResource(CategoryDisplay.displayNameRes(selectedFolder ?: "")),
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    // Audit fix M7: synthetic Bold muddies Arabic-script
+                    // joins; the heading is Bold only for Latin names.
+                    fontWeight = if (usesArabicScript(
+                        stringResource(CategoryDisplay.displayNameRes(selectedFolder ?: ""))
+                    )) {
+                        FontWeight.Normal
+                    } else {
+                        FontWeight.Bold
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -703,7 +713,8 @@ fun LibraryScreen(
                             onDeleteClick = { deleteCandidate = naat },
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
                             onEditClick = { onEdit(naat.id) },
-                            titleFontFamily = titleFontFamily
+                            titleFontChoice = titleFontChoice,
+                            customFamilies = customFamilies
                         )
                     }
                 }
@@ -806,7 +817,15 @@ fun FolderSleekCard(
                         fontSize = 20.sp,
                         lineHeight = 36.sp
                     ),
-                    fontWeight = FontWeight.Bold,
+                    // Audit fix M7: synthetic Bold muddies Arabic-script
+                    // joins; the folder name is Bold only for Latin names.
+                    fontWeight = if (usesArabicScript(
+                        stringResource(CategoryDisplay.displayNameRes(folder))
+                    )) {
+                        FontWeight.Normal
+                    } else {
+                        FontWeight.Bold
+                    },
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -936,7 +955,13 @@ fun RecentNaatCard(
                 Text(
                     text = naat.title,
                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
-                    fontWeight = FontWeight.Bold,
+                    // Audit fix M7: synthetic Bold muddies Nastaliq joins;
+                    // the card title is Bold only for Latin titles.
+                    fontWeight = if (usesArabicScript(naat.title)) {
+                        FontWeight.Normal
+                    } else {
+                        FontWeight.Bold
+                    },
                     fontFamily = titleFontFamily,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center,
@@ -1059,8 +1084,18 @@ fun NaatRowItem(
     onDeleteClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     onEditClick: () -> Unit,
-    titleFontFamily: FontFamily = FontFamily.SansSerif
+    // Audit fix M7: the row resolves its title font from this title's
+    // script (like the recents strip already did) — the old global
+    // family, resolved with urduScript = false, fell back to SansSerif
+    // for Urdu titles whenever the choice was AUTO.
+    titleFontChoice: String,
+    customFamilies: Map<String, FontFamily>
 ) {
+    val rowTitleFamily = FontChoices.resolveTitle(
+        FontChoices.effectiveTitleChoice(naat.titleFontOverride, titleFontChoice),
+        usesArabicScript(naat.title),
+        customFamilies
+    )
     val cardBg = MaterialTheme.colorScheme.surfaceVariant
     // Playing entry: white (onBackground) border in the app's monochrome
     // identity — no accent colors, per the approved preview.
@@ -1089,8 +1124,15 @@ fun NaatRowItem(
                     Text(
                         text = naat.title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = titleFontFamily,
+                        // Audit fix M7: synthetic SemiBold muddies
+                        // Nastaliq joins; Bold-family weights apply only
+                        // to Latin titles.
+                        fontWeight = if (usesArabicScript(naat.title)) {
+                            FontWeight.Normal
+                        } else {
+                            FontWeight.SemiBold
+                        },
+                        fontFamily = rowTitleFamily,
                         color = MaterialTheme.colorScheme.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

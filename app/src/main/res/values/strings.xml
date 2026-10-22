@@ -369,6 +369,12 @@
     <string name="status_drive_sync_failed">Drive sync failed: %1$s</string>
     <string name="status_drive_downloading">Downloading the Drive backup...</string>
     <string name="status_drive_download_failed">Drive download failed: %1$s</string>
+    <!-- Audit fix M3: localized Drive error texts — the raw English
+         DriveException message must never reach a toast. -->
+    <string name="status_drive_error_network">Network error — please check your connection and try again</string>
+    <string name="status_drive_error_verify">Upload verification failed — please sync again</string>
+    <string name="status_drive_error_upload">Drive upload failed — please try again</string>
+    <string name="status_drive_error_generic">Drive request failed — please try again</string>
     <string name="status_drive_no_backup">No backup in Drive yet — sync first</string>
     <string name="status_drive_disconnected">Google account disconnected</string>
     <string name="status_drive_consent_needed">Google needs your permission to continue</string>
