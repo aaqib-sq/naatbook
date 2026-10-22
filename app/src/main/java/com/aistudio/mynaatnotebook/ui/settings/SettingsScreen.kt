@@ -120,15 +120,18 @@ fun SettingsScreen(
     val driveConsentIntent by driveViewModel.consentIntent.collectAsStateWithLifecycle()
     val driveEmptySyncConfirm by driveViewModel.emptySyncConfirm.collectAsStateWithLifecycle()
     val driveRestoreChoices by driveViewModel.restoreChoices.collectAsStateWithLifecycle()
-    var driveDisconnectConfirm by remember { mutableStateOf(false) }
+    var driveDisconnectConfirm by rememberSaveable { mutableStateOf(false) }
 
     // Which font picker is open: "reader", "title", or null.
-    var fontPickerTarget by remember { mutableStateOf<String?>(null) }
+    var fontPickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
     // Picker to return to after the font-delete dialog closes (audit #14:
     // deleting several fonts used to mean reopening the picker every time).
-    var pickerTargetBeforeDelete by remember { mutableStateOf<String?>(null) }
-    // Custom font awaiting delete confirmation.
-    var fontToDelete by remember { mutableStateOf<CustomFont?>(null) }
+    var pickerTargetBeforeDelete by rememberSaveable { mutableStateOf<String?>(null) }
+    // Custom font awaiting delete confirmation. Only the id is saved
+    // across rotation (Audit fix L3) — CustomFont itself is neither
+    // Parcelable nor Serializable, so the dialog resolves it from the
+    // live font list below instead of holding the object.
+    var fontToDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Font file picker — any file is offered; CustomFontStore validates
     // strictly (extension + magic + real parse) before anything is kept.
@@ -144,7 +147,7 @@ fun SettingsScreen(
     // honors EXTRA_INITIAL_URI on most devices (incl. Samsung).
     // The backup type (full vs entries-only) is chosen in the export chooser
     // dialog and remembered here for the SAF result callback.
-    var pendingExportEntriesOnly by remember { mutableStateOf(false) }
+    var pendingExportEntriesOnly by rememberSaveable { mutableStateOf(false) }
     val exportBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
         onResult = { result ->
@@ -155,11 +158,11 @@ fun SettingsScreen(
         }
     )
 
-    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingImportUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
     // Backup type chooser state: which export row opened it (one-tap into
     // Download/NaatBook, or the choose-another-place icon).
-    var exportChoiceTarget by remember { mutableStateOf<ExportTarget?>(null) }
+    var exportChoiceTarget by rememberSaveable { mutableStateOf<ExportTarget?>(null) }
 
     // Open zip backup launcher (same starting-point hint as export).
     val importBackupLauncher = rememberLauncherForActivityResult(
@@ -231,7 +234,7 @@ fun SettingsScreen(
             onDeleteRequest = { font ->
                 pickerTargetBeforeDelete = fontPickerTarget
                 fontPickerTarget = null
-                fontToDelete = font
+                fontToDeleteId = font.id
             },
             onImport = {
                 fontPickerTarget = null
@@ -249,13 +252,13 @@ fun SettingsScreen(
         )
     }
 
-    fontToDelete?.let { font ->
+    customFonts.firstOrNull { it.id == fontToDeleteId }?.let { font ->
         val inUse = readerFont == FontChoices.customKey(font.id) ||
             titleFont == FontChoices.customKey(font.id)
         // Closing this dialog (either way) returns to the picker it came
         // from, so removing several fonts doesn't need repeated reopening.
         val closeDelete: () -> Unit = {
-            fontToDelete = null
+            fontToDeleteId = null
             fontPickerTarget = pickerTargetBeforeDelete
             pickerTargetBeforeDelete = null
         }
@@ -298,11 +301,14 @@ fun SettingsScreen(
     }
 
     pendingImportUri?.let { uri ->
-        var importMode by remember(uri) { mutableStateOf(ImportMode.MERGE) }
-        var confirmReplace by remember(uri) { mutableStateOf(false) }
+        // Audit fix L3: dialog state survives rotation (rememberSaveable,
+        // still keyed on the uri so a new import starts fresh — an
+        // unkeyed saveable could carry a stale REPLACE choice over).
+        var importMode by rememberSaveable(uri) { mutableStateOf(ImportMode.MERGE) }
+        var confirmReplace by rememberSaveable(uri) { mutableStateOf(false) }
         // Audit 02 M1: the dialogs name the backup's entry count, so an
         // empty backup can never look identical to a full one.
-        var backupEntryCount by remember(uri) { mutableStateOf<Int?>(null) }
+        var backupEntryCount by rememberSaveable(uri) { mutableStateOf<Int?>(null) }
         LaunchedEffect(uri) {
             backupEntryCount = backupViewModel.peekEntryCount(uri)
         }

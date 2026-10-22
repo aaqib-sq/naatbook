@@ -310,6 +310,38 @@ class SettingsStore @Inject constructor(
         context.settingsDataStore.edit { it.remove(readerFontSizeKey(naatId)) }
     }
 
+    /**
+     * Audit fix L4: all three per-entry keys for one entry, as a single
+     * call — the same clears finalizePendingDelete already performs.
+     */
+    suspend fun clearPerEntryKeys(naatId: Int) {
+        clearReaderScrollOffset(naatId)
+        clearReaderFontSize(naatId)
+        clearAudioPosition(naatId)
+    }
+
+    /**
+     * Audit fix L4: drop per-entry keys (scroll, font size, audio
+     * position + path) whose entry no longer exists in Room. Keys for
+     * missing ids are inert — no UI path ever reads them — so this is
+     * bloat cleanup, and the safety net for the paths that never had an
+     * entry id in hand (process-death sweep) and any REPLACE gap.
+     */
+    suspend fun pruneOrphanPerEntryKeys(existingIds: Set<Int>) {
+        context.settingsDataStore.edit { prefs ->
+            prefs.asMap().keys
+                .filter { key ->
+                    val name = key.name
+                    val id = name.substringAfterLast("_").toIntOrNull()
+                    id != null && id !in existingIds &&
+                        (name.startsWith("reader_scroll_") ||
+                            name.startsWith("reader_font_") ||
+                            name.startsWith("audio_pos_"))
+                }
+                .forEach { prefs.remove(it) }
+        }
+    }
+
     // --- Google Drive sync state ---
 
     /** Connected Google account email for Drive sync; null = not connected. */

@@ -18,9 +18,9 @@ for writing, reading, recording, and organizing **Naat, Hamd, and other devotion
 
 1. A beautiful, dependable place to keep devotional poetry — text and voice.
 2. **Zero network dependency.** The app must be fully usable offline, forever.
-3. **Privacy by construction:** no analytics, no ads, no cloud sync, no accounts.
-   The user's notebook and voice recordings never leave the device unless the user
-   explicitly exports them.
+3. **Privacy by construction:** no analytics, no ads, no accounts. The user's
+   notebook and voice recordings never leave the device except by explicit
+   export or opt-in Drive backup/sync.
 
 ## 3. Non-goals
 

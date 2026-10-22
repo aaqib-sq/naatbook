@@ -46,7 +46,10 @@ data class ImportResult(
     val skipped: Int,
     val removedExisting: Int = 0,
     val fontsAdded: Int = 0,
-    val fontsFailed: Int = 0
+    val fontsFailed: Int = 0,
+    // Audit fix L4: ids of the rows REPLACE removed, so the caller can
+    // drop their per-entry DataStore keys immediately.
+    val removedIds: List<Int> = emptyList()
 )
 
 /** How an import treats the current library. */
@@ -643,6 +646,7 @@ class BackupManager @Inject constructor(
             val entities = newEntries.map { it.entity }
             val committed: Int
             var removedExisting = 0
+            var removedIds: List<Int> = emptyList()
             if (mode == ImportMode.REPLACE && existingEntries.isNotEmpty()) {
                 val keptPaths = entities.flatMap {
                     listOfNotNull(it.audioPath, it.secondaryAudioPath)
@@ -651,6 +655,7 @@ class BackupManager @Inject constructor(
                     entities, existingEntries.map { it.id }
                 ).size
                 removedExisting = existingEntries.size
+                removedIds = existingEntries.map { it.id }
                 // Any of the old rows' audio files the new library doesn't
                 // use are now orphans; delete them (best effort, as before).
                 existingEntries.flatMap { listOfNotNull(it.audioPath, it.secondaryAudioPath) }
@@ -672,7 +677,10 @@ class BackupManager @Inject constructor(
             // left to do here; the counters below carry that outcome.
             onProgress(1f)
             sweepOrphanImportedAudio()
-            ImportResult(committed, skipped, removedExisting, fontsAdded, fontsFailed)
+            ImportResult(
+                committed, skipped, removedExisting, fontsAdded, fontsFailed,
+                removedIds = removedIds
+            )
             }.onFailure { Log.e("BackupManager", "Import failed", it) }
                 .also { stagingDir.deleteRecursively() }
         }

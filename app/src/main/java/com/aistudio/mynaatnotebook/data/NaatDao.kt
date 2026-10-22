@@ -10,7 +10,7 @@ interface NaatDao {
 
     @Query("""
         SELECT id, title, poet, category, audioType, audioPath, isFavorite, createdAt,
-               secondaryAudioType, secondaryAudioPath
+               secondaryAudioType, secondaryAudioPath, titleFontOverride
         FROM naats ORDER BY createdAt DESC
     """)
     fun getAllSummaries(): Flow<List<NaatSummary>>
@@ -35,7 +35,7 @@ interface NaatDao {
     // diacritics or Arabic yeh/kaf used to match nothing at all.
     @Query("""
         SELECT id, title, poet, category, audioType, audioPath, isFavorite, createdAt,
-               secondaryAudioType, secondaryAudioPath
+               secondaryAudioType, secondaryAudioPath, titleFontOverride
         FROM naats
         WHERE (:folder IS NULL OR category = :folder COLLATE NOCASE)
           AND (:favoritesOnly = 0 OR isFavorite = 1)
@@ -80,9 +80,11 @@ interface NaatDao {
      */
     @Transaction
     suspend fun replaceLibrary(newNaats: List<NaatEntity>, oldIds: List<Int>): List<Long> {
-        val rowIds = insertNaats(newNaats)
+        // Audit fix L5: delete-first is strictly safer — the old rows go
+        // before the new rows land. Same single transaction, so a failure
+        // still rolls everything back; new ids are fresh, so no overlap.
         oldIds.forEach { deleteNaatById(it) }
-        return rowIds
+        return insertNaats(newNaats)
     }
 
     @Update

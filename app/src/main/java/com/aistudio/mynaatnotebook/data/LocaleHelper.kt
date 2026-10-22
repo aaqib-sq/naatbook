@@ -37,7 +37,10 @@ object LocaleHelper {
     fun wrap(base: Context): Context {
         val choice = readChoice(base)
         if (choice == SYSTEM) return base
-        val locale = Locale(choice)
+        // Audit fix L6: the Locale(String) constructor is deprecated;
+        // the choices are BCP-47 tags ("en"/"ur"), so forLanguageTag
+        // is exact here.
+        val locale = Locale.forLanguageTag(choice)
         Locale.setDefault(locale)
         val config = Configuration(base.resources.configuration)
         config.setLocale(locale)

@@ -182,6 +182,15 @@ class NaatViewModel @Inject constructor(
                 // deletion that never got its undo (process death) completes
                 // now instead of lingering as unreferenced files.
                 sweepPendingDeletes()
+                // Audit fix L4: the sweep deletes parked files but never
+                // knew the entry ids, so their DataStore keys (scroll,
+                // font size, audio position) orphaned. Prune keys whose
+                // entry no longer exists in Room — this also covers any
+                // gap the REPLACE import path leaves behind.
+                runCatching {
+                    val existingIds = repository.allNaats.first().map { it.id }.toSet()
+                    settingsStore.pruneOrphanPerEntryKeys(existingIds)
+                }
                 audioFiles.exclusive {
                     val referenced = buildSet {
                         repository.allNaats.first().forEach { naat ->
@@ -1646,6 +1655,8 @@ class NaatViewModel @Inject constructor(
     /**
      * Session-scoped undo by design: a process death during the window must
      * never resurrect half-deleted state, so relaunch completes the deletion.
+     * The sweep only ever knew parked files, not entry ids — the per-entry
+     * DataStore keys are pruned by the startup prune in init (Audit fix L4).
      */
     private fun sweepPendingDeletes() {
         runCatching {
