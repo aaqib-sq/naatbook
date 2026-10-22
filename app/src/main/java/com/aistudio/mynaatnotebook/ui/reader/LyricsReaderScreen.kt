@@ -769,17 +769,18 @@ private fun ReaderTopBar(
                             },
                             modifier = Modifier.testTag("reader_share_btn")
                         )
-                        // Share-audio keeps PR #63's exact condition (primary
-                        // file first, else secondary) — only the placement
-                        // changed, from a confusing top-bar icon to a label.
-                        if (audioShareFile != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.reader_share_audio_cd)) },
-                                leadingIcon = { Icon(Icons.Default.MusicNote, contentDescription = null) },
-                                onClick = { overflowOpen = false; shareAudioFile(readerContext, audioShareFile) },
-                                modifier = Modifier.testTag("reader_share_audio_btn")
-                            )
-                        }
+                    }
+                    // Audit fix M6: share-audio keeps PR #63's exact
+                    // condition (primary file first, else secondary), but
+                    // it must NOT hide inside hasLyrics — audio-only
+                    // entries never showed it even though the file exists.
+                    if (audioShareFile != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.reader_share_audio_cd)) },
+                            leadingIcon = { Icon(Icons.Default.MusicNote, contentDescription = null) },
+                            onClick = { overflowOpen = false; shareAudioFile(readerContext, audioShareFile) },
+                            modifier = Modifier.testTag("reader_share_audio_btn")
+                        )
                     }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.common_edit_entry)) },

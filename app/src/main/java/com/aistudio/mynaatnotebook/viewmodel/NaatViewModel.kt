@@ -775,7 +775,7 @@ class NaatViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e("NaatViewModel", "Unable to open now-playing entry", e)
-                statusReporter.show(R.string.status_open_playing_failed, e.localizedMessage ?: StatusMessage.Res(R.string.status_error_database))
+                statusReporter.show(R.string.status_open_playing_failed, StatusMessage.Res(R.string.status_error_database))
                 onResolved(false) // preserve playback when lookup itself failed
             } finally {
                 _isOpeningNowPlaying.value = false
@@ -906,7 +906,7 @@ class NaatViewModel @Inject constructor(
                 }
             } catch (error: Exception) {
                 Log.e("NaatViewModel", "Unable to start recording", error)
-                statusReporter.show(R.string.status_recording_start_failed_detail, error.localizedMessage ?: StatusMessage.Res(R.string.status_error_storage))
+                statusReporter.show(R.string.status_recording_start_failed_detail, StatusMessage.Res(R.string.status_error_storage))
             } finally {
                 recordingGate.finish()
             }
@@ -1387,7 +1387,7 @@ class NaatViewModel @Inject constructor(
                 }
             } catch (error: Exception) {
                 Log.e("NaatViewModel", "Save failed", error)
-                statusReporter.show(R.string.status_save_failed, error.localizedMessage ?: StatusMessage.Res(R.string.status_error_database))
+                statusReporter.show(R.string.status_save_failed, StatusMessage.Res(R.string.status_error_database))
                 // Keep the modal and draft files intact so the user can retry.
             } finally {
                 _isSaving.value = false
@@ -1511,7 +1511,7 @@ class NaatViewModel @Inject constructor(
                 }
             } catch (error: Exception) {
                 Log.e("NaatViewModel", "Delete failed", error)
-                statusReporter.show(R.string.status_delete_failed, error.localizedMessage ?: StatusMessage.Res(R.string.status_error_database))
+                statusReporter.show(R.string.status_delete_failed, StatusMessage.Res(R.string.status_error_database))
             } finally {
                 _isDeleting.value = false
                 deleteGate.finish()
@@ -1551,7 +1551,7 @@ class NaatViewModel @Inject constructor(
                     withContext(Dispatchers.Main.immediate) {
                         statusReporter.show(
                             R.string.status_delete_failed,
-                            error.localizedMessage ?: StatusMessage.Res(R.string.status_error_database)
+                            StatusMessage.Res(R.string.status_error_database)
                         )
                     }
                 }

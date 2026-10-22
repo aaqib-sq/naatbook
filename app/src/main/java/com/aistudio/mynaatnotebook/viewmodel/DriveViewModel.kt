@@ -365,24 +365,18 @@ class DriveViewModel @Inject constructor(
                 viewModelScope.launch { settingsStore.clearDriveState() }
                 statusReporter.show(R.string.status_drive_reconnect_needed)
             }
-            // UX batch 1 (audit S3): only DriveException messages — written
-            // in this codebase, in human words — may reach the user. Any
-            // other exception's raw text stays in the logs, not the UI.
+            // Audit fix M3: only the LOCALIZED resId reaches the user —
+            // the raw English DriveException message (sometimes raw API/IO
+            // text) stays in the logs, never in a toast, in either language.
+            // The dedicated branches above already cover consent, no-backup
+            // and reconnect cases before this fallthrough runs.
             action == PendingAction.DOWNLOAD -> statusReporter.show(
                 R.string.status_drive_download_failed,
-                if (error is DriveException) {
-                    error.message ?: StatusMessage.Res(R.string.status_error_unknown)
-                } else {
-                    StatusMessage.Res(R.string.status_error_unknown)
-                }
+                StatusMessage.Res(driveError?.resId ?: R.string.status_error_unknown)
             )
             else -> statusReporter.show(
                 R.string.status_drive_sync_failed,
-                if (error is DriveException) {
-                    error.message ?: StatusMessage.Res(R.string.status_error_unknown)
-                } else {
-                    StatusMessage.Res(R.string.status_error_unknown)
-                }
+                StatusMessage.Res(driveError?.resId ?: R.string.status_error_unknown)
             )
         }
     }

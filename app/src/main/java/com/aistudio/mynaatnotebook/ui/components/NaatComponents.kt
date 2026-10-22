@@ -237,7 +237,14 @@ fun GlobalMiniPlayer(
                 Text(
                     text = current.title,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    // Audit fix M7: synthetic SemiBold muddies Nastaliq
+                    // joins; the mini-player title is SemiBold only for
+                    // Latin titles.
+                    fontWeight = if (usesArabicScript(current.title)) {
+                        FontWeight.Normal
+                    } else {
+                        FontWeight.SemiBold
+                    },
                     fontFamily = playerTitleFamily,
                     color = fg,
                     maxLines = 1,

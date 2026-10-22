@@ -2,6 +2,8 @@ package com.aistudio.mynaatnotebook.data.drive
 
 import android.content.Context
 import android.content.Intent
+import androidx.annotation.StringRes
+import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.data.BackupManager
 import com.aistudio.mynaatnotebook.data.SettingsStore
 import com.google.android.gms.auth.GoogleAuthUtil
@@ -45,7 +47,14 @@ class DriveException(
     message: String,
     val needsReconnect: Boolean = false,
     val noBackup: Boolean = false,
-    val consentIntent: Intent? = null
+    val consentIntent: Intent? = null,
+    /**
+     * Audit fix M3: the LOCALIZED string for the UI. The raw [message] is
+     * English (sometimes raw API/IO text) and must never reach a toast —
+     * DriveViewModel renders only this resId now, so Urdu mode never
+     * shows raw English errors.
+     */
+    @StringRes val resId: Int = R.string.status_error_unknown
 ) : IOException(message)
 
 /** One backup file stored in the Drive folder. */
@@ -179,7 +188,8 @@ class DriveSyncManager @Inject constructor(
                                 ) {
                                     runCatching { deleteFile(token, newId) }
                                     throw DriveException(
-                                        "Upload verification failed — please sync again"
+                                        "Upload verification failed — please sync again",
+                                        resId = R.string.status_drive_error_verify
                                     )
                                 }
                             }
@@ -267,7 +277,10 @@ class DriveSyncManager @Inject constructor(
             } catch (e: UserRecoverableAuthException) {
                 throw DriveException("Google permission needed", consentIntent = e.intent)
             } catch (e: IOException) {
-                throw DriveException(e.message ?: "Network error")
+                throw DriveException(
+                    e.message ?: "Network error",
+                    resId = R.string.status_drive_error_network
+                )
             } catch (e: Exception) {
                 throw DriveException(
                     e.message ?: "Could not get Google permission", needsReconnect = true
@@ -287,7 +300,10 @@ class DriveSyncManager @Inject constructor(
         try {
             return block(token)
         } catch (e: DriveHttpException) {
-            if (e.code != 401) throw DriveException(e.message ?: "Drive error ${e.code}")
+            if (e.code != 401) throw DriveException(
+                e.message ?: "Drive error ${e.code}",
+                resId = R.string.status_drive_error_generic
+            )
         }
         runCatching { GoogleAuthUtil.invalidateToken(context, token) }
         token = accessToken(account)
@@ -297,7 +313,10 @@ class DriveSyncManager @Inject constructor(
             if (e.code == 401) {
                 throw DriveException("Session expired — connect again", needsReconnect = true)
             }
-            throw DriveException(e.message ?: "Drive error ${e.code}")
+            throw DriveException(
+                e.message ?: "Drive error ${e.code}",
+                resId = R.string.status_drive_error_generic
+            )
         }
     }
 
@@ -441,7 +460,10 @@ class DriveSyncManager @Inject constructor(
         currentCoroutineContext().ensureActive()
         if (initCode !in 200..299) throw DriveHttpException(initCode, errorMessage(init))
         val sessionUri = init.getHeaderField("Location")
-            ?: throw DriveException("Drive did not start the upload")
+            ?: throw DriveException(
+                "Drive did not start the upload",
+                resId = R.string.status_drive_error_upload
+            )
 
         val total = file.length()
         var offset = 0L
@@ -459,7 +481,10 @@ class DriveSyncManager @Inject constructor(
                     if (n < 0) break
                     read += n
                 }
-                if (read == 0) throw DriveException("Could not read the backup file")
+                if (read == 0) throw DriveException(
+                    "Could not read the backup file",
+                    resId = R.string.status_drive_error_upload
+                )
                 val conn = openConnection(sessionUri, token, "PUT")
                 conn.doOutput = true
                 conn.setRequestProperty("Content-Length", read.toString())
@@ -497,7 +522,10 @@ class DriveSyncManager @Inject constructor(
             onProgress(1f)
             return JSONObject(checkedBody(status)).getString("id")
         }
-        throw DriveException("Upload did not complete")
+        throw DriveException(
+            "Upload did not complete",
+            resId = R.string.status_drive_error_upload
+        )
     }
 
     private suspend fun downloadFile(

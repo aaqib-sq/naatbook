@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.aistudio.mynaatnotebook.ui.components.usesArabicScript
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -163,7 +164,17 @@ fun OnboardingScreen(onDone: () -> Unit) {
                         if (page < 3) R.string.onboarding_next else R.string.onboarding_start
                     ),
                     fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold
+                    // Audit fix M7: synthetic Bold muddies Arabic-script
+                    // joins; Bold only for Latin labels.
+                    fontWeight = if (usesArabicScript(
+                        stringResource(
+                            if (page < 3) R.string.onboarding_next else R.string.onboarding_start
+                        )
+                    )) {
+                        FontWeight.Normal
+                    } else {
+                        FontWeight.Bold
+                    }
                 )
                 if (page < 3) {
                     Spacer(modifier = Modifier.width(8.dp))
@@ -310,7 +321,12 @@ private fun PageTitleBody(title: Int, body: Int) {
     Text(
         text = stringResource(title),
         style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.ExtraBold,
+        // Audit fix M7: synthetic ExtraBold muddies Arabic-script joins.
+        fontWeight = if (usesArabicScript(stringResource(title))) {
+            FontWeight.Normal
+        } else {
+            FontWeight.ExtraBold
+        },
         color = MaterialTheme.colorScheme.onBackground,
         textAlign = TextAlign.Center
     )
@@ -590,7 +606,12 @@ private fun SceneChip(text: String, selected: Boolean) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
+            // Audit fix M7: synthetic Bold muddies Arabic-script joins.
+            fontWeight = if (usesArabicScript(text)) {
+                FontWeight.Normal
+            } else {
+                FontWeight.Bold
+            },
             color = if (selected) MaterialTheme.colorScheme.background else secondaryTextColor()
         )
     }
@@ -623,7 +644,12 @@ private fun SlimSceneButton(label: String, primary: Boolean, modifier: Modifier 
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
+            // Audit fix M7: synthetic Bold muddies Arabic-script joins.
+            fontWeight = if (usesArabicScript(label)) {
+                FontWeight.Normal
+            } else {
+                FontWeight.Bold
+            },
             color = if (primary) fg else secondaryTextColor()
         )
     }
