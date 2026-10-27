@@ -319,6 +319,11 @@
     <string name="category_name_my_kalam">میرا کلام</string>
     <string name="category_name_others">دیگر</string>
     <string name="library_entries_count">%1$d اندراجات</string>
+    <string name="library_row_menu_cd">اندراج کے اختیارات</string>
+    <plurals name="library_folder_entries">
+        <item quantity="one">1 اندراج</item>
+        <item quantity="other">%1$d اندراجات</item>
+    </plurals>
     <string name="status_playback_failed">پلے بیک شروع نہیں ہو سکا</string>
     <string name="settings_import_confirm_title">بیک اپ درآمد کریں؟</string>
     <string name="settings_import_confirm_message">اس سے بیک اپ کے اندراجات آپ کی لائبریری میں شامل ہو جائیں گے۔ جاری رکھیں؟</string>

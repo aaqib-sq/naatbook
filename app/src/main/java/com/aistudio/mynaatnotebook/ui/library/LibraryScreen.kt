@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,8 +32,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
@@ -764,7 +767,11 @@ fun LibraryScreen(
     }
 }
 
-// --- Folder Sleek Card ---
+// --- Folder Sleek Card (FINAL design, user-approved 2026-10-27) ---
+// Watermark card: one single giant faded vector behind, name centered on
+// top, count small below. No border, soft inner glow, sharper corners,
+// darker background. Manqabat's Zulfiqar tilts like a pen. No small icon
+// tile anymore — the double-icon look is gone by owner order.
 @Composable
 fun FolderSleekCard(
     folder: String,
@@ -773,44 +780,57 @@ fun FolderSleekCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val cardBg = MaterialTheme.colorScheme.surfaceVariant
-    val cardBorder = MaterialTheme.colorScheme.outline
-    // Icon chips use the inverse surface so the glyph wells read against the card
-    val iconBg = MaterialTheme.colorScheme.background
+    // Theme-safe darker card: near-black in dark themes, unchanged
+    // surfaceVariant in light themes (background luminance tells them apart).
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val cardBg = if (isDark) Color(0xFF131313) else MaterialTheme.colorScheme.surfaceVariant
+    // Soft inner glow: light catching the top of the card, fading downward.
+    val glowBrush = Brush.verticalGradient(
+        listOf(
+            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.10f),
+            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.0f)
+        )
+    )
+    val cardShape = RoundedCornerShape(12.dp)
 
     Card(
         modifier = modifier
             .height(130.dp)
-            .border(1.dp, cardBorder, RoundedCornerShape(24.dp))
             .clickable(onClick = onClick)
             .testTag("folder_card_${folder.replace(" ", "_")}"),
         colors = CardDefaults.cardColors(
             containerColor = cardBg
         ),
-        shape = RoundedCornerShape(24.dp)
+        shape = cardShape
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.End
+                .clip(cardShape),
+            contentAlignment = Alignment.Center
         ) {
+            // Glow first (bottom layer), then watermark, then text on top.
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(iconBg),
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .background(glowBrush)
+            )
+            // Single watermark vector: giant, faded, centered.
+            Icon(
+                painter = iconPainter,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.14f),
+                modifier = Modifier
+                    .size(110.dp)
+                    .then(
+                        if (folder == NaatCategories.MANQABAT) Modifier.rotate(28f)
+                        else Modifier
+                    )
+            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 8.dp)
             ) {
-                Icon(
-                    painter = iconPainter,
-                    contentDescription = stringResource(CategoryDisplay.displayNameRes(folder)),
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = stringResource(CategoryDisplay.displayNameRes(folder)),
                     style = MaterialTheme.typography.titleSmall.copy(
@@ -831,7 +851,11 @@ fun FolderSleekCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = stringResource(R.string.library_entries_count, count),
+                    text = pluralStringResource(
+                        R.plurals.library_folder_entries,
+                        count,
+                        count
+                    ),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 11.sp,
                         lineHeight = 15.sp,
@@ -1077,6 +1101,7 @@ private fun EmptyStateGuide(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun NaatRowItem(
     naat: NaatSummary,
     isPlaying: Boolean = false,
@@ -1101,12 +1126,19 @@ fun NaatRowItem(
     // identity — no accent colors, per the approved preview.
     val cardBorder = if (isPlaying) MaterialTheme.colorScheme.onBackground
                      else MaterialTheme.colorScheme.outline
+    // Entry actions live behind one very small overflow menu (owner order
+    // 2026-10-27): the pencil/heart/trash buttons are gone from the card.
+    // Long-press on the card opens the same menu.
+    var menuOpen by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .border(if (isPlaying) 1.5.dp else 1.dp, cardBorder, RoundedCornerShape(16.dp))
-            .clickable(onClick = onItemClick)
+            .combinedClickable(
+                onClick = onItemClick,
+                onLongClick = { menuOpen = true }
+            )
             .testTag("naat_row_item_${naat.id}"),
         colors = CardDefaults.cardColors(
             containerColor = cardBg
@@ -1191,34 +1223,50 @@ fun NaatRowItem(
                         tint = secondaryTextColor(), modifier = Modifier.padding(end = 4.dp).size(20.dp))
                 }
 
-                // Edit entry
-                IconButton(onClick = onEditClick, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = stringResource(R.string.common_edit_entry),
-                        tint = secondaryTextColor(),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // Favorite Quick Heart Tag
-                IconButton(onClick = onFavoriteClick, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        imageVector = if (naat.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = stringResource(R.string.library_favorite_toggle_cd),
-                        tint = if (naat.isFavorite) HighContrastRed else secondaryTextColor(),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Delete Entry
-                IconButton(onClick = onDeleteClick, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.library_delete_cd),
-                        tint = secondaryTextColor().copy(alpha = 0.6f),
-                        modifier = Modifier.size(20.dp)
-                    )
+                // One very small overflow menu: tap the dots, or
+                // long-press the card — both open Edit / Favorite / Delete.
+                Box {
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = stringResource(R.string.library_row_menu_cd),
+                            tint = secondaryTextColor(),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.common_edit_entry)) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Edit, contentDescription = null)
+                            },
+                            onClick = { menuOpen = false; onEditClick() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.library_favorite_toggle_cd)) },
+                            leadingIcon = {
+                                Icon(
+                                    if (naat.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (naat.isFavorite) HighContrastRed else MaterialTheme.colorScheme.onBackground
+                                )
+                            },
+                            onClick = { menuOpen = false; onFavoriteClick() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.library_delete_cd)) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Delete, contentDescription = null)
+                            },
+                            onClick = { menuOpen = false; onDeleteClick() }
+                        )
+                    }
                 }
             }
         }
