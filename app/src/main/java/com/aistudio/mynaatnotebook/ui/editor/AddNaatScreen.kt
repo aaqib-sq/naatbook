@@ -12,6 +12,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -262,10 +264,24 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
         // Editor top-tap fix (owner report 2026-10-27): with pasted lyrics
         // and the keyboard open, tapping the very top of the field left
         // the first line clipped above the viewport — the outer list and
-        // the field's inner scroll fought. On focus, ask the list to bring
-        // the field fully into view once the IME has settled.
+        // the field's inner scroll fought. Round 1 fired only on focus
+        // change, which never happens when the keyboard is already open
+        // and the field is already focused — so round 2 also fires on
+        // EVERY press inside the field, then asks the list to bring the
+        // field fully into view once the IME has settled.
         val lyricsBringIntoView = remember { BringIntoViewRequester() }
         val lyricsScope = rememberCoroutineScope()
+        val lyricsInteraction = remember { MutableInteractionSource() }
+        LaunchedEffect(lyricsInteraction) {
+            lyricsInteraction.interactions.collect { interaction ->
+                if (interaction is PressInteraction.Press) {
+                    lyricsScope.launch {
+                        delay(300)
+                        lyricsBringIntoView.bringIntoView()
+                    }
+                }
+            }
+        }
         EditorSectionCard {
             EditorCardLabel(stringResource(R.string.editor_lyrics_label))
             TextField(
@@ -296,6 +312,7 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
                 },
                 // Audit E2: the field grows with the kalam up to a cap
                 // instead of trapping long lyrics in a fixed 180dp slit.
+                interactionSource = lyricsInteraction,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 420.dp)
                     .bringIntoViewRequester(lyricsBringIntoView)
                     .onFocusChanged { state ->

@@ -780,56 +780,100 @@ fun FolderSleekCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Theme-safe darker card: near-black in dark themes, unchanged
-    // surfaceVariant in light themes (background luminance tells them apart).
+    // Theme-safe darker card: background luminance (app theme, not
+    // system theme) tells dark and light apart.
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val cardBg = if (isDark) Color(0xFF131313) else MaterialTheme.colorScheme.surfaceVariant
-    // Soft inner glow: light catching the top of the card, fading downward.
-    val glowBrush = Brush.verticalGradient(
-        listOf(
-            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.10f),
-            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.0f)
+    // Adapted from the Argon 4 reference implementation (owner-supplied
+    // 2026-10-28), kept app-correct: localized title/count, app-theme
+    // dark check, and the existing testTag stay as they were.
+    // Background gradient: #1E1E1E (top) -> #131313 (bottom) in dark
+    // theme; surfaceVariant gradient in light theme.
+    val backgroundBrush = if (isDark) {
+        Brush.verticalGradient(
+            0.0f to Color(0xFF1E1E1E),
+            1.0f to Color(0xFF131313)
         )
+    } else {
+        Brush.verticalGradient(
+            0.0f to MaterialTheme.colorScheme.surfaceVariant,
+            1.0f to MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
+        )
+    }
+    // Card look (owner correction 2026-10-28): the reference card's
+    // defining feature is the effect on the card itself — a clear
+    // sheen at the top edge fading down, and a soft dark shade
+    // grounding the bottom edge. Sheen peak kept at 28% (Argon's
+    // 14% repeats round 1's too-faint mistake); curve shape follows
+    // Argon's stops.
+    val topGlowBrush = Brush.verticalGradient(
+        0.0f to Color.White.copy(alpha = 0.28f),
+        0.18f to Color.White.copy(alpha = 0.10f),
+        0.5f to Color.White.copy(alpha = 0.0f)
     )
-    val cardShape = RoundedCornerShape(12.dp)
+    val bottomShadeBrush = Brush.verticalGradient(
+        0.0f to Color.Transparent,
+        0.5f to Color.Transparent,
+        0.82f to Color.Black.copy(alpha = if (isDark) 0.16f else 0.07f),
+        1.0f to Color.Black.copy(alpha = if (isDark) 0.35f else 0.15f)
+    )
+    val cardShape = RoundedCornerShape(14.dp)
 
     Card(
         modifier = modifier
             .height(130.dp)
+            .clip(cardShape)
             .clickable(onClick = onClick)
             .testTag("folder_card_${folder.replace(" ", "_")}"),
         colors = CardDefaults.cardColors(
-            containerColor = cardBg
+            containerColor = Color.Transparent
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = cardShape
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(brush = backgroundBrush)
                 .clip(cardShape),
             contentAlignment = Alignment.Center
         ) {
-            // Glow first (bottom layer), then watermark, then text on top.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(glowBrush)
-            )
-            // Single watermark vector: giant, faded, centered.
+            // Watermark first, then the card effect over it (light top,
+            // shade bottom), then text on top — text stays crisp white.
+            // Single watermark vector: fills the card, clearly visible,
+            // centered — the reference look. Round 1 (110dp/14%) was
+            // near-invisible on device; the dome shape itself fills only
+            // ~65% of its viewport, so the box must be big AND the alpha
+            // high enough to read like the reference.
             Icon(
                 painter = iconPainter,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.14f),
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f),
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(150.dp)
                     .then(
                         if (folder == NaatCategories.MANQABAT) Modifier.rotate(28f)
                         else Modifier
                     )
             )
+            // Card effect: top sheen + bottom shade, over the watermark.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(topGlowBrush)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(bottomShadeBrush)
+            )
+            // Reference titles sit slightly below geometric center
+            // (~16dp) so the watermark crown stays visible above them.
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset(y = 16.dp)
+                    .padding(horizontal = 12.dp)
             ) {
                 Text(
                     text = stringResource(CategoryDisplay.displayNameRes(folder)),
@@ -850,6 +894,7 @@ fun FolderSleekCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = pluralStringResource(
                         R.plurals.library_folder_entries,
@@ -859,10 +904,10 @@ fun FolderSleekCard(
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 11.sp,
                         lineHeight = 15.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.6.sp,
                         color = secondaryTextColor()
-                    ),
-                    modifier = Modifier.padding(top = 2.dp)
+                    )
                 )
             }
         }
