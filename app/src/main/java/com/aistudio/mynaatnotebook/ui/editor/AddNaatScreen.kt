@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -67,7 +68,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.focus.onFocusChanged
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -173,6 +180,7 @@ private fun EditorHeader(viewModel: NaatViewModel, onClose: () -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: SettingsViewModel) {
     val context = LocalContext.current
     val metadata by viewModel.editorMetadata.collectAsStateWithLifecycle()
@@ -251,6 +259,13 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
         EntryFontSection(viewModel, settingsViewModel)
 
         // Lyrics in their own card (approved design).
+        // Editor top-tap fix (owner report 2026-10-27): with pasted lyrics
+        // and the keyboard open, tapping the very top of the field left
+        // the first line clipped above the viewport — the outer list and
+        // the field's inner scroll fought. On focus, ask the list to bring
+        // the field fully into view once the IME has settled.
+        val lyricsBringIntoView = remember { BringIntoViewRequester() }
+        val lyricsScope = rememberCoroutineScope()
         EditorSectionCard {
             EditorCardLabel(stringResource(R.string.editor_lyrics_label))
             TextField(
@@ -281,7 +296,17 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
                 },
                 // Audit E2: the field grows with the kalam up to a cap
                 // instead of trapping long lyrics in a fixed 180dp slit.
-                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 420.dp).testTag("add_naat_lyrics"),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 420.dp)
+                    .bringIntoViewRequester(lyricsBringIntoView)
+                    .onFocusChanged { state ->
+                        if (state.isFocused) {
+                            lyricsScope.launch {
+                                delay(300)
+                                lyricsBringIntoView.bringIntoView()
+                            }
+                        }
+                    }
+                    .testTag("add_naat_lyrics"),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 enabled = !isSaving,
                 colors = borderlessFieldColors()

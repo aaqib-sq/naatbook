@@ -319,6 +319,11 @@
     <string name="category_name_my_kalam">My Kalam</string>
     <string name="category_name_others">Others</string>
     <string name="library_entries_count">%1$d ENTRIES</string>
+    <string name="library_row_menu_cd">Entry options</string>
+    <plurals name="library_folder_entries">
+        <item quantity="one">1 Entry</item>
+        <item quantity="other">%1$d Entries</item>
+    </plurals>
     <string name="status_playback_failed">Unable to start playback</string>
     <string name="settings_import_confirm_title">Import backup?</string>
     <string name="settings_import_confirm_message">This will add entries from the backup to your library. Continue?</string>
