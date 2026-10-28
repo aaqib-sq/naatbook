@@ -307,34 +307,25 @@ fun LibraryScreen(
                 // Recents first (approved design): the entries a user returns
                 // to most sit at the top as swipeable cards; the full lists
                 // stay inside the folder cards below.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp, start = 4.dp, end = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.library_recent_title),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = secondaryTextColor()
-                    )
-                }
-
-                if (recentNaats.isEmpty()) {
-                    // Audit 03 L4: a fresh install's home used to be a
-                    // wall of zero-count folder cards under a bare "no
-                    // entries" line, with no next action. The guided
-                    // empty state is the root's call to action.
-                    EmptyStateGuide(
-                        titleText = stringResource(R.string.empty_guide_title),
-                        bodyText = stringResource(R.string.library_empty_folder),
-                        buttonText = stringResource(R.string.empty_guide_add),
-                        onAddEntry = onAddEntry,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                } else {
+                // Owner order 2026-10-28: an empty Recents section renders
+                // nothing at all — no header, no guide card. The home reflows
+                // to search bar + LIBRARY FOLDERS, and the first-run guide
+                // lives on the + button instead.
+                if (recentNaats.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp, start = 4.dp, end = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.library_recent_title),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = secondaryTextColor()
+                        )
+                    }
                     // Room already applies updatedAt DESC and strict LIMIT 10,
                     // so this strip stays bounded however large the library gets.
                     LazyRow(
