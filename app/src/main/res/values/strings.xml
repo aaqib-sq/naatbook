@@ -87,6 +87,13 @@
     <string name="settings_typography_title">Typography Adjustment</string>
     <string name="settings_font_size_label">Lyrics Default Text Size: %1$d sp</string>
     <string name="settings_backup_title">Backup</string>
+    <string name="settings_data_title">Data</string>
+    <string name="settings_clear_data_title">Delete all data</string>
+    <string name="settings_clear_data_subtitle">Permanently remove every entry and its audio from this device</string>
+    <string name="settings_clear_data_cd">Delete all data</string>
+    <string name="settings_clear_data_dialog_title">Delete all data?</string>
+    <string name="settings_clear_data_dialog_message">Every entry and its attached audio will be permanently deleted from this device. Backups already saved in Drive or as files are not deleted. Make a backup first if you want to keep anything. Continue?</string>
+    <string name="settings_clear_data_confirm">Delete all</string>
     <string name="settings_export_cd">Export</string>
     <string name="settings_export_zip">Export ZIP</string>
     <string name="settings_export_subtitle">Into Download/NaatBook</string>
@@ -228,6 +235,13 @@
     <string name="editor_current_voice_note">Current voice note</string>
     <string name="editor_current_linked_audio">Current linked audio</string>
     <string name="editor_remove_attachment_cd">Remove attachment</string>
+    <string name="editor_remove_audio_title">Remove audio?</string>
+    <string name="editor_remove_audio_body">This audio will be removed from the entry when you save.</string>
+    <string name="editor_remove_file_title">Remove attached file?</string>
+    <string name="editor_remove_file_body">The attached copy will be deleted.</string>
+    <string name="editor_discard_recording_title">Discard recording?</string>
+    <string name="editor_discard_recording_body">This recording will be deleted and cannot be recovered.</string>
+    <string name="editor_remove_confirm">Remove</string>
     <string name="editor_mic_permission">Microphone permission is required</string>
     <string name="editor_resume">Resume</string>
     <string name="editor_finish">Finish</string>
@@ -269,6 +283,7 @@
     <string name="status_entry_updated">Entry Updated!</string>
     <string name="status_save_failed">Save failed: %1$s</string>
     <string name="status_entry_deleted">Entry deleted</string>
+    <string name="status_all_data_deleted">All data deleted</string>
     <string name="status_entry_restored">Entry restored</string>
     <string name="status_cancelled">Cancelled</string>
     <string name="status_entry_missing">Entry no longer exists</string>

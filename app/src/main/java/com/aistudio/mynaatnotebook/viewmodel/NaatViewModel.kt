@@ -1571,6 +1571,56 @@ class NaatViewModel @Inject constructor(
     }
 
     /**
+     * Settings "Delete all data": permanently removes every entry and its
+     * app-owned audio files, plus the per-entry reader state of the deleted
+     * ids (so a later entry reusing an id never inherits stale offsets).
+     * No undo window — unlike single-entry delete, the Settings confirmation
+     * dialog is the safety. Drive/file backups are untouched, and parked
+     * editor drafts are left alone (unsaved work, not library data).
+     */
+    fun clearAllData(onDone: () -> Unit = {}) {
+        if (!deleteGate.tryStart()) {
+            statusReporter.show(R.string.status_busy_wait)
+            return
+        }
+        _isDeleting.value = true
+        viewModelScope.launch {
+            try {
+                audioFiles.exclusive {
+                    finalizePendingDelete()
+                    val all = repository.allNaats.first()
+                    withContext(Dispatchers.Main.immediate) {
+                        if (playbackController.nowPlaying.value != null) {
+                            playbackController.stop()
+                        }
+                    }
+                    repository.deleteAll()
+                    all.flatMap { listOfNotNull(it.audioPath, it.secondaryAudioPath) }
+                        .forEach { deleteAudioIfUnreferencedLocked(it) }
+                    withContext(Dispatchers.IO) {
+                        all.forEach { entity ->
+                            runCatching { settingsStore.clearReaderScrollOffset(entity.id) }
+                            runCatching { settingsStore.clearReaderFontSize(entity.id) }
+                            runCatching { settingsStore.clearAudioPosition(entity.id) }
+                        }
+                    }
+                }
+                withContext(Dispatchers.Main.immediate) {
+                    _selectedNaat.value = null
+                    statusReporter.show(R.string.status_all_data_deleted)
+                    onDone()
+                }
+            } catch (error: Exception) {
+                Log.e("NaatViewModel", "Clear all data failed", error)
+                statusReporter.show(R.string.status_delete_failed, StatusMessage.Res(R.string.status_error_database))
+            } finally {
+                _isDeleting.value = false
+                deleteGate.finish()
+            }
+        }
+    }
+
+    /**
      * Brings back the entry deleted in this undo window: the row is re-inserted
      * with its original id (so recents/favorites/order survive) and the parked
      * audio files are moved back to their exact original paths.

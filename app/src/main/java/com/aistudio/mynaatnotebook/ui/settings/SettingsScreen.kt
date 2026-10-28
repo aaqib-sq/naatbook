@@ -72,6 +72,7 @@ import com.aistudio.mynaatnotebook.data.CustomFontStore
 import com.aistudio.mynaatnotebook.data.drive.driveBackupEntryCount
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
+import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.resolve
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -89,6 +90,7 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
     backupViewModel: BackupViewModel,
     driveViewModel: DriveViewModel,
+    naatViewModel: NaatViewModel,
     onShowIntro: () -> Unit = {},
     onOpenPrivacyPolicy: () -> Unit = {},
     onOpenContactUs: () -> Unit = {}
@@ -121,6 +123,7 @@ fun SettingsScreen(
     val driveEmptySyncConfirm by driveViewModel.emptySyncConfirm.collectAsStateWithLifecycle()
     val driveRestoreChoices by driveViewModel.restoreChoices.collectAsStateWithLifecycle()
     var driveDisconnectConfirm by rememberSaveable { mutableStateOf(false) }
+    var showClearDataConfirm by rememberSaveable { mutableStateOf(false) }
 
     // Which font picker is open: "reader", "title", or null.
     var fontPickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
@@ -570,6 +573,37 @@ fun SettingsScreen(
                     Text(stringResource(R.string.action_cancel))
                 }
             }
+        )
+    }
+
+    // Settings "Delete all data": the only destructive action on this page
+    // that is not a backup operation. The dialog is the safety — there is
+    // no undo window for wiping the whole library (unlike single delete).
+    if (showClearDataConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearDataConfirm = false },
+            title = { Text(stringResource(R.string.settings_clear_data_dialog_title)) },
+            text = { Text(stringResource(R.string.settings_clear_data_dialog_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearDataConfirm = false
+                        naatViewModel.clearAllData()
+                    },
+                    modifier = Modifier.testTag("clear_data_confirm")
+                ) {
+                    Text(
+                        stringResource(R.string.settings_clear_data_confirm),
+                        color = HighContrastRed
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+            modifier = Modifier.testTag("clear_data_dialog")
         )
     }
 
@@ -1058,6 +1092,34 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.testTag("drive_restore_chooser")
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Destructive data action, kept apart from Backup: wiping the
+        // library is not a backup operation, and it must never sit next
+        // to the one-tap export/import rows.
+        SettingsGroupHeading(stringResource(R.string.settings_data_title))
+        Spacer(modifier = Modifier.height(8.dp))
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column {
+                SettingsActionRow(
+                    icon = Icons.Default.Delete,
+                    title = stringResource(R.string.settings_clear_data_title),
+                    subtitle = stringResource(R.string.settings_clear_data_subtitle),
+                    contentDescription = stringResource(R.string.settings_clear_data_cd),
+                    enabled = !backupWorking,
+                    testTag = "clear_data_btn",
+                    onClick = { showClearDataConfirm = true },
+                    trailing = {}
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
