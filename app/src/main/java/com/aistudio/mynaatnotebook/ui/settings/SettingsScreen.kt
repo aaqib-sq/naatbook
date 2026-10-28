@@ -581,9 +581,10 @@ fun SettingsScreen(
             // a saveable scroll state keeps the user's place through it.
             .verticalScroll(rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) })
     ) {
-        // Identity zone (top of page): the app's Noon mark + name +
-        // version/tagline. The bottom footer block was removed — this is the
-        // identity's single home on this page.
+        // Identity zone (top of page): the app's Noon mark + name only.
+        // Owner order 2026-10-28 (reversing the PR #55 removal): the
+        // tagline line is gone from here and the version lives in the
+        // footer at the bottom of this page instead.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -614,14 +615,6 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = stringResource(
-                        R.string.settings_identity_sub,
-                        BuildConfig.VERSION_NAME
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -1313,6 +1306,19 @@ fun SettingsScreen(
                 onClick = onOpenContactUs
             )
         }
+
+        // Version footer (owner order 2026-10-28): the version lives
+        // here at the bottom now, not in the identity header.
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = BuildConfig.VERSION_NAME,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_version_footer"),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
