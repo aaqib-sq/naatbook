@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
@@ -798,8 +797,11 @@ fun FolderSleekCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val cardBg = if (isDark) Color(0xFF1A1A1E) else MaterialTheme.colorScheme.surfaceVariant
+    // Card base is the app's own neutral surface (same as the recent cards):
+    // the old 0xFF1A1A1E was blue-tinted (26,26,30) and read as a cool cast
+    // next to the neutral black bar and neutral recent cards (owner-caught
+    // 2026-10-28). surfaceVariant is neutral in both themes.
+    val cardBg = MaterialTheme.colorScheme.surfaceVariant
     val cardShape = RoundedCornerShape(12.dp)
     val folderName = stringResource(CategoryDisplay.displayNameRes(folder))
     // Reference count style: plural counts are tracked capitals
