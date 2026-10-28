@@ -32,10 +32,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
@@ -380,30 +378,33 @@ fun LibraryScreen(
                 // Taxonomy is defined once in NaatCategories: content types only,
                 // never media formats (the old mixed list had an "Audio Only"
                 // folder; audio attachments now live inside any category).
-                // Folder glyphs: six hand-crafted vector drawables carrying the
-                // correct symbolism (Kaaba/Gumbad/masjid-skyline/Zulfiqar/ode
-                // scroll/voice waveform); My Kalam & Others keep their approved
-                // stock icons. All painters are tinted onBackground by the card.
-                val kaabaPainter = painterResource(R.drawable.ic_cat_kaaba)
+                // Folder glyphs (Clean Minimal, owner-final 2026-10-28):
+                // hand-crafted vectors (Gumbad/masjid-skyline/Zulfiqar/ode
+                // scroll/voice waveform) + pen for My Kalam + the reference's
+                // open book for Hamd. Others deliberately uses NO folder
+                // glyph (a folder says "file manager"; this app is a notebook
+                // of kalam) — the neutral MoreHoriz mark instead. All
+                // painters are tinted onBackground by the card.
+                val bookPainter = rememberVectorPainter(Icons.Default.MenuBook)
                 val domePainter = painterResource(R.drawable.ic_cat_dome)
                 val skylinePainter = painterResource(R.drawable.ic_cat_skyline)
                 val zulfiqarPainter = painterResource(R.drawable.ic_cat_zulfiqar)
                 val scrollPainter = painterResource(R.drawable.ic_cat_scroll)
                 val wavesPainter = painterResource(R.drawable.ic_cat_waves)
                 val editPainter = rememberVectorPainter(Icons.Default.Edit)
-                val folderStockPainter = rememberVectorPainter(Icons.Default.Folder)
+                val moreHorizPainter = rememberVectorPainter(Icons.Default.MoreHoriz)
                 // Audit 05 L3: the icon map is stable — don't rebuild
                 // it on every recomposition of the home list.
                 val folderIcons: Map<String, Painter> = remember {
                     mapOf(
                     NaatCategories.NAAT to domePainter,
-                    NaatCategories.HAMD to kaabaPainter,
+                    NaatCategories.HAMD to bookPainter,
                     NaatCategories.MANQABAT to zulfiqarPainter,
                     NaatCategories.SALAM to skylinePainter,
                     NaatCategories.QASIDA to scrollPainter,
                     NaatCategories.NASHEED to wavesPainter,
                     NaatCategories.MY_KALAM to editPainter,
-                    NaatCategories.OTHERS to folderStockPainter
+                    NaatCategories.OTHERS to moreHorizPainter
                     )
                 }
 
@@ -414,13 +415,13 @@ fun LibraryScreen(
                         rowFolders.forEachIndexed { index, folder ->
                             FolderSleekCard(
                                 folder = folder,
-                                iconPainter = folderIcons[folder] ?: folderStockPainter,
+                                iconPainter = folderIcons[folder] ?: moreHorizPainter,
                                 count = categoryCounts[folder] ?: 0,
                                 onClick = { viewModel.selectFolder(folder) },
                                 modifier = Modifier.weight(1f)
                             )
                             if (index < rowFolders.lastIndex) {
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(9.dp))
                             }
                         }
                         // Keep the grid rectangular if the taxonomy ever gains an odd count
@@ -429,7 +430,7 @@ fun LibraryScreen(
                         }
                     }
                     if (rowIndex < folderRows.lastIndex) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(15.dp))
                     }
                 }
 
@@ -768,11 +769,27 @@ fun LibraryScreen(
     }
 }
 
-// --- Folder Sleek Card (FINAL design, user-approved 2026-10-27) ---
-// Watermark card: one single giant faded vector behind, name centered on
-// top, count small below. No border, soft inner glow, sharper corners,
-// darker background. Manqabat's Zulfiqar tilts like a pen. No small icon
-// tile anymore — the double-icon look is gone by owner order.
+// --- Folder card (home grid) ---
+/**
+ * Clean Minimal folder card (owner-final 2026-10-28, from the ChatGPT
+ * reference image): a quiet matte card — bold name + tracked count on
+ * the LEFT, one small monochrome icon in a soft disc on the RIGHT, and
+ * a small chevron at the bottom-right. No ghost, no split, no divider,
+ * no bleed: the vector never fights the text, so the card reads the
+ * same in dark and light themes.
+ *
+ * Proportions are measured from the reference (1024px wide): card
+ * 466x294px (ratio 1.585), 26px gutter, 43px row gap, ~48dp icon disc,
+ * ~34dp icon, ~14dp chevron. The card keeps its ratio on any screen
+ * width via aspectRatio; the grid gaps are the reference's 9dp/15dp
+ * equivalents. Corner radius 12dp is approximated from the reference
+ * corner arc.
+ *
+ * Owner exception: the Others folder does NOT use a folder glyph —
+ * a folder says "file manager" and this app is a notebook of kalam,
+ * so Others uses the neutral MoreHoriz mark (see the icon map above).
+ * Theme from app background luminance (app theme, not system).
+ */
 @Composable
 fun FolderSleekCard(
     folder: String,
@@ -781,20 +798,24 @@ fun FolderSleekCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Variant F — Ghost Split (owner-approved 2026-10-28, replaces the
-    // centered-watermark Variant 4): text on the LEFT, a thin divider
-    // at mid-card, and one big ghost vector on the RIGHT bleeding
-    // deliberately off the right edge. Text never sits centered on
-    // the vector, so it stays readable in dark AND light themes —
-    // the structural fix for Variant 4's light-mode failure.
-    // Theme from app background luminance (app theme, not system).
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val cardBg = if (isDark) Color(0xFF1A1A1E) else MaterialTheme.colorScheme.surfaceVariant
-    val cardShape = RoundedCornerShape(14.dp)
+    val cardShape = RoundedCornerShape(12.dp)
+    val folderName = stringResource(CategoryDisplay.displayNameRes(folder))
+    // Reference count style: plural counts are tracked capitals
+    // ("15 ENTRIES"); the singular stays title-case ("1 Entry").
+    // uppercase() is a no-op on Urdu script, so this is safe in both
+    // locales; the count itself still comes from plurals, never hardcoded.
+    val countText = pluralStringResource(
+        R.plurals.library_folder_entries,
+        count,
+        count
+    )
+    val displayCount = if (count == 1) countText else countText.uppercase()
 
     Card(
         modifier = modifier
-            .height(150.dp)
+            .aspectRatio(1.585f)
             .clip(cardShape)
             .clickable(onClick = onClick)
             .testTag("folder_card_${folder.replace(" ", "_")}"),
@@ -811,89 +832,77 @@ fun FolderSleekCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(cardShape),
-            contentAlignment = Alignment.Center
+                .clip(cardShape)
         ) {
-            // Right ghost: big vector, pushed past the right edge so
-            // the cut reads as deliberate bleed, not an accident.
-            // Card clip cuts it at the edge.
-            Box(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RectangleShape),
-                contentAlignment = Alignment.CenterEnd
+                    .padding(start = 14.dp, end = 12.dp)
             ) {
-                Icon(
-                    painter = iconPainter,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
-                    modifier = Modifier
-                        .size(160.dp)
-                        .offset(x = 55.dp)
-                        .then(
-                            if (folder == NaatCategories.MANQABAT) Modifier.rotate(28f)
-                            else Modifier
+                Column(
+                    horizontalAlignment = Alignment.Start,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = folderName,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 18.sp,
+                            lineHeight = 24.sp
+                        ),
+                        // Audit fix M7: synthetic Bold muddies Arabic-script
+                        // joins; the folder name is Bold only for Latin names.
+                        fontWeight = if (usesArabicScript(folderName)) {
+                            FontWeight.Normal
+                        } else {
+                            FontWeight.Bold
+                        },
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = displayCount,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 1.0.sp,
+                            color = secondaryTextColor()
                         )
-                )
-            }
-            // Mid-card divider: 1dp wide, 51% of card height, centered
-            // — drawn under the text, so long names cross it like in
-            // the reference instead of colliding with it.
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                // Icon disc: soft onBackground disc, icon drawn whole
+                // at full contrast — never cut, never ghosted.
                 Box(
                     modifier = Modifier
-                        .width(1.dp)
-                        .fillMaxHeight(0.51f)
+                        .size(48.dp)
+                        .clip(CircleShape)
                         .background(
-                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.20f)
-                        )
-                )
-            }
-            // Left text: name + count, left-aligned, above the ghost.
-            Column(
-                horizontalAlignment = Alignment.Start,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 8.dp)
-            ) {
-                Text(
-                    text = stringResource(CategoryDisplay.displayNameRes(folder)),
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 20.sp,
-                        lineHeight = 36.sp
-                    ),
-                    // Audit fix M7: synthetic Bold muddies Arabic-script
-                    // joins; the folder name is Bold only for Latin names.
-                    fontWeight = if (usesArabicScript(
-                        stringResource(CategoryDisplay.displayNameRes(folder))
-                    )) {
-                        FontWeight.Normal
-                    } else {
-                        FontWeight.Bold
-                    },
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = pluralStringResource(
-                        R.plurals.library_folder_entries,
-                        count,
-                        count
-                    ),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.6.sp,
-                        color = secondaryTextColor()
+                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = iconPainter,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                        modifier = Modifier.size(34.dp)
                     )
-                )
+                }
             }
+            // Navigation chevron, bottom-right, as in the reference.
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.40f),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 10.dp, bottom = 8.dp)
+                    .size(14.dp)
+            )
         }
     }
 }
