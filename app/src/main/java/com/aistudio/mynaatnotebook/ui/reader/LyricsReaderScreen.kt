@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
@@ -163,11 +164,17 @@ fun LyricsReaderScreen(
     // entry's leftover position, mid-text (reader audit H1).
     var restoreSettled by remember(naat.id) { mutableStateOf(false) }
     LaunchedEffect(naat.id) {
-        val saved = settingsViewModel.getReaderScrollOffset(naat.id)
-        withFrameNanos { }
-        val target = clampedRestoreOffset(saved, scrollState.maxValue)
-        if (scrollState.value != target) scrollState.scrollTo(target)
-        restoreSettled = true
+        // The finally matters: if the saved-offset read ever fails, the
+        // lyrics must still appear (at the top) instead of staying hidden
+        // behind the first-paint gate below.
+        try {
+            val saved = settingsViewModel.getReaderScrollOffset(naat.id)
+            withFrameNanos { }
+            val target = clampedRestoreOffset(saved, scrollState.maxValue)
+            if (scrollState.value != target) scrollState.scrollTo(target)
+        } finally {
+            restoreSettled = true
+        }
     }
     // The dispose-save above loses the position when the process dies
     // mid-reading (reader audit M1): also save while reading — collectLatest
@@ -403,19 +410,35 @@ fun LyricsReaderScreen(
             .background(MaterialTheme.colorScheme.background)
             .testTag("reader_root")
     ) {
-        ReaderLyricsViewport(
-            naat = naat,
-            scrollState = scrollState,
-            fontSize = effectiveFontSize,
-            topChromePaddingPx = topContentPaddingPx,
-            bottomChromePaddingPx = bottomContentPaddingPx,
-            immersive = immersive,
-            onIntentionalTap = ::toggleImmersiveChrome,
-            onDoubleTap = ::toggleImmersiveMode,
-            onPressChanged = { viewportPressed = it },
-            readerFontChoice = effectiveReaderChoice,
-            customFamilies = customFamilies
-        )
+        // First paint must already be settled: rendering the lyrics before
+        // the scroll restore lands and before the top chrome is measured
+        // showed one frame at the top with zero padding, then a jump to
+        // the saved position plus a 300ms padding glide (owner-caught
+        // 2026-10-28: a visible jolt on every open, worst from Recents
+        // where a saved offset always exists). The lyrics still compose
+        // underneath at alpha 0 — so scroll extents are real and the
+        // restore lands on invisible content — and only become visible
+        // once both are settled. The chrome itself renders ungated above,
+        // so its measurement proceeds.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(if (restoreSettled && hasMeasuredTopChrome) 1f else 0f)
+        ) {
+            ReaderLyricsViewport(
+                naat = naat,
+                scrollState = scrollState,
+                fontSize = effectiveFontSize,
+                topChromePaddingPx = topContentPaddingPx,
+                bottomChromePaddingPx = bottomContentPaddingPx,
+                immersive = immersive,
+                onIntentionalTap = ::toggleImmersiveChrome,
+                onDoubleTap = ::toggleImmersiveMode,
+                onPressChanged = { viewportPressed = it },
+                readerFontChoice = effectiveReaderChoice,
+                customFamilies = customFamilies
+            )
+        }
 
         if (readerChromeVisible) {
             // The top chrome is the bar alone now — the permanent font

@@ -240,6 +240,21 @@ class NaatViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    /**
+     * The query as the list actually sees it. The UI must switch between
+     * the folder grid and the results list on THIS, not on raw keystrokes:
+     * the list follows the 160ms-debounced query, so switching on raw text
+     * showed the previous (unfiltered) list under the new query for ~160ms
+     * on every keystroke (owner-caught 2026-10-28: a flash of the Naat
+     * folder list). The text field itself still uses the raw query so
+     * typing, hint and clear stay instant.
+     */
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    val debouncedSearchQuery: StateFlow<String> = _searchQuery
+        .debounce(160)
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
     private val _selectedFolder = MutableStateFlow<String?>(null) // null means "All" / Folder Grid View
     val selectedFolder: StateFlow<String?> = _selectedFolder.asStateFlow()
 
