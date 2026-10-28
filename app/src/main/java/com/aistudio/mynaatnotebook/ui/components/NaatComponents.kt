@@ -116,27 +116,27 @@ fun NaatBottomNavigation(
                     val pulseTransition = rememberInfiniteTransition(label = "add_pulse")
                     fabScale = pulseTransition.animateFloat(
                         initialValue = 1f,
-                        targetValue = 1.12f,
+                        targetValue = 1.25f,
                         animationSpec = infiniteRepeatable(
-                            animation = tween(900, easing = FastOutSlowInEasing),
+                            animation = tween(800, easing = FastOutSlowInEasing),
                             repeatMode = RepeatMode.Reverse
                         ),
                         label = "add_pulse_fab_scale"
                     ).value
                     ringScale = pulseTransition.animateFloat(
                         initialValue = 1f,
-                        targetValue = 1.55f,
+                        targetValue = 1.8f,
                         animationSpec = infiniteRepeatable(
-                            animation = tween(1400, easing = LinearOutSlowInEasing),
+                            animation = tween(1200, easing = LinearOutSlowInEasing),
                             repeatMode = RepeatMode.Restart
                         ),
                         label = "add_pulse_ring_scale"
                     ).value
                     ringAlpha = pulseTransition.animateFloat(
-                        initialValue = 0.45f,
+                        initialValue = 0.7f,
                         targetValue = 0f,
                         animationSpec = infiniteRepeatable(
-                            animation = tween(1400, easing = LinearOutSlowInEasing),
+                            animation = tween(1200, easing = LinearOutSlowInEasing),
                             repeatMode = RepeatMode.Restart
                         ),
                         label = "add_pulse_ring_alpha"
