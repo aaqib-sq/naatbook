@@ -143,6 +143,19 @@ fun LibraryScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Home wordmark: the app name as the screen's top-left header
+        // title, WhatsApp-style — text only (no logo image), monochrome
+        // (onBackground, so white on dark / black on light), and the
+        // same title typography as the Settings identity header.
+        Text(
+            text = "NaatBook",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.testTag("home_wordmark")
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
         val searchBg = MaterialTheme.colorScheme.surfaceVariant
         val searchBorder = MaterialTheme.colorScheme.outline
 
