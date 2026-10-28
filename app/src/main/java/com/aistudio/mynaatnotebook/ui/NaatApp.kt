@@ -100,6 +100,10 @@ fun NaatApp(
     val currentRoute = backStackEntry?.destination?.route
 
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+    // First-run pulse gate: the live category counts, summed. Empty map =
+    // empty library = pulse on; the moment the first entry lands, the sum
+    // goes above zero and the pulse stops by itself.
+    val categoryCounts by viewModel.categoryCounts.collectAsStateWithLifecycle()
     val showAddModal by viewModel.showAddModal.collectAsStateWithLifecycle()
     val selectedNaat by viewModel.selectedNaat.collectAsStateWithLifecycle()
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
@@ -335,7 +339,8 @@ fun NaatApp(
                                         onTabSelected = { tab ->
                                             if (tab != currentTab) viewModel.selectTab(tab)
                                         },
-                                        onAddRequested = ::openAdd
+                                        onAddRequested = ::openAdd,
+                                        showAddPulse = categoryCounts.values.sum() == 0
                                     )
                                 }
                             }

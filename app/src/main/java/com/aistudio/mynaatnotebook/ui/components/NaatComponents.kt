@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -30,6 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
@@ -68,7 +70,8 @@ import java.io.File
 fun NaatBottomNavigation(
     currentTab: Int,
     onTabSelected: (Int) -> Unit,
-    onAddRequested: () -> Unit
+    onAddRequested: () -> Unit,
+    showAddPulse: Boolean = false
 ) {
     // Child composables must NEVER re-read the system dark flag: the app's
     // explicit White/Black/System mode is already resolved into the colorScheme.
@@ -95,13 +98,68 @@ fun NaatBottomNavigation(
 
             // Add is an app action, not a third navigation destination. Using the
             // Material FAB gives it true elevation, touch feedback, and semantics.
+            // First-run guide (owner pick 2026-10-28, preview 6): while the
+            // library is completely empty the FAB breathes and sheds a fading
+            // ring — monochrome only, no finger, no bubble. The gate is the
+            // live category-count flow, so the pulse stops the moment the
+            // first entry exists; nothing is persisted to get stuck on. The
+            // transition is composed only while pulsing, so it costs nothing
+            // once the library is non-empty.
             Box(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.Center
             ) {
+                val fabScale: Float
+                val ringScale: Float
+                val ringAlpha: Float
+                if (showAddPulse) {
+                    val pulseTransition = rememberInfiniteTransition(label = "add_pulse")
+                    fabScale = pulseTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.12f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(900, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "add_pulse_fab_scale"
+                    ).value
+                    ringScale = pulseTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.55f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1400, easing = LinearOutSlowInEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "add_pulse_ring_scale"
+                    ).value
+                    ringAlpha = pulseTransition.animateFloat(
+                        initialValue = 0.45f,
+                        targetValue = 0f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1400, easing = LinearOutSlowInEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "add_pulse_ring_alpha"
+                    ).value
+                } else {
+                    fabScale = 1f
+                    ringScale = 1f
+                    ringAlpha = 0f
+                }
+                if (showAddPulse) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .scale(ringScale)
+                            .clip(CircleShape)
+                            .background(foreground.copy(alpha = ringAlpha))
+                    )
+                }
                 FloatingActionButton(
                     onClick = onAddRequested,
-                    modifier = Modifier.testTag("nav_tab_add"),
+                    modifier = Modifier
+                        .testTag("nav_tab_add")
+                        .scale(fabScale),
                     containerColor = foreground,
                     contentColor = background,
                     elevation = FloatingActionButtonDefaults.elevation()
