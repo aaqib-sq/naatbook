@@ -85,6 +85,7 @@ fun LibraryScreen(
 ) {
     val context = LocalContext.current
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val debouncedSearchQuery by viewModel.debouncedSearchQuery.collectAsStateWithLifecycle()
     val selectedFolder by viewModel.selectedFolder.collectAsStateWithLifecycle()
     val filteredNaats by viewModel.filteredSummaries.collectAsStateWithLifecycle()
     val recentNaats by viewModel.recentSummaries.collectAsStateWithLifecycle()
@@ -235,7 +236,7 @@ fun LibraryScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         if (selectedFolder == null) {
-            if (searchQuery.isBlank() && !favoritesOnly) {
+            if (debouncedSearchQuery.isBlank() && !favoritesOnly) {
             // Main Folder System Grid View with Recent entries
             Column(
                 modifier = Modifier
@@ -442,9 +443,9 @@ fun LibraryScreen(
                     text = when {
                         // The query is user-typed text and can be Urdu — it is
                         // shown as typed, never uppercased or letter-tracked.
-                        favoritesOnly && searchQuery.isNotBlank() -> stringResource(R.string.library_favorites_query_title, searchQuery.trim())
+                        favoritesOnly && debouncedSearchQuery.isNotBlank() -> stringResource(R.string.library_favorites_query_title, debouncedSearchQuery.trim())
                         favoritesOnly -> stringResource(R.string.library_favorites_title)
-                        else -> stringResource(R.string.library_results_title, searchQuery.trim())
+                        else -> stringResource(R.string.library_results_title, debouncedSearchQuery.trim())
                     },
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
@@ -453,7 +454,7 @@ fun LibraryScreen(
                 )
                 // Audit L7: the results say how many they are, not just
                 // what was typed.
-                if (searchQuery.isNotBlank() && filteredNaats.isNotEmpty()) {
+                if (debouncedSearchQuery.isNotBlank() && filteredNaats.isNotEmpty()) {
                     Text(
                         text = pluralStringResource(
                             R.plurals.library_results_count,
@@ -511,18 +512,18 @@ fun LibraryScreen(
                     ) {
                         EmptyStateGuide(
                             titleText = stringResource(R.string.empty_guide_title),
-                            bodyText = if (favoritesOnly && searchQuery.isBlank()) {
+                            bodyText = if (favoritesOnly && debouncedSearchQuery.isBlank()) {
                                 stringResource(R.string.library_empty_favorites)
                             } else {
                                 stringResource(R.string.library_empty_search)
                             },
                             // Audit #7: an empty result caused by a search
                             // query used to be a dead end — offer clearing it.
-                            buttonText = if (searchQuery.isNotBlank()) {
+                            buttonText = if (debouncedSearchQuery.isNotBlank()) {
                                 stringResource(R.string.library_clear_search)
                             } else null,
                             onAddEntry = onAddEntry,
-                            onButtonClick = if (searchQuery.isNotBlank()) {
+                            onButtonClick = if (debouncedSearchQuery.isNotBlank()) {
                                 { viewModel.setSearchQuery("") }
                             } else null
                         )
@@ -587,7 +588,7 @@ fun LibraryScreen(
             // Show when search is active inside a folder, so the user knows
             // the results are scoped and not global. Audit S1: once the
             // whole-library escape is active the caption says so instead.
-            if (searchQuery.isNotBlank()) {
+            if (debouncedSearchQuery.isNotBlank()) {
                 Text(
                     text = if (searchWholeLibrary) {
                         stringResource(R.string.library_search_whole)
@@ -664,8 +665,8 @@ fun LibraryScreen(
                     // held entries gets "deleted" copy; a brand-new folder
                     // gets the first-entry copy.
                     val folderHadEntries = selectedFolder != null && selectedFolder in foldersWithEntries &&
-                        searchQuery.isBlank()
-                    if (searchQuery.isNotBlank()) {
+                        debouncedSearchQuery.isBlank()
+                    if (debouncedSearchQuery.isNotBlank()) {
                         // Audit #7: the emptiness is caused by the search
                         // filter, not by an empty folder — the honest action
                         // is clearing the search (an entry added here would
