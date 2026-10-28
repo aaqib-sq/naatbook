@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
@@ -780,52 +781,29 @@ fun FolderSleekCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Theme-safe darker card: background luminance (app theme, not
-    // system theme) tells dark and light apart.
+    // Variant F — Ghost Split (owner-approved 2026-10-28, replaces the
+    // centered-watermark Variant 4): text on the LEFT, a thin divider
+    // at mid-card, and one big ghost vector on the RIGHT bleeding
+    // deliberately off the right edge. Text never sits centered on
+    // the vector, so it stays readable in dark AND light themes —
+    // the structural fix for Variant 4's light-mode failure.
+    // Theme from app background luminance (app theme, not system).
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    // Adapted from the Argon 4 reference implementation (owner-supplied
-    // 2026-10-28), kept app-correct: localized title/count, app-theme
-    // dark check, and the existing testTag stay as they were.
-    // Background gradient: #1E1E1E (top) -> #131313 (bottom) in dark
-    // theme; surfaceVariant gradient in light theme.
-    val backgroundBrush = if (isDark) {
-        Brush.verticalGradient(
-            0.0f to Color(0xFF1E1E1E),
-            1.0f to Color(0xFF131313)
-        )
-    } else {
-        Brush.verticalGradient(
-            0.0f to MaterialTheme.colorScheme.surfaceVariant,
-            1.0f to MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
-        )
-    }
-    // Card look (owner correction 2026-10-28): the reference card's
-    // defining feature is the effect on the card itself — a clear
-    // sheen at the top edge fading down, and a soft dark shade
-    // grounding the bottom edge. Sheen peak kept at 28% (Argon's
-    // 14% repeats round 1's too-faint mistake); curve shape follows
-    // Argon's stops.
-    val topGlowBrush = Brush.verticalGradient(
-        0.0f to Color.White.copy(alpha = 0.28f),
-        0.18f to Color.White.copy(alpha = 0.10f),
-        0.5f to Color.White.copy(alpha = 0.0f)
-    )
-    val bottomShadeBrush = Brush.verticalGradient(
-        0.0f to Color.Transparent,
-        0.5f to Color.Transparent,
-        0.82f to Color.Black.copy(alpha = if (isDark) 0.16f else 0.07f),
-        1.0f to Color.Black.copy(alpha = if (isDark) 0.35f else 0.15f)
-    )
+    val cardBg = if (isDark) Color(0xFF1A1A1E) else MaterialTheme.colorScheme.surfaceVariant
     val cardShape = RoundedCornerShape(14.dp)
 
     Card(
         modifier = modifier
-            .height(130.dp)
+            .height(150.dp)
             .clip(cardShape)
             .clickable(onClick = onClick)
             .testTag("folder_card_${folder.replace(" ", "_")}"),
         colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent
+            containerColor = cardBg
+        ),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = cardShape
@@ -833,47 +811,53 @@ fun FolderSleekCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(brush = backgroundBrush)
                 .clip(cardShape),
             contentAlignment = Alignment.Center
         ) {
-            // Watermark first, then the card effect over it (light top,
-            // shade bottom), then text on top — text stays crisp white.
-            // Single watermark vector: fills the card, clearly visible,
-            // centered — the reference look. Round 1 (110dp/14%) was
-            // near-invisible on device; the dome shape itself fills only
-            // ~65% of its viewport, so the box must be big AND the alpha
-            // high enough to read like the reference.
-            Icon(
-                painter = iconPainter,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f),
-                modifier = Modifier
-                    .size(150.dp)
-                    .then(
-                        if (folder == NaatCategories.MANQABAT) Modifier.rotate(28f)
-                        else Modifier
-                    )
-            )
-            // Card effect: top sheen + bottom shade, over the watermark.
+            // Right ghost: big vector, pushed past the right edge so
+            // the cut reads as deliberate bleed, not an accident.
+            // Card clip cuts it at the edge.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(topGlowBrush)
-            )
+                    .clip(RectangleShape),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    painter = iconPainter,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
+                    modifier = Modifier
+                        .size(160.dp)
+                        .offset(x = 55.dp)
+                        .then(
+                            if (folder == NaatCategories.MANQABAT) Modifier.rotate(28f)
+                            else Modifier
+                        )
+                )
+            }
+            // Mid-card divider: 1dp wide, 51% of card height, centered
+            // — drawn under the text, so long names cross it like in
+            // the reference instead of colliding with it.
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(bottomShadeBrush)
-            )
-            // Reference titles sit slightly below geometric center
-            // (~16dp) so the watermark crown stays visible above them.
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight(0.51f)
+                        .background(
+                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.20f)
+                        )
+                )
+            }
+            // Left text: name + count, left-aligned, above the ghost.
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalAlignment = Alignment.Start,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .offset(y = 16.dp)
-                    .padding(horizontal = 12.dp)
+                    .padding(start = 16.dp, end = 8.dp)
             ) {
                 Text(
                     text = stringResource(CategoryDisplay.displayNameRes(folder)),
