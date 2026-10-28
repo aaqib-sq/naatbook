@@ -61,5 +61,7 @@ class NaatRepository @Inject constructor(private val naatDao: NaatDao) {
 
     suspend fun deleteById(id: Int) = naatDao.deleteNaatById(id)
 
+    suspend fun deleteAll() = naatDao.deleteAllNaats()
+
     suspend fun countByAudioPath(audioPath: String): Int = naatDao.countByAudioPath(audioPath)
 }

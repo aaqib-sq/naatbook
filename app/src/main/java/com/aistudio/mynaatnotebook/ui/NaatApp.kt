@@ -363,6 +363,7 @@ fun NaatApp(
                                         settingsViewModel,
                                         backupViewModel,
                                         driveViewModel,
+                                        viewModel,
                                         onShowIntro = { introRequested = true },
                                         onOpenPrivacyPolicy = {
                                             navController.navigate(NaatRoutes.PRIVACY) {

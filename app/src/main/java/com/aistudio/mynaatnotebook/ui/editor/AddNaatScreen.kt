@@ -557,6 +557,38 @@ private fun ReplaceAudioConfirmDialog(
     )
 }
 
+/**
+ * Confirmation before an audio removal. Single-entry delete and audio
+ * replace already ask; audio remove used to delete silently (2026-10-28
+ * owner catch) — this closes that inconsistency for all three remove
+ * controls: saved audio, fresh file, fresh recording.
+ */
+@Composable
+private fun RemoveAudioConfirmDialog(
+    title: String,
+    body: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(body) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag("remove_audio_confirm")
+            ) { Text(confirmText, color = HighContrastRed) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+        modifier = Modifier.testTag("remove_audio_dialog")
+    )
+}
+
+
 @Composable
 private fun EditorAudioSection(viewModel: NaatViewModel) {
     val context = LocalContext.current
@@ -579,6 +611,7 @@ private fun EditorAudioSection(viewModel: NaatViewModel) {
     val hasExistingLinked = (attachments.existingAudioType == "local_file" && !attachments.existingAudioRemoved) ||
         (attachments.existingSecondaryAudioType == "local_file" && !attachments.existingSecondaryAudioRemoved)
     var pendingReplaceUri by remember { mutableStateOf<Uri?>(null) }
+    var confirmRemoveFilePath by remember { mutableStateOf<String?>(null) }
 
     val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null && !isAttaching) {
@@ -593,6 +626,22 @@ private fun EditorAudioSection(viewModel: NaatViewModel) {
                 doAttach(uri)
             },
             onDismiss = { pendingReplaceUri = null }
+        )
+    }
+
+    confirmRemoveFilePath?.let { path ->
+        RemoveAudioConfirmDialog(
+            title = stringResource(R.string.editor_remove_file_title),
+            body = stringResource(R.string.editor_remove_file_body),
+            confirmText = stringResource(R.string.editor_remove_confirm),
+            onConfirm = {
+                confirmRemoveFilePath = null
+                viewModel.deleteOrphanFile(path)
+                viewModel.updateDraft {
+                    it.copy(newAttachmentPath = null, newAttachmentName = null)
+                }
+            },
+            onDismiss = { confirmRemoveFilePath = null }
         )
     }
 
@@ -629,12 +678,7 @@ private fun EditorAudioSection(viewModel: NaatViewModel) {
                             overflow = TextOverflow.Ellipsis
                         )
                         AudioAttachmentPreview(path, viewModel)
-                        IconButton(onClick = {
-                            viewModel.deleteOrphanFile(path)
-                            viewModel.updateDraft {
-                                it.copy(newAttachmentPath = null, newAttachmentName = null)
-                            }
-                        }) {
+                        IconButton(onClick = { confirmRemoveFilePath = path }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.editor_remove_linked_cd), tint = HighContrastRed)
                         }
                     }
@@ -650,6 +694,22 @@ private fun ExistingAttachments(
     recordingReplaced: Boolean,
     viewModel: NaatViewModel
 ) {
+    var confirmRemove by remember { mutableStateOf<Boolean?>(null) }
+    confirmRemove?.let { secondary ->
+        RemoveAudioConfirmDialog(
+            title = stringResource(R.string.editor_remove_audio_title),
+            body = stringResource(R.string.editor_remove_audio_body),
+            confirmText = stringResource(R.string.editor_remove_confirm),
+            onConfirm = {
+                confirmRemove = null
+                viewModel.updateDraft {
+                    if (secondary) it.copy(existingSecondaryAudioRemoved = true)
+                    else it.copy(existingAudioRemoved = true)
+                }
+            },
+            onDismiss = { confirmRemove = null }
+        )
+    }
     listOf(
         Triple(draft.existingAudioType, draft.existingAudioPath, false),
         Triple(draft.existingSecondaryAudioType, draft.existingSecondaryAudioPath, true)
@@ -685,12 +745,7 @@ private fun ExistingAttachments(
                     }
                 }
                 AudioAttachmentPreview(path, viewModel)
-                IconButton(onClick = {
-                    viewModel.updateDraft {
-                        if (secondary) it.copy(existingSecondaryAudioRemoved = true)
-                        else it.copy(existingAudioRemoved = true)
-                    }
-                }) {
+                IconButton(onClick = { confirmRemove = secondary }) {
                     Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.editor_remove_attachment_cd), tint = HighContrastRed)
                 }
             }
@@ -759,6 +814,7 @@ private fun RecorderControls(
     val hasExistingRecorded = (attachments.existingAudioType == "recorded" && !attachments.existingAudioRemoved) ||
         (attachments.existingSecondaryAudioType == "recorded" && !attachments.existingSecondaryAudioRemoved)
     var confirmRecord by remember { mutableStateOf(false) }
+    var confirmDiscard by remember { mutableStateOf(false) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) viewModel.startRecording()
         else Toast.makeText(context, context.getString(R.string.editor_mic_permission), Toast.LENGTH_LONG).show()
@@ -771,6 +827,19 @@ private fun RecorderControls(
                 permission.launch(android.Manifest.permission.RECORD_AUDIO)
             },
             onDismiss = { confirmRecord = false }
+        )
+    }
+
+    if (confirmDiscard) {
+        RemoveAudioConfirmDialog(
+            title = stringResource(R.string.editor_discard_recording_title),
+            body = stringResource(R.string.editor_discard_recording_body),
+            confirmText = stringResource(R.string.common_discard),
+            onConfirm = {
+                confirmDiscard = false
+                viewModel.discardRecording()
+            },
+            onDismiss = { confirmDiscard = false }
         )
     }
 
@@ -870,7 +939,7 @@ private fun RecorderControls(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     AudioAttachmentPreview(finishedFile.absolutePath, viewModel)
                     TextButton(
-                        onClick = viewModel::discardRecording,
+                        onClick = { confirmDiscard = true },
                         modifier = Modifier.testTag("discard_recording_btn")
                     ) { Text(stringResource(R.string.common_discard), color = HighContrastRed) }
                     IconButton(
