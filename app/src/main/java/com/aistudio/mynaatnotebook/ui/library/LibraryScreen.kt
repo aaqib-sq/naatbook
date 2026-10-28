@@ -32,6 +32,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -826,6 +830,9 @@ fun FolderSleekCard(
     // next to the neutral black bar and neutral recent cards (owner-caught
     // 2026-10-28). surfaceVariant is neutral in both themes.
     val cardBg = MaterialTheme.colorScheme.surfaceVariant
+    // Hoisted for the icon gradient below: drawWithCache is not a
+    // @Composable scope, so no MaterialTheme read may live inside it.
+    val iconTop = MaterialTheme.colorScheme.onBackground
     val cardShape = RoundedCornerShape(12.dp)
     val folderName = stringResource(CategoryDisplay.displayNameRes(folder))
     // Reference count style: plural counts are tracked capitals
@@ -864,7 +871,7 @@ fun FolderSleekCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 14.dp, end = 12.dp)
+                    .padding(start = 10.dp, end = 8.dp)
             ) {
                 Column(
                     horizontalAlignment = Alignment.Start,
@@ -899,12 +906,27 @@ fun FolderSleekCard(
                         )
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                // Icon disc: soft onBackground disc, icon drawn whole
-                // at full contrast — never cut, never ghosted.
+                Spacer(modifier = Modifier.width(6.dp))
+                // Icon disc + gradient icon (reference, measured
+                // 2026-10-28): the icon spans ~51% of the card height
+                // (ours was ~32%), and it carries a vertical gradient —
+                // bright at the top, dissolving into the card toward the
+                // bottom — so the name stays the hero and the icon sits
+                // behind it (reference text ~96% white, icon mean ~61%).
+                // SrcIn replaces the icon's color with the gradient inside
+                // the icon's own alpha mask: shape and disc untouched.
+                // The old flat 85% tint read as equal to the text; the
+                // gradient + bigger size restore the reference hierarchy.
+                // CORRECTION 2026-10-28: SrcIn WITHOUT an offscreen layer
+                // composites against the whole opaque card beneath, so
+                // every icon rendered as a solid gradient rectangle on
+                // device. The graphicsLayer below isolates the glyph, so
+                // the gradient fills the glyph alone. Disc 60dp (not 64dp)
+                // plus tighter row padding: at 64dp the names truncated
+                // ("Manqa...", "My Kal...") on a phone-width card.
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(60.dp)
                         .clip(CircleShape)
                         .background(
                             MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
@@ -914,8 +936,29 @@ fun FolderSleekCard(
                     Icon(
                         painter = iconPainter,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
-                        modifier = Modifier.size(34.dp)
+                        tint = iconTop,
+                        modifier = Modifier
+                            .size(54.dp)
+                            // Offscreen layer is MANDATORY for SrcIn (see
+                            // the correction note above): without it the
+                            // gradient rectangle covers the whole box.
+                            .graphicsLayer {
+                                compositingStrategy = CompositingStrategy.Offscreen
+                            }
+                            .drawWithCache {
+                                val gradient = Brush.verticalGradient(
+                                    colors = listOf(
+                                        iconTop,
+                                        cardBg
+                                    ),
+                                    startY = 0f,
+                                    endY = size.height
+                                )
+                                onDrawWithContent {
+                                    drawContent()
+                                    drawRect(brush = gradient, blendMode = BlendMode.SrcIn)
+                                }
+                            }
                     )
                 }
             }
