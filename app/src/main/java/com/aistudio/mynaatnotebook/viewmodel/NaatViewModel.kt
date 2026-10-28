@@ -315,8 +315,25 @@ class NaatViewModel @Inject constructor(
         val favoritesOnly: Boolean
     )
 
+    /**
+     * One object, one truth: the list AND the filter it was fetched for,
+     * emitted together. The results UI renders a list ONLY when its filter
+     * matches the filter on screen — rendering the list and the query from
+     * separate states is exactly how the stale-list flash survived the
+     * debounce fix (owner-caught 2026-10-28: shrinking the window from
+     * ~160ms to a few ms is not a cure; the wrong list still appeared).
+     * `query` is the normalized form (see normalizeSearchText); callers
+     * compare with normalizeSearchText(debouncedQuery), never raw text.
+     */
+    data class LibraryResults(
+        val query: String,
+        val folder: String?,
+        val favoritesOnly: Boolean,
+        val summaries: List<NaatSummary>
+    )
+
     @OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val filteredSummaries: StateFlow<List<NaatSummary>> = combine(
+    val libraryResults: StateFlow<LibraryResults> = combine(
         _searchQuery.debounce(160).distinctUntilChanged(),
         _selectedFolder,
         _showFavoritesOnly,
@@ -341,13 +358,23 @@ class NaatViewModel @Inject constructor(
             // Stage-2 UX audit: rank the matches (title > poet > lyrics-only) on the way out.
             repository.filteredSummaries(filter.query, filter.folder, filter.favoritesOnly)
                 .map { rankSearchResults(it, filter.query) }
+                .map { LibraryResults(filter.query, filter.folder, filter.favoritesOnly, it) }
         }
         // Audit 03 H-b: a Room failure used to leave the list silently
         // stale or empty with no trace anywhere.
         .catch { error ->
             Log.e("NaatViewModel", "Library filter flow failed", error)
-            emit(emptyList())
+            // A failed fetch is not an empty result: emit a filter that
+            // matches nothing on screen, so the UI shows blank instead of
+            // a false "no results" state.
+            emit(LibraryResults("", null, false, emptyList()))
         }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LibraryResults("", null, false, emptyList()))
+
+    /** List-only projection of [libraryResults] for callers that need no
+     * filter matching (reader prev/next). Same pipeline, no second query. */
+    val filteredSummaries: StateFlow<List<NaatSummary>> = libraryResults
+        .map { it.summaries }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Active recording file state (for adding a new Naat). File validation happens

@@ -60,6 +60,7 @@ import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
+import com.aistudio.mynaatnotebook.viewmodel.normalizeSearchText
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -87,11 +88,21 @@ fun LibraryScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val debouncedSearchQuery by viewModel.debouncedSearchQuery.collectAsStateWithLifecycle()
     val selectedFolder by viewModel.selectedFolder.collectAsStateWithLifecycle()
-    val filteredNaats by viewModel.filteredSummaries.collectAsStateWithLifecycle()
+    val libraryResults by viewModel.libraryResults.collectAsStateWithLifecycle()
     val recentNaats by viewModel.recentSummaries.collectAsStateWithLifecycle()
     val categoryCounts by viewModel.categoryCounts.collectAsStateWithLifecycle()
     val favoritesOnly by viewModel.showFavoritesOnly.collectAsStateWithLifecycle()
     val searchWholeLibrary by viewModel.searchWholeLibrary.collectAsStateWithLifecycle()
+    // The filter the lists on screen were asked for — folder scope follows
+    // the same whole-library resolution as the ViewModel pipeline. A list
+    // renders ONLY when it was fetched for exactly this filter; anything
+    // else is stale and shows as blank, never as a wrong list, not even
+    // for one frame (owner-caught 2026-10-28: the debounce fix only shrank
+    // the stale window, it did not close it).
+    val displayedFolder = if (searchWholeLibrary && debouncedSearchQuery.isNotBlank()) null else selectedFolder
+    val listMatchesFilter = normalizeSearchText(debouncedSearchQuery) == libraryResults.query &&
+        displayedFolder == libraryResults.folder &&
+        favoritesOnly == libraryResults.favoritesOnly
     val isDeleting by viewModel.isDeleting.collectAsStateWithLifecycle()
     // Arena E8: a deliberately parked draft waits here as a banner instead
     // of reopening the editor on every cold start.
@@ -454,12 +465,12 @@ fun LibraryScreen(
                 )
                 // Audit L7: the results say how many they are, not just
                 // what was typed.
-                if (debouncedSearchQuery.isNotBlank() && filteredNaats.isNotEmpty()) {
+                if (debouncedSearchQuery.isNotBlank() && listMatchesFilter && libraryResults.summaries.isNotEmpty()) {
                     Text(
                         text = pluralStringResource(
                             R.plurals.library_results_count,
-                            filteredNaats.size,
-                            filteredNaats.size
+                            libraryResults.summaries.size,
+                            libraryResults.summaries.size
                         ),
                         style = MaterialTheme.typography.labelSmall,
                         color = secondaryTextColor(),
@@ -503,7 +514,11 @@ fun LibraryScreen(
                         )
                     }
                 }
-                if (filteredNaats.isEmpty()) {
+                if (!listMatchesFilter) {
+                    // Stale list must never render: blank until the
+                    // matching list lands (a few ms), never a wrong list.
+                    Spacer(modifier = Modifier.weight(1f))
+                } else if (libraryResults.summaries.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -534,7 +549,7 @@ fun LibraryScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(filteredNaats, key = { it.id }) { naat ->
+                        items(libraryResults.summaries, key = { it.id }) { naat ->
                         NaatRowItem(
                             naat = naat,
                             isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
@@ -603,12 +618,12 @@ fun LibraryScreen(
                     modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
                 )
                 // Audit L7: the results say how many they are.
-                if (filteredNaats.isNotEmpty()) {
+                if (listMatchesFilter && libraryResults.summaries.isNotEmpty()) {
                     Text(
                         text = pluralStringResource(
                             R.plurals.library_results_count,
-                            filteredNaats.size,
-                            filteredNaats.size
+                            libraryResults.summaries.size,
+                            libraryResults.summaries.size
                         ),
                         style = MaterialTheme.typography.labelSmall,
                         color = secondaryTextColor(),
@@ -654,7 +669,15 @@ fun LibraryScreen(
                 }
             }
 
-            if (filteredNaats.isEmpty()) {
+            if (!listMatchesFilter) {
+                // Stale list must never render: blank until the
+                // matching list lands (a few ms), never a wrong list.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {}
+            } else if (libraryResults.summaries.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -710,7 +733,7 @@ fun LibraryScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredNaats, key = { it.id }) { naat ->
+                    items(libraryResults.summaries, key = { it.id }) { naat ->
                         NaatRowItem(
                             naat = naat,
                             isPlaying = hasPlaybackSession && nowPlaying?.naatId == naat.id,
