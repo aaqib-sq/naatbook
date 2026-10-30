@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.aistudio.mynaatnotebook.viewmodel.StatusMessage
@@ -62,8 +66,10 @@ import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
 import kotlinx.coroutines.flow.collectLatest
+import com.aistudio.mynaatnotebook.ui.lock.LockScreen
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
+import com.aistudio.mynaatnotebook.viewmodel.LockViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 
@@ -91,7 +97,8 @@ fun NaatApp(
     viewModel: NaatViewModel,
     settingsViewModel: SettingsViewModel,
     backupViewModel: BackupViewModel,
-    driveViewModel: DriveViewModel
+    driveViewModel: DriveViewModel,
+    lockViewModel: LockViewModel
 ) {
     val context = LocalContext.current
     val navController = rememberNavController()
@@ -146,6 +153,21 @@ fun NaatApp(
         "white" -> false
         "black" -> true
         else -> isSystemInDarkTheme()
+    }
+
+    // App lock: re-lock on every foreground return while the lock is on.
+    // ON_START also fires returning from a document picker or the Drive
+    // consent screen, so an unlocked user coming back from a picker is
+    // re-locked and unlocks again — a safe default, a minor annoyance.
+    val lockEnabled by lockViewModel.lockEnabled.collectAsStateWithLifecycle()
+    val lockUnlocked by lockViewModel.unlocked.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) lockViewModel.relock()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Audit 03 M13: status messages arrive on a queue — every receipt is
@@ -368,6 +390,7 @@ fun NaatApp(
                                         settingsViewModel,
                                         backupViewModel,
                                         driveViewModel,
+                                        lockViewModel,
                                         viewModel,
                                         onShowIntro = { introRequested = true },
                                         onOpenPrivacyPolicy = {
@@ -573,6 +596,15 @@ fun NaatApp(
                             introRequested = false
                             settingsViewModel.setOnboardingSeen()
                         }
+                    )
+                }
+                // App lock: opaque topmost overlay. Drawn last in the Box
+                // so it covers the library, reader, and settings alike.
+                // Back is swallowed inside LockScreen itself.
+                if (lockEnabled && !lockUnlocked) {
+                    LockScreen(
+                        lockViewModel = lockViewModel,
+                        driveViewModel = driveViewModel
                     )
                 }
             }

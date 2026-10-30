@@ -2,10 +2,10 @@ package com.aistudio.mynaatnotebook
 
 import android.content.Context
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -14,17 +14,20 @@ import com.aistudio.mynaatnotebook.data.LocaleHelper
 import com.aistudio.mynaatnotebook.ui.NaatApp
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
+import com.aistudio.mynaatnotebook.viewmodel.LockViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+// FragmentActivity (not plain ComponentActivity): BiometricPrompt requires it.
+class MainActivity : FragmentActivity() {
 
   private val viewModel: NaatViewModel by viewModels()
   private val settingsViewModel: SettingsViewModel by viewModels()
   private val backupViewModel: BackupViewModel by viewModels()
   private val driveViewModel: DriveViewModel by viewModels()
+  private val lockViewModel: LockViewModel by viewModels()
 
   override fun attachBaseContext(newBase: Context) {
     // Apply the user's language choice before anything renders.
@@ -46,7 +49,8 @@ class MainActivity : ComponentActivity() {
                 viewModel = viewModel,
                 settingsViewModel = settingsViewModel,
                 backupViewModel = backupViewModel,
-                driveViewModel = driveViewModel
+                driveViewModel = driveViewModel,
+                lockViewModel = lockViewModel
             )
         }
     }

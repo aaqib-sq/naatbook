@@ -47,6 +47,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -72,6 +74,7 @@ import com.aistudio.mynaatnotebook.data.CustomFontStore
 import com.aistudio.mynaatnotebook.data.drive.driveBackupEntryCount
 import com.aistudio.mynaatnotebook.viewmodel.BackupViewModel
 import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
+import com.aistudio.mynaatnotebook.viewmodel.LockViewModel
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.resolve
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
@@ -81,6 +84,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** Which manual export destination opened the backup-type chooser dialog. */
 private enum class ExportTarget { APP_FOLDER, CHOOSE_PLACE }
@@ -90,6 +96,7 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
     backupViewModel: BackupViewModel,
     driveViewModel: DriveViewModel,
+    lockViewModel: LockViewModel,
     naatViewModel: NaatViewModel,
     onShowIntro: () -> Unit = {},
     onOpenPrivacyPolicy: () -> Unit = {},
@@ -124,6 +131,19 @@ fun SettingsScreen(
     val driveRestoreChoices by driveViewModel.restoreChoices.collectAsStateWithLifecycle()
     var driveDisconnectConfirm by rememberSaveable { mutableStateOf(false) }
     var showClearDataConfirm by rememberSaveable { mutableStateOf(false) }
+
+    // App lock dialog state: PIN setup (set or change) and the
+    // backup-mandatory block. Neither is saveable across process death —
+    // both are transient questions, never data.
+    var showPinDialog by remember { mutableStateOf(false) }
+    var showLockBlockedDialog by remember { mutableStateOf(false) }
+
+    // App lock state (LockViewModel owns the DataStore flows).
+    val lockEnabled by lockViewModel.lockEnabled.collectAsStateWithLifecycle()
+    val lockPinSet by lockViewModel.pinSet.collectAsStateWithLifecycle()
+    val lockBiometricEnabled by lockViewModel.biometricEnabled.collectAsStateWithLifecycle()
+    val lockLastBackupAtMs by lockViewModel.lastBackupAtMs.collectAsStateWithLifecycle()
+    val lockBackupStale by lockViewModel.isBackupStale.collectAsStateWithLifecycle()
 
     // Which font picker is open: "reader", "title", or null.
     var fontPickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
@@ -604,6 +624,46 @@ fun SettingsScreen(
                 }
             },
             modifier = Modifier.testTag("clear_data_dialog")
+        )
+    }
+
+    // App lock: PIN setup (set or change). On a match the PIN is stored
+    // (salted hash only) and, when the lock is still off, the enable
+    // attempt runs again — a backup that vanished in between still blocks.
+    if (showPinDialog) {
+        PinSetupDialog(
+            title = stringResource(R.string.lock_pin_set_title),
+            onDismiss = { showPinDialog = false },
+            onConfirm = { pin ->
+                showPinDialog = false
+                lockViewModel.setPin(pin) {
+                    if (!lockEnabled) {
+                        lockViewModel.tryEnableLock { result ->
+                            if (result is LockViewModel.EnableResult.BlockedNoBackup) {
+                                showLockBlockedDialog = true
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    // App lock: backup-mandatory block. Plain message, no jargon.
+    if (showLockBlockedDialog) {
+        AlertDialog(
+            onDismissRequest = { showLockBlockedDialog = false },
+            title = { Text(stringResource(R.string.lock_blocked_title)) },
+            text = { Text(stringResource(R.string.lock_blocked_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { showLockBlockedDialog = false },
+                    modifier = Modifier.testTag("lock_blocked_ok")
+                ) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            },
+            modifier = Modifier.testTag("lock_blocked_dialog")
         )
     }
 
@@ -1124,6 +1184,137 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // App lock (PIN + biometric, fully offline). Sits between Data
+        // and Drive on purpose: the lock's safety story is backups, and
+        // both neighbours are exactly that. PIN is always available —
+        // biometric is an extra, never the only way in.
+        SettingsGroupHeading(stringResource(R.string.lock_title))
+        Spacer(modifier = Modifier.height(8.dp))
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column {
+                SettingsActionRow(
+                    icon = Icons.Default.Lock,
+                    title = stringResource(R.string.lock_title),
+                    subtitle = stringResource(R.string.lock_subtitle),
+                    contentDescription = stringResource(R.string.lock_title),
+                    enabled = true,
+                    testTag = "lock_toggle",
+                    onClick = {
+                        if (lockEnabled) {
+                            lockViewModel.disableLock()
+                        } else {
+                            lockViewModel.tryEnableLock { result ->
+                                when (result) {
+                                    is LockViewModel.EnableResult.NeedsPin ->
+                                        showPinDialog = true
+                                    is LockViewModel.EnableResult.BlockedNoBackup ->
+                                        showLockBlockedDialog = true
+                                    is LockViewModel.EnableResult.Enabled -> Unit
+                                }
+                            }
+                        }
+                    },
+                    trailing = {
+                        Switch(
+                            checked = lockEnabled,
+                            onCheckedChange = { checked ->
+                                if (!checked) {
+                                    lockViewModel.disableLock()
+                                } else {
+                                    lockViewModel.tryEnableLock { result ->
+                                        when (result) {
+                                            is LockViewModel.EnableResult.NeedsPin ->
+                                                showPinDialog = true
+                                            is LockViewModel.EnableResult.BlockedNoBackup ->
+                                                showLockBlockedDialog = true
+                                            is LockViewModel.EnableResult.Enabled -> Unit
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.testTag("lock_switch")
+                        )
+                    }
+                )
+                SettingsRowDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.Password,
+                    title = stringResource(R.string.lock_pin_title),
+                    subtitle = if (lockPinSet) {
+                        stringResource(R.string.lock_change_pin)
+                    } else {
+                        stringResource(R.string.lock_set_pin)
+                    },
+                    contentDescription = stringResource(R.string.lock_pin_title),
+                    enabled = true,
+                    testTag = "lock_pin_btn",
+                    onClick = { showPinDialog = true },
+                    trailing = {}
+                )
+                if (lockViewModel.biometricAvailable) {
+                    SettingsRowDivider()
+                    SettingsActionRow(
+                        icon = Icons.Default.Fingerprint,
+                        title = stringResource(R.string.lock_biometric_setting),
+                        subtitle = null,
+                        contentDescription = stringResource(R.string.lock_biometric_setting),
+                        enabled = lockEnabled,
+                        testTag = "lock_biometric_row",
+                        onClick = {
+                            if (lockEnabled) {
+                                lockViewModel.setBiometricEnabled(!lockBiometricEnabled)
+                            }
+                        },
+                        trailing = {
+                            Switch(
+                                checked = lockBiometricEnabled,
+                                onCheckedChange = { lockViewModel.setBiometricEnabled(it) },
+                                enabled = lockEnabled,
+                                modifier = Modifier.testTag("lock_biometric_switch")
+                            )
+                        }
+                    )
+                }
+                SettingsRowDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.Backup,
+                    title = if (lockLastBackupAtMs > 0L) {
+                        stringResource(
+                            R.string.lock_last_backup,
+                            SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+                                .format(Date(lockLastBackupAtMs))
+                        )
+                    } else {
+                        stringResource(R.string.lock_backup_never)
+                    },
+                    subtitle = if (lockBackupStale) {
+                        stringResource(R.string.lock_backup_stale)
+                    } else {
+                        null
+                    },
+                    contentDescription = stringResource(R.string.lock_backup_now),
+                    enabled = !backupWorking && !driveSyncing,
+                    testTag = "lock_backup_btn",
+                    onClick = {
+                        if (driveEmail != null) {
+                            driveViewModel.syncNow()
+                        } else {
+                            exportChoiceTarget = ExportTarget.APP_FOLDER
+                        }
+                    },
+                    trailing = {}
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         // 4. Google Drive Backup (online, opt-in)
         SettingsGroupHeading(stringResource(R.string.settings_drive_title))
         Spacer(modifier = Modifier.height(8.dp))
@@ -1601,3 +1792,78 @@ private fun backupInitialUri(persisted: String?): Uri =
             "com.android.externalstorage.documents",
             "primary:Download/NaatBook"
         )
+
+/** App-lock PIN setup: 4 digits + confirm. Mismatch is shown in place
+ * and the confirm field is cleared — nothing is stored until both agree. */
+@Composable
+private fun PinSetupDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var pin by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var mismatch by remember { mutableStateOf(false) }
+    val pinKeyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.lock_pin_set_message))
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = {
+                        pin = it.filter { ch -> ch.isDigit() }.take(4)
+                        mismatch = false
+                    },
+                    label = { Text(stringResource(R.string.lock_pin_title)) },
+                    singleLine = true,
+                    keyboardOptions = pinKeyboard,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth().testTag("lock_pin_field")
+                )
+                OutlinedTextField(
+                    value = confirm,
+                    onValueChange = {
+                        confirm = it.filter { ch -> ch.isDigit() }.take(4)
+                        mismatch = false
+                    },
+                    label = { Text(stringResource(R.string.lock_pin_confirm)) },
+                    singleLine = true,
+                    keyboardOptions = pinKeyboard,
+                    visualTransformation = PasswordVisualTransformation(),
+                    isError = mismatch,
+                    supportingText = if (mismatch) {
+                        { Text(stringResource(R.string.lock_pin_mismatch)) }
+                    } else {
+                        null
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("lock_pin_confirm_field")
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = pin.length == 4 && confirm.length == 4,
+                onClick = {
+                    if (pin == confirm) {
+                        onConfirm(pin)
+                    } else {
+                        mismatch = true
+                        confirm = ""
+                    }
+                },
+                modifier = Modifier.testTag("lock_pin_save")
+            ) {
+                Text(stringResource(R.string.common_ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+        modifier = Modifier.testTag("lock_pin_dialog")
+    )
+}
