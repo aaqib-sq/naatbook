@@ -494,5 +494,14 @@
     <string name="lock_emergency_saved_toast">Emergency file saved</string>
     <string name="lock_emergency_failed">Could not save: %1$s</string>
     <string name="lock_emergency_note">The local file is encrypted and can only be opened by NaatBook on this phone. It survives clearing the app\'s data, but it is lost if the app is uninstalled.</string>
+    <string name="lock_menu_desc">More options</string>
+    <string name="lock_autolock_title">Auto-lock timer</string>
+    <string name="lock_autolock_subtitle">Lock again: %1$s</string>
+    <string name="lock_autolock_immediate">Immediately</string>
+    <string name="lock_autolock_10">After 10 minutes</string>
+    <string name="lock_autolock_20">After 20 minutes</string>
+    <string name="lock_autolock_30">After 30 minutes</string>
+    <string name="lock_device_unlock_title">Lock when phone is unlocked</string>
+    <string name="lock_device_unlock_subtitle">Ask for PIN or fingerprint again after unlocking the phone</string>
     <string name="status_lock_biometric_failed">Fingerprint / face unlock failed — try your PIN</string>
 </resources>

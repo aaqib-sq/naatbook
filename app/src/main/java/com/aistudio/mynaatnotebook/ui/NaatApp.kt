@@ -155,19 +155,43 @@ fun NaatApp(
         else -> isSystemInDarkTheme()
     }
 
-    // App lock: re-lock on every foreground return while the lock is on.
-    // ON_START also fires returning from a document picker or the Drive
-    // consent screen, so an unlocked user coming back from a picker is
-    // re-locked and unlocks again — a safe default, a minor annoyance.
+    // App lock: the grace clock starts on background, and the foreground
+    // decision runs through AutoLockPolicy (Immediate / grace timer /
+    // device-unlock cycle). A device unlock while backgrounded is seen
+    // via ACTION_USER_PRESENT.
     val lockEnabled by lockViewModel.lockEnabled.collectAsStateWithLifecycle()
     val lockUnlocked by lockViewModel.unlocked.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_START) lockViewModel.relock()
+            when (event) {
+                Lifecycle.Event.ON_STOP -> lockViewModel.onBackgrounded()
+                Lifecycle.Event.ON_START -> lockViewModel.onForegrounded()
+                else -> Unit
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        val unlockReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(
+                context: android.content.Context?,
+                intent: android.content.Intent?
+            ) {
+                lockViewModel.onDeviceUnlocked()
+            }
+        }
+        val unlockFilter = android.content.IntentFilter(
+            android.content.Intent.ACTION_USER_PRESENT
+        )
+        androidx.core.content.ContextCompat.registerReceiver(
+            context,
+            unlockReceiver,
+            unlockFilter,
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            context.unregisterReceiver(unlockReceiver)
+        }
     }
 
     // Audit 03 M13: status messages arrive on a queue — every receipt is

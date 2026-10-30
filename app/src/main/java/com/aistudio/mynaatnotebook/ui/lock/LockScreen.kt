@@ -10,25 +10,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -61,11 +58,13 @@ import kotlinx.coroutines.launch
  * input), and Back is swallowed. The keypad is ALWAYS the fallback —
  * biometric-only mode is forbidden by design.
  *
- * Emergency section: hidden until the user taps "Can't unlock?" or any
- * unlock attempt fails. Its buttons save data BEFORE any wipe:
- * "Drive sync karo" uploads the current library (existing Drive sync),
- * "Local file banao" writes an encrypted emergency file to
+ * No scrolling, ever (owner order): the content is sized to fit, with
+ * the emergency options living in the top-right three-dot menu instead
+ * of a card below the keypad. The menu buttons save data BEFORE any
+ * wipe: "Sync to Drive" uploads the current library (existing Drive
+ * sync), "Make a local file" writes an encrypted emergency file to
  * Download/NaatBook. Neither button unlocks the app or shows entries.
+ * The standard Material fingerprint icon is the biometric mark.
  */
 @Composable
 fun LockScreen(
@@ -74,7 +73,6 @@ fun LockScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val failedAttempts by lockViewModel.failedAttempts.collectAsStateWithLifecycle()
     val lockoutUntilMs by lockViewModel.lockoutUntilMs.collectAsStateWithLifecycle()
     val biometricEnabled by lockViewModel.biometricEnabled.collectAsStateWithLifecycle()
     val biometricError by lockViewModel.biometricError.collectAsStateWithLifecycle()
@@ -82,11 +80,12 @@ fun LockScreen(
     val emergencyResult by lockViewModel.emergencyResult.collectAsStateWithLifecycle()
     val driveEmail by driveViewModel.connectedEmail.collectAsStateWithLifecycle()
     val driveSyncing by driveViewModel.isSyncing.collectAsStateWithLifecycle()
-    val driveLastSyncText by driveViewModel.lastSyncText.collectAsStateWithLifecycle()
 
     var pin by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
-    var showEmergency by remember { mutableStateOf(false) }
+    var pinSubmitting by remember { mutableStateOf(false) }
+    var pressedKey by remember { mutableStateOf<String?>(null) }
+    var menuExpanded by remember { mutableStateOf(false) }
     // 1s ticker so the lockout countdown moves without recomposing the world.
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(lockoutUntilMs) {
@@ -98,11 +97,7 @@ fun LockScreen(
     }
     val lockedOut = nowMs < lockoutUntilMs
     val remainingSec = ((lockoutUntilMs - nowMs) / 1000L).coerceAtLeast(0L)
-
-    // The emergency section opens itself after any failed attempt.
-    LaunchedEffect(failedAttempts) {
-        if (failedAttempts > 0) showEmergency = true
-    }
+    val keypadEnabled = !lockedOut && !pinSubmitting
 
     // Back must never escape the lock screen into the library.
     BackHandler(enabled = true) { }
@@ -118,17 +113,16 @@ fun LockScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 32.dp, vertical = 48.dp),
+                .padding(horizontal = 32.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_app_logo),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier.size(56.dp)
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = stringResource(R.string.lock_app_name),
                 style = MaterialTheme.typography.titleLarge,
@@ -146,7 +140,7 @@ fun LockScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             // PIN dots.
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 repeat(4) { index ->
@@ -166,41 +160,70 @@ fun LockScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             // Keypad: 1-9, blank, 0, backspace. Monochrome outlined circles.
+            // The pressed key fills briefly so every tap — including the
+            // last digit, whose auto-submit used to swallow all feedback —
+            // shows a visible click before anything else happens.
             val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "<")
             keys.chunked(3).forEach { rowKeys ->
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(vertical = 6.dp)
                 ) {
                     rowKeys.forEach { key ->
                         if (key.isEmpty()) {
-                            Spacer(modifier = Modifier.size(72.dp))
+                            Spacer(modifier = Modifier.size(68.dp))
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(72.dp)
+                                    .size(68.dp)
                                     .clip(CircleShape)
                                     .border(
                                         2.dp,
                                         MaterialTheme.colorScheme.onBackground,
                                         CircleShape
                                     )
-                                    .clickable(enabled = !lockedOut) {
+                                    .background(
+                                        if (pressedKey == key) {
+                                            MaterialTheme.colorScheme.onBackground
+                                                .copy(alpha = 0.18f)
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                        CircleShape
+                                    )
+                                    .clickable(enabled = keypadEnabled) {
                                         pinError = false
                                         lockViewModel.clearBiometricError()
+                                        pressedKey = key
                                         if (key == "<") {
                                             pin = pin.dropLast(1)
+                                            scope.launch {
+                                                delay(150L)
+                                                if (pressedKey == key) pressedKey = null
+                                            }
                                         } else if (pin.length < 4) {
                                             pin += key
                                             if (pin.length == 4) {
+                                                // Last digit: let the press
+                                                // effect (and 4th dot) show
+                                                // before auto-submit runs.
                                                 val typed = pin
+                                                pinSubmitting = true
                                                 scope.launch {
+                                                    delay(150L)
+                                                    if (pressedKey == key) pressedKey = null
                                                     if (!lockViewModel.checkPin(typed)) {
                                                         pin = ""
                                                         pinError = true
                                                     }
+                                                    pinSubmitting = false
+                                                }
+                                            } else {
+                                                scope.launch {
+                                                    delay(150L)
+                                                    if (pressedKey == key) pressedKey = null
                                                 }
                                             }
                                         }
@@ -219,7 +242,7 @@ fun LockScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             if (biometricEnabled && lockViewModel.biometricAvailable && !lockedOut) {
                 OutlinedButton(
                     onClick = {
@@ -239,98 +262,70 @@ fun LockScreen(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            TextButton(
-                onClick = { showEmergency = !showEmergency },
-                modifier = Modifier.testTag("lock_cant_unlock_btn")
-            ) {
-                Text(text = stringResource(R.string.lock_cant_unlock))
+            // Emergency result line (the options themselves live in the
+            // three-dot menu). Shown only after an option was used.
+            emergencyResult?.let { result ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = result,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.lock_emergency_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            if (showEmergency) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Column(
+        }
+        // Emergency options: three-dot overflow menu, top-right.
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopEnd
+        ) {
+            Column {
+                IconButton(
+                    onClick = { menuExpanded = true },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline,
-                            RoundedCornerShape(12.dp)
-                        )
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(top = 8.dp, end = 8.dp)
+                        .testTag("lock_menu_btn")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(28.dp)
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.lock_menu_desc),
+                        tint = MaterialTheme.colorScheme.onBackground
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.lock_emergency_message),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { driveViewModel.syncNow() },
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = if (driveEmail != null) {
+                                    stringResource(R.string.lock_emergency_drive_btn)
+                                } else {
+                                    stringResource(R.string.lock_emergency_drive_not_connected)
+                                }
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            driveViewModel.syncNow()
+                        },
                         enabled = driveEmail != null && !driveSyncing,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("lock_emergency_drive_btn")
-                    ) {
-                        if (driveSyncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Text(
-                            text = if (driveEmail != null) {
-                                stringResource(R.string.lock_emergency_drive_btn)
-                            } else {
-                                stringResource(R.string.lock_emergency_drive_not_connected)
-                            }
-                        )
-                    }
-                    driveLastSyncText?.let { text ->
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = text,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = { lockViewModel.emergencyExport() },
+                        modifier = Modifier.testTag("lock_menu_drive")
+                    )
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.lock_emergency_local_btn)) },
+                        onClick = {
+                            menuExpanded = false
+                            lockViewModel.emergencyExport()
+                        },
                         enabled = !emergencyWorking,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("lock_emergency_local_btn")
-                    ) {
-                        if (emergencyWorking) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Text(text = stringResource(R.string.lock_emergency_local_btn))
-                    }
-                    emergencyResult?.let { result ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = result,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.lock_emergency_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        modifier = Modifier.testTag("lock_menu_local")
                     )
                 }
             }

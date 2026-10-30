@@ -208,3 +208,32 @@ object LockAttemptPolicy {
         else -> 900_000L
     }
 }
+
+/**
+ * Auto-lock decision on returning to the foreground. Pure function,
+ * unit-tested. The app re-locks when any of these hold:
+ * - the lock is off (never: there is nothing to re-lock — returns false),
+ * - a device-lock/unlock cycle happened since backgrounding and the
+ *   "lock on device unlock" toggle is on,
+ * - the timer is Immediate (0 minutes),
+ * - the app stayed backgrounded at least the chosen grace period.
+ * Otherwise (still inside the grace period, no device-unlock cycle) the
+ * session stays unlocked.
+ */
+object AutoLockPolicy {
+    /** True when the app must show the lock screen on this foreground. */
+    fun shouldRelock(
+        lockEnabled: Boolean,
+        lockOnDeviceUnlock: Boolean,
+        deviceUnlockedSinceBackground: Boolean,
+        autoLockMinutes: Int,
+        backgroundedAtMs: Long,
+        nowMs: Long
+    ): Boolean {
+        if (!lockEnabled) return false
+        if (lockOnDeviceUnlock && deviceUnlockedSinceBackground) return true
+        if (autoLockMinutes <= 0) return true
+        if (backgroundedAtMs <= 0L) return true
+        return nowMs - backgroundedAtMs >= autoLockMinutes * 60_000L
+    }
+}
