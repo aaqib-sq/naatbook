@@ -53,6 +53,8 @@ private val KEY_LOCK_ENABLED = androidx.datastore.preferences.core.booleanPrefer
 private val KEY_LOCK_PIN_HASH = stringPreferencesKey("lock_pin_hash")
 private val KEY_LOCK_PIN_SALT = stringPreferencesKey("lock_pin_salt")
 private val KEY_LOCK_BIOMETRIC_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("lock_biometric_enabled")
+private val KEY_LOCK_AUTO_LOCK_MINUTES = androidx.datastore.preferences.core.intPreferencesKey("lock_auto_lock_minutes")
+private val KEY_LOCK_ON_DEVICE_UNLOCK = androidx.datastore.preferences.core.booleanPreferencesKey("lock_on_device_unlock")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -438,6 +440,33 @@ class SettingsStore @Inject constructor(
 
     suspend fun setLockBiometricEnabled(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_LOCK_BIOMETRIC_ENABLED] = enabled }
+    }
+
+    /**
+     * Auto-lock grace in minutes after the app goes to background.
+     * 0 = Immediate (lock as soon as the app is backgrounded, the
+     * pre-refinement behaviour). 10 / 20 / 30 = lock only if the app
+     * stays backgrounded longer than that. LOCAL ONLY, like all lock state.
+     */
+    val lockAutoLockMinutes: Flow<Int> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LOCK_AUTO_LOCK_MINUTES] ?: 0 }
+
+    suspend fun setLockAutoLockMinutes(minutes: Int) {
+        context.settingsDataStore.edit { it[KEY_LOCK_AUTO_LOCK_MINUTES] = minutes }
+    }
+
+    /**
+     * When true (the default), a device-lock/unlock cycle re-locks the
+     * app even inside the auto-lock grace period: opening the app after
+     * unlocking the phone always asks for PIN/biometric again.
+     */
+    val lockOnDeviceUnlock: Flow<Boolean> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LOCK_ON_DEVICE_UNLOCK] ?: true }
+
+    suspend fun setLockOnDeviceUnlock(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_LOCK_ON_DEVICE_UNLOCK] = enabled }
     }
 
     /**

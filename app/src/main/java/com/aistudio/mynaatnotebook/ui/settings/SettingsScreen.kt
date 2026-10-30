@@ -137,11 +137,14 @@ fun SettingsScreen(
     // both are transient questions, never data.
     var showPinDialog by remember { mutableStateOf(false) }
     var showLockBlockedDialog by remember { mutableStateOf(false) }
+    var showAutoLockDialog by remember { mutableStateOf(false) }
 
     // App lock state (LockViewModel owns the DataStore flows).
     val lockEnabled by lockViewModel.lockEnabled.collectAsStateWithLifecycle()
     val lockPinSet by lockViewModel.pinSet.collectAsStateWithLifecycle()
     val lockBiometricEnabled by lockViewModel.biometricEnabled.collectAsStateWithLifecycle()
+    val lockAutoLockMinutes by lockViewModel.autoLockMinutes.collectAsStateWithLifecycle()
+    val lockOnDeviceUnlock by lockViewModel.lockOnDeviceUnlock.collectAsStateWithLifecycle()
     val lockLastBackupAtMs by lockViewModel.lastBackupAtMs.collectAsStateWithLifecycle()
     val lockBackupStale by lockViewModel.isBackupStale.collectAsStateWithLifecycle()
 
@@ -664,6 +667,58 @@ fun SettingsScreen(
                 }
             },
             modifier = Modifier.testTag("lock_blocked_dialog")
+        )
+    }
+
+    // App lock: auto-lock timer choice (Immediate / 10 / 20 / 30 min).
+    if (showAutoLockDialog) {
+        AlertDialog(
+            onDismissRequest = { showAutoLockDialog = false },
+            title = { Text(stringResource(R.string.lock_autolock_title)) },
+            text = {
+                Column {
+                    listOf(
+                        0 to R.string.lock_autolock_immediate,
+                        10 to R.string.lock_autolock_10,
+                        20 to R.string.lock_autolock_20,
+                        30 to R.string.lock_autolock_30
+                    ).forEach { (minutes, label) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    lockViewModel.setAutoLockMinutes(minutes)
+                                    showAutoLockDialog = false
+                                }
+                                .padding(vertical = 4.dp)
+                                .testTag("lock_autolock_$minutes")
+                        ) {
+                            RadioButton(
+                                selected = lockAutoLockMinutes == minutes,
+                                onClick = {
+                                    lockViewModel.setAutoLockMinutes(minutes)
+                                    showAutoLockDialog = false
+                                }
+                            )
+                            Text(
+                                stringResource(label),
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showAutoLockDialog = false },
+                    modifier = Modifier.testTag("lock_autolock_cancel")
+                ) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+            modifier = Modifier.testTag("lock_autolock_dialog")
         )
     }
 
@@ -1281,6 +1336,51 @@ fun SettingsScreen(
                         }
                     )
                 }
+                // Auto-lock timer: how long the app may stay backgrounded
+                // before it locks again. Immediate = lock at once.
+                SettingsRowDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.Timer,
+                    title = stringResource(R.string.lock_autolock_title),
+                    subtitle = stringResource(
+                        R.string.lock_autolock_subtitle,
+                        when (lockAutoLockMinutes) {
+                            10 -> stringResource(R.string.lock_autolock_10)
+                            20 -> stringResource(R.string.lock_autolock_20)
+                            30 -> stringResource(R.string.lock_autolock_30)
+                            else -> stringResource(R.string.lock_autolock_immediate)
+                        }
+                    ),
+                    contentDescription = stringResource(R.string.lock_autolock_title),
+                    enabled = lockEnabled,
+                    testTag = "lock_autolock_row",
+                    onClick = { if (lockEnabled) showAutoLockDialog = true },
+                    trailing = {}
+                )
+                // Lock again after a device-lock/unlock cycle, even inside
+                // the grace period. On by default.
+                SettingsRowDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.PhonelinkLock,
+                    title = stringResource(R.string.lock_device_unlock_title),
+                    subtitle = stringResource(R.string.lock_device_unlock_subtitle),
+                    contentDescription = stringResource(R.string.lock_device_unlock_title),
+                    enabled = lockEnabled,
+                    testTag = "lock_device_unlock_row",
+                    onClick = {
+                        if (lockEnabled) {
+                            lockViewModel.setLockOnDeviceUnlock(!lockOnDeviceUnlock)
+                        }
+                    },
+                    trailing = {
+                        Switch(
+                            checked = lockOnDeviceUnlock,
+                            onCheckedChange = { lockViewModel.setLockOnDeviceUnlock(it) },
+                            enabled = lockEnabled,
+                            modifier = Modifier.testTag("lock_device_unlock_switch")
+                        )
+                    }
+                )
                 SettingsRowDivider()
                 SettingsActionRow(
                     icon = Icons.Default.Backup,

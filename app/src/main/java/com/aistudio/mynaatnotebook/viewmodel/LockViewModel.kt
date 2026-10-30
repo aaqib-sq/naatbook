@@ -7,6 +7,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.mynaatnotebook.R
+import com.aistudio.mynaatnotebook.data.AutoLockPolicy
 import com.aistudio.mynaatnotebook.data.EncryptedBackup
 import com.aistudio.mynaatnotebook.data.LockAttemptPolicy
 import com.aistudio.mynaatnotebook.data.PinHash
@@ -38,7 +39,10 @@ import kotlinx.coroutines.launch
  * - Wrong PIN attempts escalate a delay (30s, 1min, 5min, 15min cap) and
  *   NEVER wipe data.
  * - `unlocked` is in-memory only: process death re-locks, and every
- *   foreground (ON_START) re-locks while the lock is enabled.
+ *   foreground (ON_START) re-evaluates the lock through AutoLockPolicy:
+ *   Immediate re-locks at once, a grace timer re-locks only after the
+ *   app stayed backgrounded past it, and a device-lock/unlock cycle
+ *   re-locks regardless of the timer when that toggle is on (default).
  */
 @HiltViewModel
 class LockViewModel @Inject constructor(
@@ -95,6 +99,20 @@ class LockViewModel @Inject constructor(
             BiometricManager.Authenticators.BIOMETRIC_STRONG
         ) == BiometricManager.BIOMETRIC_SUCCESS
 
+    /** Auto-lock grace in minutes (0 = Immediate). */
+    private val _autoLockMinutes = MutableStateFlow(0)
+    val autoLockMinutes: StateFlow<Int> = _autoLockMinutes.asStateFlow()
+
+    /** Re-lock after a device-lock/unlock cycle (default true). */
+    private val _lockOnDeviceUnlock = MutableStateFlow(true)
+    val lockOnDeviceUnlock: StateFlow<Boolean> = _lockOnDeviceUnlock.asStateFlow()
+
+    /** When the app last went to background (0 = never backgrounded). */
+    private var backgroundedAtMs: Long = 0L
+
+    /** True when the phone was unlocked after the app went to background. */
+    private var deviceUnlockedSinceBackground: Boolean = false
+
     init {
         viewModelScope.launch { settingsStore.lockEnabled.collect { _lockEnabled.value = it } }
         viewModelScope.launch {
@@ -102,6 +120,12 @@ class LockViewModel @Inject constructor(
         }
         viewModelScope.launch {
             settingsStore.lockBiometricEnabled.collect { _biometricEnabled.value = it }
+        }
+        viewModelScope.launch {
+            settingsStore.lockAutoLockMinutes.collect { _autoLockMinutes.value = it }
+        }
+        viewModelScope.launch {
+            settingsStore.lockOnDeviceUnlock.collect { _lockOnDeviceUnlock.value = it }
         }
         viewModelScope.launch {
             settingsStore.lastAnyBackupAt.collect { at ->
@@ -115,6 +139,46 @@ class LockViewModel @Inject constructor(
     /** Re-lock on foreground. No-op when the lock is off. */
     fun relock() {
         if (_lockEnabled.value) _unlocked.value = false
+    }
+
+    /** Called when the app goes to background: start the grace clock. */
+    fun onBackgrounded() {
+        backgroundedAtMs = System.currentTimeMillis()
+        deviceUnlockedSinceBackground = false
+    }
+
+    /** Called when the phone is unlocked while the app is backgrounded. */
+    fun onDeviceUnlocked() {
+        deviceUnlockedSinceBackground = true
+    }
+
+    /** Called on foreground: re-lock only when AutoLockPolicy says so. */
+    fun onForegrounded() {
+        if (AutoLockPolicy.shouldRelock(
+                lockEnabled = _lockEnabled.value,
+                lockOnDeviceUnlock = _lockOnDeviceUnlock.value,
+                deviceUnlockedSinceBackground = deviceUnlockedSinceBackground,
+                autoLockMinutes = _autoLockMinutes.value,
+                backgroundedAtMs = backgroundedAtMs,
+                nowMs = System.currentTimeMillis()
+            )
+        ) {
+            _unlocked.value = false
+        }
+    }
+
+    fun setAutoLockMinutes(minutes: Int) {
+        viewModelScope.launch {
+            settingsStore.setLockAutoLockMinutes(minutes)
+            _autoLockMinutes.value = minutes
+        }
+    }
+
+    fun setLockOnDeviceUnlock(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsStore.setLockOnDeviceUnlock(enabled)
+            _lockOnDeviceUnlock.value = enabled
+        }
     }
 
     /** Outcome of an enable attempt (see the backup-mandatory rule). */
