@@ -2,6 +2,7 @@ package com.aistudio.mynaatnotebook.viewmodel
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.audio.PlaybackController
 import com.aistudio.mynaatnotebook.data.BackupManager
+import com.aistudio.mynaatnotebook.data.EncryptedBackup
 import com.aistudio.mynaatnotebook.data.ImportMode
 import com.aistudio.mynaatnotebook.data.SettingsStore
 import com.aistudio.mynaatnotebook.data.drive.DriveSyncManager
@@ -36,6 +38,7 @@ import javax.inject.Inject
 @HiltViewModel
 class BackupViewModel @Inject constructor(
     private val backupManager: BackupManager,
+    private val encryptedBackup: EncryptedBackup,
     private val statusReporter: StatusReporter,
     private val playbackController: PlaybackController,
     private val settingsStore: SettingsStore,
@@ -171,6 +174,9 @@ class BackupViewModel @Inject constructor(
         if (mode == ImportMode.REPLACE) playbackController.stop()
         backupJob = viewModelScope.launch {
             settingsStore.setLastImportUri(uri.toString())
+            // App lock: temp ZIP for a decrypted emergency file. Declared
+            // OUTSIDE try so the finally block below can delete it.
+            var decryptedTemp: File? = null
             try {
                 // UX batch 1 (Arena S4): a REPLACE wipes the current library
                 // with no undo, so a safety copy of it is saved FIRST. If the
@@ -211,7 +217,23 @@ class BackupViewModel @Inject constructor(
                     _progress.value = 0f
                 }
                 statusReporter.show(R.string.status_importing)
-                val result = backupManager.importBackup(uri, mode) { p ->
+                // App lock: an encrypted emergency file (.enc) decrypts to a
+                // temp ZIP first; the temp file is deleted in the finally
+                // block below. The original .enc file is never touched.
+                var importUri = uri
+                if (isEmergencyFile(uri)) {
+                    val decrypted = encryptedBackup.decryptToTempZip(uri)
+                    val temp = decrypted.getOrElse { error ->
+                        statusReporter.show(
+                            R.string.status_import_failed,
+                            friendlyError(error)
+                        )
+                        return@launch
+                    }
+                    decryptedTemp = temp
+                    importUri = Uri.fromFile(temp)
+                }
+                val result = backupManager.importBackup(importUri, mode) { p ->
                     _progress.value = p.coerceIn(0f, 1f)
                 }
                 result.onSuccess { importResult ->
@@ -281,8 +303,27 @@ class BackupViewModel @Inject constructor(
                 // failure alike. User-picked files are never touched (the
                 // canonical-path identity check fails for anything else).
                 deleteDriveRestoreCopy(uri)
+                // App lock: the decrypted temp ZIP is staging only.
+                decryptedTemp?.let { temp -> runCatching { temp.delete() } }
             }
         }
+    }
+
+    /**
+     * True when [uri] names an encrypted emergency file (.enc). The display
+     * name is queried for SAF documents; file URIs use the path directly.
+     */
+    private fun isEmergencyFile(uri: Uri): Boolean {
+        if (uri.scheme == "file") return uri.path?.endsWith(".enc") == true
+        val displayName = runCatching {
+            context.contentResolver.query(
+                uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull()
+        return displayName?.endsWith(".enc") == true ||
+            uri.lastPathSegment?.endsWith(".enc") == true
     }
 
     /**

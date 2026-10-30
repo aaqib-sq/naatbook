@@ -49,6 +49,10 @@ private val KEY_DRIVE_SYNC_INTERVAL = stringPreferencesKey("drive_sync_interval"
 private val KEY_DRIVE_LAST_HASH = stringPreferencesKey("drive_last_hash")
 private val KEY_LAST_PLAYBACK_POSITION_MS = androidx.datastore.preferences.core.longPreferencesKey("last_playback_position_ms")
 private val KEY_LAST_PLAYBACK_AUDIO_PATH = androidx.datastore.preferences.core.stringPreferencesKey("last_playback_audio_path")
+private val KEY_LOCK_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("lock_enabled")
+private val KEY_LOCK_PIN_HASH = stringPreferencesKey("lock_pin_hash")
+private val KEY_LOCK_PIN_SALT = stringPreferencesKey("lock_pin_salt")
+private val KEY_LOCK_BIOMETRIC_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("lock_biometric_enabled")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -398,6 +402,65 @@ class SettingsStore @Inject constructor(
             prefs.remove(KEY_DRIVE_LAST_HASH)
         }
     }
+
+    // --- App lock (privacy gate; LOCAL ONLY, never in any backup/export) ---
+
+    /** Whether the app lock screen gates the library. */
+    val lockEnabled: Flow<Boolean> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LOCK_ENABLED] ?: false }
+
+    suspend fun setLockEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_LOCK_ENABLED] = enabled }
+    }
+
+    /** SHA-256 hash of the PIN + per-install salt. The PIN itself is never stored. */
+    val lockPinHash: Flow<String?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LOCK_PIN_HASH] }
+
+    /** Per-install random salt for the PIN hash. */
+    val lockPinSalt: Flow<String?> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LOCK_PIN_SALT] }
+
+    suspend fun setLockPin(hash: String, salt: String) {
+        context.settingsDataStore.edit {
+            it[KEY_LOCK_PIN_HASH] = hash
+            it[KEY_LOCK_PIN_SALT] = salt
+        }
+    }
+
+    /** Whether the biometric unlock option is on (only meaningful with the lock). */
+    val lockBiometricEnabled: Flow<Boolean> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LOCK_BIOMETRIC_ENABLED] ?: false }
+
+    suspend fun setLockBiometricEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_LOCK_BIOMETRIC_ENABLED] = enabled }
+    }
+
+    /**
+     * Backup-mandatory gate: true when ANY backup exists — a Drive sync, a
+     * manual export, or a picked export document. A Drive connection alone
+     * (no sync yet) does NOT count: the lock may only be enabled when
+     * something restorable actually exists.
+     */
+    suspend fun hasAnyBackup(): Boolean {
+        val prefs = context.settingsDataStore.data
+            .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+            .first()
+        return (prefs[KEY_LAST_BACKUP_AT] ?: 0L) > 0L ||
+            (prefs[KEY_DRIVE_LAST_SYNC_AT] ?: 0L) > 0L ||
+            prefs[KEY_LAST_EXPORT_URI] != null
+    }
+
+    /** Most recent backup moment across Drive sync and manual export (0 = never). */
+    val lastAnyBackupAt: Flow<Long> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { prefs ->
+            maxOf(prefs[KEY_LAST_BACKUP_AT] ?: 0L, prefs[KEY_DRIVE_LAST_SYNC_AT] ?: 0L)
+        }
 }
 
 /** Shared preference defaults (kept here so ViewModel and store can never drift). */

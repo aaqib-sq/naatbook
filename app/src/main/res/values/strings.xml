@@ -458,4 +458,41 @@
     <string name="editor_draft_keep_failed">Could not save the draft for later</string>
     <string name="editor_recording_lost">An unfinished recording could not be recovered</string>
     <string name="reader_switched_audio">Switched to %1$s</string>
+
+    <!-- App lock -->
+    <string name="lock_title">App lock</string>
+    <string name="lock_subtitle">Lock the app with a PIN and fingerprint or face unlock</string>
+    <string name="lock_pin_title">PIN</string>
+    <string name="lock_set_pin">Set PIN</string>
+    <string name="lock_change_pin">Change PIN</string>
+    <string name="lock_biometric_setting">Fingerprint / face unlock</string>
+    <string name="lock_last_backup">Last backup: %1$s</string>
+    <string name="lock_backup_never">No backup yet</string>
+    <string name="lock_backup_stale">Backup is stale — make a fresh backup first</string>
+    <string name="lock_backup_now">Back up now</string>
+    <string name="lock_blocked_title">Back up first</string>
+    <string name="lock_blocked_message">App lock can only be turned on after a backup exists. Make a Drive backup or save a local export file first, so you can always get your library back.</string>
+    <string name="lock_pin_set_title">Set a 4-digit PIN</string>
+    <string name="lock_pin_set_message">Enter a 4-digit PIN, then enter it again to confirm.</string>
+    <string name="lock_pin_confirm">Confirm PIN</string>
+    <string name="lock_pin_mismatch">PINs do not match — try again</string>
+    <string name="lock_pin_invalid">Enter 4 digits</string>
+    <string name="lock_app_name">NaatBook</string>
+    <string name="lock_enter_pin">Enter your PIN</string>
+    <string name="lock_wrong_pin">Wrong PIN</string>
+    <string name="lock_try_again_in">Try again in %1$s</string>
+    <string name="lock_use_pin_instead">Use PIN instead</string>
+    <string name="lock_biometric_btn">Unlock with fingerprint / face</string>
+    <string name="lock_biometric_title">Unlock NaatBook</string>
+    <string name="lock_biometric_subtitle">Confirm it is you</string>
+    <string name="lock_cant_unlock">Can\'t unlock?</string>
+    <string name="lock_emergency_message">Without your PIN or fingerprint, the app cannot be unlocked. Before anything is wiped, save a copy of your library:</string>
+    <string name="lock_emergency_drive_btn">Sync to Drive</string>
+    <string name="lock_emergency_drive_not_connected">Drive is not connected — connect it from Settings first</string>
+    <string name="lock_emergency_local_btn">Make a local file</string>
+    <string name="lock_emergency_saved">Emergency file saved to %1$s</string>
+    <string name="lock_emergency_saved_toast">Emergency file saved</string>
+    <string name="lock_emergency_failed">Could not save: %1$s</string>
+    <string name="lock_emergency_note">The local file is encrypted and can only be opened by NaatBook on this phone. It survives clearing the app\'s data, but it is lost if the app is uninstalled.</string>
+    <string name="status_lock_biometric_failed">Fingerprint / face unlock failed — try your PIN</string>
 </resources>

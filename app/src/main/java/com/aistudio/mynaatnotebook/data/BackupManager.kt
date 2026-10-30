@@ -79,6 +79,9 @@ class BackupManager @Inject constructor(
         val V2_AUDIO_NAME = Regex("^audio/([0-9a-f]{64})\\.([a-z0-9]{1,8})$")
     }
 
+    /** Shared Downloads folder for emergency exports — same folder the normal export uses. */
+    internal val appFolderRelativePath: String get() = APP_FOLDER_RELATIVE_PATH
+
     private data class PackedAudio(val relativePath: String, val source: File)
     private data class ExportAudioIndex(
         val primaryPathByNaatId: Map<Int, String>,
