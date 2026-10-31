@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -65,6 +67,13 @@ import kotlinx.coroutines.launch
  * sync), "Make a local file" writes an encrypted emergency file to
  * Download/NaatBook. Neither button unlocks the app or shows entries.
  * The standard Material fingerprint icon is the biometric mark.
+ *
+ * Layout (owner orders, 2026-10-31): the content block is vertically
+ * centered so the keypad sits at thumb reach instead of crowding the
+ * top; the three-dot menu clears the status bar; and background taps
+ * show NO press effect at all — the overlay still consumes every touch
+ * (the library underneath stays unreachable), but with indication =
+ * null, so ripples appear only on real buttons and keys.
  */
 @Composable
 fun LockScreen(
@@ -106,7 +115,16 @@ fun LockScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .clickable(enabled = true, onClick = {})
+            // Consume every touch so nothing reaches the library
+            // underneath — but with NO visual indication, so taps on
+            // empty background show no ripple at all. Ripples live
+            // only on real buttons and keys.
+            .clickable(
+                enabled = true,
+                onClick = {},
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            )
             .testTag("lock_screen"),
         contentAlignment = Alignment.TopCenter
     ) {
@@ -114,7 +132,11 @@ fun LockScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 32.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            // Vertically centered (was top-packed): the keypad sat in
+            // the upper half with a dead black bottom half. Centering
+            // drops the keypad to thumb reach and balances the space.
+            verticalArrangement = Arrangement.Center
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_app_logo),
@@ -288,7 +310,10 @@ fun LockScreen(
                 IconButton(
                     onClick = { menuExpanded = true },
                     modifier = Modifier
-                        .padding(top = 8.dp, end = 8.dp)
+                        // Clear of the status bar (was 8dp from the
+                        // screen edge, jammed into the status zone).
+                        .statusBarsPadding()
+                        .padding(top = 8.dp, end = 16.dp)
                         .testTag("lock_menu_btn")
                 ) {
                     Icon(
