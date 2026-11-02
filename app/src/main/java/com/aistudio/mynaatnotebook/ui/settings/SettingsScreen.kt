@@ -1021,7 +1021,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column {
@@ -1220,7 +1220,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column {
@@ -1249,7 +1249,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column {
@@ -1423,7 +1423,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column {
@@ -1617,7 +1617,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             shape = RoundedCornerShape(12.dp)
         ) {
             SettingsActionRow(
@@ -1676,8 +1676,9 @@ fun SettingsScreen(
 }
 
 /** Uniform bordered card shared by every settings group (matches the
- * Drive/Export card treatment: visible border, 12dp corners, transparent
- * body so the theme background shows through). */
+ * Drive/Export card treatment: visible border, 12dp corners, slightly
+ * grey fill — surfaceContainerHigh — so each section reads as a grey
+ * card against the page background in both themes). */
 @Composable
 private fun SettingsGroupCard(
     modifier: Modifier = Modifier,
@@ -1687,7 +1688,7 @@ private fun SettingsGroupCard(
         modifier = modifier
             .fillMaxWidth()
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(content = content)
