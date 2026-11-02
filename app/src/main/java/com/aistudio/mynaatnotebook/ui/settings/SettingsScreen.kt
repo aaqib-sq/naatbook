@@ -1011,6 +1011,182 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // App lock (PIN + biometric, fully offline). Sits above Backup
+        // on purpose: the lock guards the library that backups protect.
+        // PIN is always available — biometric is an extra, never the
+        // only way in.
+        SettingsGroupHeading(stringResource(R.string.lock_title))
+        Spacer(modifier = Modifier.height(8.dp))
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column {
+                SettingsActionRow(
+                    icon = Icons.Default.Lock,
+                    title = stringResource(R.string.lock_title),
+                    subtitle = stringResource(R.string.lock_subtitle),
+                    contentDescription = stringResource(R.string.lock_title),
+                    enabled = true,
+                    testTag = "lock_toggle",
+                    onClick = {
+                        if (lockEnabled) {
+                            lockViewModel.disableLock()
+                        } else {
+                            lockViewModel.tryEnableLock { result ->
+                                when (result) {
+                                    is LockViewModel.EnableResult.NeedsPin ->
+                                        showPinDialog = true
+                                    is LockViewModel.EnableResult.BlockedNoBackup ->
+                                        showLockBlockedDialog = true
+                                    is LockViewModel.EnableResult.Enabled -> Unit
+                                }
+                            }
+                        }
+                    },
+                    trailing = {
+                        Switch(
+                            checked = lockEnabled,
+                            onCheckedChange = { checked ->
+                                if (!checked) {
+                                    lockViewModel.disableLock()
+                                } else {
+                                    lockViewModel.tryEnableLock { result ->
+                                        when (result) {
+                                            is LockViewModel.EnableResult.NeedsPin ->
+                                                showPinDialog = true
+                                            is LockViewModel.EnableResult.BlockedNoBackup ->
+                                                showLockBlockedDialog = true
+                                            is LockViewModel.EnableResult.Enabled -> Unit
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.testTag("lock_switch")
+                        )
+                    }
+                )
+                SettingsRowDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.Password,
+                    title = stringResource(R.string.lock_pin_title),
+                    subtitle = if (lockPinSet) {
+                        stringResource(R.string.lock_change_pin)
+                    } else {
+                        stringResource(R.string.lock_set_pin)
+                    },
+                    contentDescription = stringResource(R.string.lock_pin_title),
+                    enabled = true,
+                    testTag = "lock_pin_btn",
+                    onClick = { showPinDialog = true },
+                    trailing = {}
+                )
+                if (lockViewModel.biometricAvailable) {
+                    SettingsRowDivider()
+                    SettingsActionRow(
+                        icon = Icons.Default.Fingerprint,
+                        title = stringResource(R.string.lock_biometric_setting),
+                        subtitle = null,
+                        contentDescription = stringResource(R.string.lock_biometric_setting),
+                        enabled = lockEnabled,
+                        testTag = "lock_biometric_row",
+                        onClick = {
+                            if (lockEnabled) {
+                                lockViewModel.setBiometricEnabled(!lockBiometricEnabled)
+                            }
+                        },
+                        trailing = {
+                            Switch(
+                                checked = lockBiometricEnabled,
+                                onCheckedChange = { lockViewModel.setBiometricEnabled(it) },
+                                enabled = lockEnabled,
+                                modifier = Modifier.testTag("lock_biometric_switch")
+                            )
+                        }
+                    )
+                }
+                // Auto-lock timer: how long the app may stay backgrounded
+                // before it locks again. Immediate = lock at once.
+                SettingsRowDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.Timer,
+                    title = stringResource(R.string.lock_autolock_title),
+                    subtitle = stringResource(
+                        R.string.lock_autolock_subtitle,
+                        when (lockAutoLockMinutes) {
+                            10 -> stringResource(R.string.lock_autolock_10)
+                            20 -> stringResource(R.string.lock_autolock_20)
+                            30 -> stringResource(R.string.lock_autolock_30)
+                            else -> stringResource(R.string.lock_autolock_immediate)
+                        }
+                    ),
+                    contentDescription = stringResource(R.string.lock_autolock_title),
+                    enabled = lockEnabled,
+                    testTag = "lock_autolock_row",
+                    onClick = { if (lockEnabled) showAutoLockDialog = true },
+                    trailing = {}
+                )
+                // Lock again after a device-lock/unlock cycle, even inside
+                // the grace period. On by default.
+                SettingsRowDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.PhonelinkLock,
+                    title = stringResource(R.string.lock_device_unlock_title),
+                    subtitle = stringResource(R.string.lock_device_unlock_subtitle),
+                    contentDescription = stringResource(R.string.lock_device_unlock_title),
+                    enabled = lockEnabled,
+                    testTag = "lock_device_unlock_row",
+                    onClick = {
+                        if (lockEnabled) {
+                            lockViewModel.setLockOnDeviceUnlock(!lockOnDeviceUnlock)
+                        }
+                    },
+                    trailing = {
+                        Switch(
+                            checked = lockOnDeviceUnlock,
+                            onCheckedChange = { lockViewModel.setLockOnDeviceUnlock(it) },
+                            enabled = lockEnabled,
+                            modifier = Modifier.testTag("lock_device_unlock_switch")
+                        )
+                    }
+                )
+                SettingsRowDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.Backup,
+                    title = if (lockLastBackupAtMs > 0L) {
+                        stringResource(
+                            R.string.lock_last_backup,
+                            SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+                                .format(Date(lockLastBackupAtMs))
+                        )
+                    } else {
+                        stringResource(R.string.lock_backup_never)
+                    },
+                    subtitle = if (lockBackupStale) {
+                        stringResource(R.string.lock_backup_stale)
+                    } else {
+                        null
+                    },
+                    contentDescription = stringResource(R.string.lock_backup_now),
+                    enabled = !backupWorking && !driveSyncing,
+                    testTag = "lock_backup_btn",
+                    onClick = {
+                        if (driveEmail != null) {
+                            driveViewModel.syncNow()
+                        } else {
+                            exportChoiceTarget = ExportTarget.APP_FOLDER
+                        }
+                    },
+                    trailing = {}
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         // 3. Local Backup & Restore (offline)
         SettingsGroupHeading(stringResource(R.string.settings_backup_title))
         Spacer(modifier = Modifier.height(8.dp))
@@ -1021,7 +1197,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column {
@@ -1211,210 +1387,6 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Destructive data action, kept apart from Backup: wiping the
-        // library is not a backup operation, and it must never sit next
-        // to the one-tap export/import rows.
-        SettingsGroupHeading(stringResource(R.string.settings_data_title))
-        Spacer(modifier = Modifier.height(8.dp))
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column {
-                SettingsActionRow(
-                    icon = Icons.Default.Delete,
-                    title = stringResource(R.string.settings_clear_data_title),
-                    subtitle = stringResource(R.string.settings_clear_data_subtitle),
-                    contentDescription = stringResource(R.string.settings_clear_data_cd),
-                    enabled = !backupWorking,
-                    testTag = "clear_data_btn",
-                    onClick = { showClearDataConfirm = true },
-                    trailing = {}
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // App lock (PIN + biometric, fully offline). Sits between Data
-        // and Drive on purpose: the lock's safety story is backups, and
-        // both neighbours are exactly that. PIN is always available —
-        // biometric is an extra, never the only way in.
-        SettingsGroupHeading(stringResource(R.string.lock_title))
-        Spacer(modifier = Modifier.height(8.dp))
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column {
-                SettingsActionRow(
-                    icon = Icons.Default.Lock,
-                    title = stringResource(R.string.lock_title),
-                    subtitle = stringResource(R.string.lock_subtitle),
-                    contentDescription = stringResource(R.string.lock_title),
-                    enabled = true,
-                    testTag = "lock_toggle",
-                    onClick = {
-                        if (lockEnabled) {
-                            lockViewModel.disableLock()
-                        } else {
-                            lockViewModel.tryEnableLock { result ->
-                                when (result) {
-                                    is LockViewModel.EnableResult.NeedsPin ->
-                                        showPinDialog = true
-                                    is LockViewModel.EnableResult.BlockedNoBackup ->
-                                        showLockBlockedDialog = true
-                                    is LockViewModel.EnableResult.Enabled -> Unit
-                                }
-                            }
-                        }
-                    },
-                    trailing = {
-                        Switch(
-                            checked = lockEnabled,
-                            onCheckedChange = { checked ->
-                                if (!checked) {
-                                    lockViewModel.disableLock()
-                                } else {
-                                    lockViewModel.tryEnableLock { result ->
-                                        when (result) {
-                                            is LockViewModel.EnableResult.NeedsPin ->
-                                                showPinDialog = true
-                                            is LockViewModel.EnableResult.BlockedNoBackup ->
-                                                showLockBlockedDialog = true
-                                            is LockViewModel.EnableResult.Enabled -> Unit
-                                        }
-                                    }
-                                }
-                            },
-                            modifier = Modifier.testTag("lock_switch")
-                        )
-                    }
-                )
-                SettingsRowDivider()
-                SettingsActionRow(
-                    icon = Icons.Default.Password,
-                    title = stringResource(R.string.lock_pin_title),
-                    subtitle = if (lockPinSet) {
-                        stringResource(R.string.lock_change_pin)
-                    } else {
-                        stringResource(R.string.lock_set_pin)
-                    },
-                    contentDescription = stringResource(R.string.lock_pin_title),
-                    enabled = true,
-                    testTag = "lock_pin_btn",
-                    onClick = { showPinDialog = true },
-                    trailing = {}
-                )
-                if (lockViewModel.biometricAvailable) {
-                    SettingsRowDivider()
-                    SettingsActionRow(
-                        icon = Icons.Default.Fingerprint,
-                        title = stringResource(R.string.lock_biometric_setting),
-                        subtitle = null,
-                        contentDescription = stringResource(R.string.lock_biometric_setting),
-                        enabled = lockEnabled,
-                        testTag = "lock_biometric_row",
-                        onClick = {
-                            if (lockEnabled) {
-                                lockViewModel.setBiometricEnabled(!lockBiometricEnabled)
-                            }
-                        },
-                        trailing = {
-                            Switch(
-                                checked = lockBiometricEnabled,
-                                onCheckedChange = { lockViewModel.setBiometricEnabled(it) },
-                                enabled = lockEnabled,
-                                modifier = Modifier.testTag("lock_biometric_switch")
-                            )
-                        }
-                    )
-                }
-                // Auto-lock timer: how long the app may stay backgrounded
-                // before it locks again. Immediate = lock at once.
-                SettingsRowDivider()
-                SettingsActionRow(
-                    icon = Icons.Default.Timer,
-                    title = stringResource(R.string.lock_autolock_title),
-                    subtitle = stringResource(
-                        R.string.lock_autolock_subtitle,
-                        when (lockAutoLockMinutes) {
-                            10 -> stringResource(R.string.lock_autolock_10)
-                            20 -> stringResource(R.string.lock_autolock_20)
-                            30 -> stringResource(R.string.lock_autolock_30)
-                            else -> stringResource(R.string.lock_autolock_immediate)
-                        }
-                    ),
-                    contentDescription = stringResource(R.string.lock_autolock_title),
-                    enabled = lockEnabled,
-                    testTag = "lock_autolock_row",
-                    onClick = { if (lockEnabled) showAutoLockDialog = true },
-                    trailing = {}
-                )
-                // Lock again after a device-lock/unlock cycle, even inside
-                // the grace period. On by default.
-                SettingsRowDivider()
-                SettingsActionRow(
-                    icon = Icons.Default.PhonelinkLock,
-                    title = stringResource(R.string.lock_device_unlock_title),
-                    subtitle = stringResource(R.string.lock_device_unlock_subtitle),
-                    contentDescription = stringResource(R.string.lock_device_unlock_title),
-                    enabled = lockEnabled,
-                    testTag = "lock_device_unlock_row",
-                    onClick = {
-                        if (lockEnabled) {
-                            lockViewModel.setLockOnDeviceUnlock(!lockOnDeviceUnlock)
-                        }
-                    },
-                    trailing = {
-                        Switch(
-                            checked = lockOnDeviceUnlock,
-                            onCheckedChange = { lockViewModel.setLockOnDeviceUnlock(it) },
-                            enabled = lockEnabled,
-                            modifier = Modifier.testTag("lock_device_unlock_switch")
-                        )
-                    }
-                )
-                SettingsRowDivider()
-                SettingsActionRow(
-                    icon = Icons.Default.Backup,
-                    title = if (lockLastBackupAtMs > 0L) {
-                        stringResource(
-                            R.string.lock_last_backup,
-                            SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-                                .format(Date(lockLastBackupAtMs))
-                        )
-                    } else {
-                        stringResource(R.string.lock_backup_never)
-                    },
-                    subtitle = if (lockBackupStale) {
-                        stringResource(R.string.lock_backup_stale)
-                    } else {
-                        null
-                    },
-                    contentDescription = stringResource(R.string.lock_backup_now),
-                    enabled = !backupWorking && !driveSyncing,
-                    testTag = "lock_backup_btn",
-                    onClick = {
-                        if (driveEmail != null) {
-                            driveViewModel.syncNow()
-                        } else {
-                            exportChoiceTarget = ExportTarget.APP_FOLDER
-                        }
-                    },
-                    trailing = {}
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
         // 4. Google Drive Backup (online, opt-in)
         SettingsGroupHeading(stringResource(R.string.settings_drive_title))
         Spacer(modifier = Modifier.height(8.dp))
@@ -1423,7 +1395,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column {
@@ -1617,7 +1589,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
             shape = RoundedCornerShape(12.dp)
         ) {
             SettingsActionRow(
@@ -1629,6 +1601,34 @@ fun SettingsScreen(
                 testTag = "settings_intro_btn",
                 onClick = onShowIntro
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Destructive data action, kept apart from Backup: wiping the
+        // library is not a backup operation, and it must never sit next
+        // to the one-tap export/import rows.
+        SettingsGroupHeading(stringResource(R.string.settings_data_title))
+        Spacer(modifier = Modifier.height(8.dp))
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column {
+                SettingsActionRow(
+                    icon = Icons.Default.Delete,
+                    title = stringResource(R.string.settings_clear_data_title),
+                    subtitle = stringResource(R.string.settings_clear_data_subtitle),
+                    contentDescription = stringResource(R.string.settings_clear_data_cd),
+                    enabled = !backupWorking,
+                    testTag = "clear_data_btn",
+                    onClick = { showClearDataConfirm = true },
+                    trailing = {}
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -1677,7 +1677,7 @@ fun SettingsScreen(
 
 /** Uniform bordered card shared by every settings group (matches the
  * Drive/Export card treatment: visible border, 12dp corners, slightly
- * grey fill — surfaceContainerHigh — so each section reads as a grey
+ * grey fill — surfaceContainerHighest — so each section reads as a grey
  * card against the page background in both themes). */
 @Composable
 private fun SettingsGroupCard(
@@ -1688,7 +1688,7 @@ private fun SettingsGroupCard(
         modifier = modifier
             .fillMaxWidth()
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(content = content)
