@@ -22,3 +22,6 @@ debug.keystore
 *.jks
 *.keystore
 !app/debug.keystore
+
+# Claude Code local settings (may contain secrets - never commit)
+**/.claude/settings.local.json
