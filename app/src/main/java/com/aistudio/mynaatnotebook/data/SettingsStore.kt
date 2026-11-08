@@ -55,6 +55,8 @@ private val KEY_LOCK_PIN_SALT = stringPreferencesKey("lock_pin_salt")
 private val KEY_LOCK_BIOMETRIC_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("lock_biometric_enabled")
 private val KEY_LOCK_AUTO_LOCK_MINUTES = androidx.datastore.preferences.core.intPreferencesKey("lock_auto_lock_minutes")
 private val KEY_LOCK_ON_DEVICE_UNLOCK = androidx.datastore.preferences.core.booleanPreferencesKey("lock_on_device_unlock")
+private val KEY_LOCK_FAILED_ATTEMPTS = androidx.datastore.preferences.core.intPreferencesKey("lock_failed_attempts")
+private val KEY_LOCK_LOCKOUT_UNTIL_MS = androidx.datastore.preferences.core.longPreferencesKey("lock_lockout_until_ms")
 
 private val Context.settingsDataStore by preferencesDataStore(
     name = "settings",
@@ -467,6 +469,27 @@ class SettingsStore @Inject constructor(
 
     suspend fun setLockOnDeviceUnlock(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_LOCK_ON_DEVICE_UNLOCK] = enabled }
+    }
+
+    /**
+     * Wrong-PIN lockout state. Persisted (LOCAL ONLY, like all lock state)
+     * so force-stopping the app cannot reset the delay ladder: the
+     * countdown survives process death, and only a correct PIN (or
+     * disabling the lock) clears it.
+     */
+    val lockFailedAttempts: Flow<Int> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LOCK_FAILED_ATTEMPTS] ?: 0 }
+
+    val lockLockoutUntilMs: Flow<Long> = context.settingsDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_LOCK_LOCKOUT_UNTIL_MS] ?: 0L }
+
+    suspend fun setLockoutState(failedAttempts: Int, lockoutUntilMs: Long) {
+        context.settingsDataStore.edit {
+            it[KEY_LOCK_FAILED_ATTEMPTS] = failedAttempts
+            it[KEY_LOCK_LOCKOUT_UNTIL_MS] = lockoutUntilMs
+        }
     }
 
     /**

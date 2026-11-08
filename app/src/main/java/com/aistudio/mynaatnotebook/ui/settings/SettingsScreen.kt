@@ -32,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
@@ -138,9 +139,14 @@ fun SettingsScreen(
     var showPinDialog by remember { mutableStateOf(false) }
     var showLockBlockedDialog by remember { mutableStateOf(false) }
     var showAutoLockDialog by remember { mutableStateOf(false) }
+    // Verifies the current PIN (change-PIN flow) without blocking the UI.
+    val lockPinScope = rememberCoroutineScope()
 
-    // App lock state (LockViewModel owns the DataStore flows).
-    val lockEnabled by lockViewModel.lockEnabled.collectAsStateWithLifecycle()
+    // App lock state: one atomic read — enabled is derived from the same
+    // LockState value the gate uses, never from a second flow.
+    val lockState by lockViewModel.lockState.collectAsStateWithLifecycle()
+    val lockEnabled = lockState.enabled
+    val lockBusy by lockViewModel.lockBusy.collectAsStateWithLifecycle()
     val lockPinSet by lockViewModel.pinSet.collectAsStateWithLifecycle()
     val lockBiometricEnabled by lockViewModel.biometricEnabled.collectAsStateWithLifecycle()
     val lockAutoLockMinutes by lockViewModel.autoLockMinutes.collectAsStateWithLifecycle()
@@ -633,9 +639,20 @@ fun SettingsScreen(
     // App lock: PIN setup (set or change). On a match the PIN is stored
     // (salted hash only) and, when the lock is still off, the enable
     // attempt runs again — a backup that vanished in between still blocks.
+    // Changing a PIN proves the current one first: without that, anyone
+    // holding the unlocked phone could set a new PIN and lock the
+    // owner out.
     if (showPinDialog) {
         PinSetupDialog(
-            title = stringResource(R.string.lock_pin_set_title),
+            title = if (lockPinSet) {
+                stringResource(R.string.lock_change_pin)
+            } else {
+                stringResource(R.string.lock_pin_set_title)
+            },
+            requireCurrentPin = lockPinSet,
+            onVerifyCurrentPin = { pin, onResult ->
+                lockPinScope.launch { onResult(lockViewModel.verifyPin(pin)) }
+            },
             onDismiss = { showPinDialog = false },
             onConfirm = { pin ->
                 showPinDialog = false
@@ -1033,7 +1050,10 @@ fun SettingsScreen(
                     enabled = true,
                     testTag = "lock_toggle",
                     onClick = {
-                        if (lockEnabled) {
+                        if (lockBusy) {
+                            // A tap mid-flight is dropped (the ViewModel
+                            // serialises enable/disable); no second flip.
+                        } else if (lockEnabled) {
                             lockViewModel.disableLock()
                         } else {
                             lockViewModel.tryEnableLock { result ->
@@ -1050,6 +1070,8 @@ fun SettingsScreen(
                     trailing = {
                         Switch(
                             checked = lockEnabled,
+                            enabled = !lockBusy,
+                            colors = lockSwitchColors(),
                             onCheckedChange = { checked ->
                                 if (!checked) {
                                     lockViewModel.disableLock()
@@ -1103,6 +1125,7 @@ fun SettingsScreen(
                                 checked = lockBiometricEnabled,
                                 onCheckedChange = { lockViewModel.setBiometricEnabled(it) },
                                 enabled = lockEnabled,
+                                colors = lockSwitchColors(),
                                 modifier = Modifier.testTag("lock_biometric_switch")
                             )
                         }
@@ -1149,37 +1172,38 @@ fun SettingsScreen(
                             checked = lockOnDeviceUnlock,
                             onCheckedChange = { lockViewModel.setLockOnDeviceUnlock(it) },
                             enabled = lockEnabled,
+                            colors = lockSwitchColors(),
                             modifier = Modifier.testTag("lock_device_unlock_switch")
                         )
                     }
                 )
                 SettingsRowDivider()
+                // Last backup is a STATUS line, not a button: tapping it
+                // used to fire a Drive sync (wrong target — sync lives
+                // on the Drive section's own Sync now button). Display
+                // only: no click, no ripple, status content description.
+                val lockBackupTitle = if (lockLastBackupAtMs > 0L) {
+                    stringResource(
+                        R.string.lock_last_backup,
+                        SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+                            .format(Date(lockLastBackupAtMs))
+                    )
+                } else {
+                    stringResource(R.string.lock_backup_never)
+                }
                 SettingsActionRow(
                     icon = Icons.Default.Backup,
-                    title = if (lockLastBackupAtMs > 0L) {
-                        stringResource(
-                            R.string.lock_last_backup,
-                            SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-                                .format(Date(lockLastBackupAtMs))
-                        )
-                    } else {
-                        stringResource(R.string.lock_backup_never)
-                    },
+                    title = lockBackupTitle,
                     subtitle = if (lockBackupStale) {
                         stringResource(R.string.lock_backup_stale)
                     } else {
                         null
                     },
-                    contentDescription = stringResource(R.string.lock_backup_now),
-                    enabled = !backupWorking && !driveSyncing,
-                    testTag = "lock_backup_btn",
-                    onClick = {
-                        if (driveEmail != null) {
-                            driveViewModel.syncNow()
-                        } else {
-                            exportChoiceTarget = ExportTarget.APP_FOLDER
-                        }
-                    },
+                    contentDescription = lockBackupTitle,
+                    enabled = true,
+                    testTag = "lock_backup_status",
+                    clickable = false,
+                    onClick = {},
                     trailing = {}
                 )
             }
@@ -1818,6 +1842,25 @@ private fun FontNameDialog(
     )
 }
 
+/**
+ * Lock switches, made visible on the grey cards in both themes.
+ * Material3's defaults hide the OFF switch here: the default OFF track
+ * is surfaceVariant (near-white in light, near-black in dark) and the
+ * default OFF thumb/border is outline (the same pale grey), so the
+ * switch melts into the surfaceContainerHighest card. These explicit
+ * theme-native colours keep OFF clearly visible — mid-grey track with
+ * a surface thumb — while ON stays the theme primary. No new colour.
+ */
+@Composable
+private fun lockSwitchColors(): SwitchColors = SwitchDefaults.colors(
+    checkedTrackColor = MaterialTheme.colorScheme.primary,
+    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+    checkedBorderColor = Color.Transparent,
+    uncheckedTrackColor = secondaryTextColor(),
+    uncheckedThumbColor = MaterialTheme.colorScheme.surface,
+    uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
+)
+
 /** One tappable row inside the Settings data card: icon well, title + subtitle, chevron. */
 @Composable
 private fun SettingsActionRow(
@@ -1828,12 +1871,18 @@ private fun SettingsActionRow(
     enabled: Boolean,
     testTag: String,
     onClick: () -> Unit,
-    trailing: (@Composable () -> Unit)? = null
+    trailing: (@Composable () -> Unit)? = null,
+    // Display-only rows (e.g. a status line): no click target, no
+    // ripple, but the row keeps its normal colours (unlike enabled=false).
+    clickable: Boolean = true
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
+            .then(
+                if (clickable) Modifier.clickable(enabled = enabled, onClick = onClick)
+                else Modifier
+            )
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
@@ -1864,7 +1913,11 @@ private fun SettingsActionRow(
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    // A disabled row dims as a whole: the old code left
+                    // the subtitle at full strength while the title and
+                    // icon faded, which read as a half-broken row.
+                    color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+                    else secondaryTextColor()
                 )
             }
         }
@@ -1895,16 +1948,23 @@ private fun backupInitialUri(persisted: String?): Uri =
         )
 
 /** App-lock PIN setup: 4 digits + confirm. Mismatch is shown in place
- * and the confirm field is cleared — nothing is stored until both agree. */
+ * and the confirm field is cleared — nothing is stored until both agree.
+ * When a PIN already exists (change flow), the current PIN must be
+ * proven first and the new PIN is only saved after that check passes. */
 @Composable
 private fun PinSetupDialog(
     title: String,
+    requireCurrentPin: Boolean = false,
+    onVerifyCurrentPin: ((String, (Boolean) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    var pin by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf("") }
-    var mismatch by remember { mutableStateOf(false) }
+    var pin by rememberSaveable { mutableStateOf("") }
+    var confirm by rememberSaveable { mutableStateOf("") }
+    var mismatch by rememberSaveable { mutableStateOf(false) }
+    var current by rememberSaveable { mutableStateOf("") }
+    var currentError by rememberSaveable { mutableStateOf(false) }
+    var currentVerified by rememberSaveable { mutableStateOf(false) }
     val pinKeyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1912,6 +1972,26 @@ private fun PinSetupDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.lock_pin_set_message))
+                if (requireCurrentPin && !currentVerified) {
+                    OutlinedTextField(
+                        value = current,
+                        onValueChange = {
+                            current = it.filter { ch -> ch.isDigit() }.take(4)
+                            currentError = false
+                        },
+                        label = { Text(stringResource(R.string.lock_pin_current)) },
+                        singleLine = true,
+                        keyboardOptions = pinKeyboard,
+                        visualTransformation = PasswordVisualTransformation(),
+                        isError = currentError,
+                        supportingText = if (currentError) {
+                            { Text(stringResource(R.string.lock_pin_wrong_current)) }
+                        } else {
+                            null
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("lock_pin_current_field")
+                    )
+                }
                 OutlinedTextField(
                     value = pin,
                     onValueChange = {
@@ -1946,13 +2026,29 @@ private fun PinSetupDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = pin.length == 4 && confirm.length == 4,
+                enabled = pin.length == 4 && confirm.length == 4 &&
+                    (!requireCurrentPin || currentVerified || current.length == 4),
                 onClick = {
-                    if (pin == confirm) {
-                        onConfirm(pin)
+                    val trySave = {
+                        if (pin == confirm) {
+                            onConfirm(pin)
+                        } else {
+                            mismatch = true
+                            confirm = ""
+                        }
+                    }
+                    if (requireCurrentPin && !currentVerified) {
+                        onVerifyCurrentPin?.invoke(current) { ok ->
+                            if (ok) {
+                                currentVerified = true
+                                trySave()
+                            } else {
+                                currentError = true
+                                current = ""
+                            }
+                        }
                     } else {
-                        mismatch = true
-                        confirm = ""
+                        trySave()
                     }
                 },
                 modifier = Modifier.testTag("lock_pin_save")

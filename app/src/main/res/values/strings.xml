@@ -469,14 +469,15 @@
     <string name="lock_last_backup">Last backup: %1$s</string>
     <string name="lock_backup_never">No backup yet</string>
     <string name="lock_backup_stale">Backup is stale — make a fresh backup first</string>
-    <string name="lock_backup_now">Back up now</string>
     <string name="lock_blocked_title">Back up first</string>
     <string name="lock_blocked_message">App lock can only be turned on after a backup exists. Make a Drive backup or save a local export file first, so you can always get your library back.</string>
     <string name="lock_pin_set_title">Set a 4-digit PIN</string>
     <string name="lock_pin_set_message">Enter a 4-digit PIN, then enter it again to confirm.</string>
     <string name="lock_pin_confirm">Confirm PIN</string>
+    <string name="lock_pin_current">Current PIN</string>
     <string name="lock_pin_mismatch">PINs do not match — try again</string>
-    <string name="lock_pin_invalid">Enter 4 digits</string>
+    <string name="lock_pin_wrong_current">Wrong PIN — try again</string>
+    <string name="lock_backspace_desc">Delete</string>
     <string name="lock_app_name">NaatBook</string>
     <string name="lock_enter_pin">Enter your PIN</string>
     <string name="lock_wrong_pin">Wrong PIN</string>
@@ -485,8 +486,6 @@
     <string name="lock_biometric_btn">Unlock with fingerprint / face</string>
     <string name="lock_biometric_title">Unlock NaatBook</string>
     <string name="lock_biometric_subtitle">Confirm it is you</string>
-    <string name="lock_cant_unlock">Can\'t unlock?</string>
-    <string name="lock_emergency_message">Without your PIN or fingerprint, the app cannot be unlocked. Before anything is wiped, save a copy of your library:</string>
     <string name="lock_emergency_drive_btn">Sync to Drive</string>
     <string name="lock_emergency_drive_not_connected">Drive is not connected — connect it from Settings first</string>
     <string name="lock_emergency_local_btn">Make a local file</string>

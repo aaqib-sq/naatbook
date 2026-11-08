@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
@@ -33,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,7 +92,10 @@ fun LockScreen(
     val driveEmail by driveViewModel.connectedEmail.collectAsStateWithLifecycle()
     val driveSyncing by driveViewModel.isSyncing.collectAsStateWithLifecycle()
 
-    var pin by remember { mutableStateOf("") }
+    // Typed digits survive a rotation: retyping a half-entered PIN
+    // after turning the phone is the kind of small paper-cut this
+    // screen must not have.
+    var pin by rememberSaveable { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
     var pinSubmitting by remember { mutableStateOf(false) }
     var pressedKey by remember { mutableStateOf<String?>(null) }
@@ -154,7 +159,14 @@ fun LockScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = when {
-                    lockedOut -> stringResource(R.string.lock_try_again_in, remainingSec)
+                    // A bare number is meaningless at 5 or 15 minutes:
+                    // "Try again in 300" reads as broken. Seconds stay
+                    // seconds, longer waits read as m:ss.
+                    lockedOut -> stringResource(
+                        R.string.lock_try_again_in,
+                        if (remainingSec < 60) "${remainingSec}s"
+                        else "${remainingSec / 60}:${(remainingSec % 60).toString().padStart(2, '0')}"
+                    )
                     pinError -> stringResource(R.string.lock_wrong_pin)
                     biometricError != null -> stringResource(R.string.lock_use_pin_instead)
                     else -> stringResource(R.string.lock_enter_pin)
@@ -253,12 +265,23 @@ fun LockScreen(
                                     .testTag("lock_key_$key"),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = key,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
+                                // Delete is a standard backspace mark,
+                                // not a "<" glyph pretending to be one.
+                                if (key == "<") {
+                                    Icon(
+                                        imageVector = Icons.Default.Backspace,
+                                        contentDescription = stringResource(R.string.lock_backspace_desc),
+                                        tint = MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        text = key,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
                             }
                         }
                     }
