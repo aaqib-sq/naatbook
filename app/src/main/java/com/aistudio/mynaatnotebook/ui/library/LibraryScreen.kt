@@ -72,6 +72,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import com.aistudio.mynaatnotebook.util.Haptics
 
 @Composable
 fun LibraryScreen(
@@ -458,19 +459,62 @@ fun LibraryScreen(
             }
             } else {
                 // Results list: global search across folders, and/or the favorites filter
-                Text(
-                    text = when {
+                // Favorites get the same header as a folder: a back
+                // button plus the name in big bold type — never a
+                // tappable label that acts as the way back.
+                if (favoritesOnly) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { viewModel.setFavoritesOnly(false) },
+                            modifier = Modifier.testTag("back_from_favorites")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.library_back_cd),
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        val favoritesTitle =
+                            stringResource(R.string.library_favorites_title)
+                        Text(
+                            text = favoritesTitle,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = if (usesArabicScript(favoritesTitle)) {
+                                FontWeight.Normal
+                            } else {
+                                FontWeight.Bold
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                if (debouncedSearchQuery.isNotBlank()) {
+                    Text(
                         // The query is user-typed text and can be Urdu — it is
                         // shown as typed, never uppercased or letter-tracked.
-                        favoritesOnly && debouncedSearchQuery.isNotBlank() -> stringResource(R.string.library_favorites_query_title, debouncedSearchQuery.trim())
-                        favoritesOnly -> stringResource(R.string.library_favorites_title)
-                        else -> stringResource(R.string.library_results_title, debouncedSearchQuery.trim())
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = secondaryTextColor(),
-                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
-                )
+                        text = if (favoritesOnly) {
+                            stringResource(
+                                R.string.library_favorites_query_title,
+                                debouncedSearchQuery.trim()
+                            )
+                        } else {
+                            stringResource(
+                                R.string.library_results_title,
+                                debouncedSearchQuery.trim()
+                            )
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = secondaryTextColor(),
+                        modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+                    )
+                }
                 // Audit L7: the results say how many they are, not just
                 // what was typed.
                 if (debouncedSearchQuery.isNotBlank() && listMatchesFilter && libraryResults.summaries.isNotEmpty()) {
@@ -484,43 +528,6 @@ fun LibraryScreen(
                         color = secondaryTextColor(),
                         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                     )
-                }
-                // Audit 03 M1: at the root, the favorites filter hid its
-                // own off-switch (the chip lives in the home branch that
-                // this view replaces). Same removable indicator the
-                // folder view already had.
-                if (favoritesOnly) {
-                    Row(
-                        modifier = Modifier
-                            .padding(bottom = 8.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { viewModel.setFavoritesOnly(false) }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                            .testTag("root_favorites_chip"),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Favorite,
-                            contentDescription = null,
-                            tint = HighContrastRed,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = stringResource(R.string.library_favorites_title),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(R.string.library_favorites_filter_off_cd),
-                            tint = secondaryTextColor(),
-                            modifier = Modifier.size(13.dp)
-                        )
-                    }
                 }
                 if (!listMatchesFilter) {
                     // Stale list must never render: blank until the
@@ -777,6 +784,7 @@ fun LibraryScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        Haptics.deleteConfirm(context)
                         viewModel.deleteNaat(candidate.id) { deleteCandidate = null }
                     },
                     enabled = !isDeleting,
@@ -1227,6 +1235,7 @@ fun NaatRowItem(
     titleFontChoice: String,
     customFamilies: Map<String, FontFamily>
 ) {
+    val context = LocalContext.current
     val rowTitleFamily = FontChoices.resolveTitle(
         FontChoices.effectiveTitleChoice(naat.titleFontOverride, titleFontChoice),
         usesArabicScript(naat.title),
@@ -1248,7 +1257,7 @@ fun NaatRowItem(
             .border(if (isPlaying) 1.5.dp else 1.dp, cardBorder, RoundedCornerShape(16.dp))
             .combinedClickable(
                 onClick = onItemClick,
-                onLongClick = { menuOpen = true }
+                onLongClick = { Haptics.longPress(context); menuOpen = true }
             )
             .testTag("naat_row_item_${naat.id}"),
         colors = CardDefaults.cardColors(
@@ -1368,7 +1377,7 @@ fun NaatRowItem(
                                     tint = if (naat.isFavorite) HighContrastRed else MaterialTheme.colorScheme.onBackground
                                 )
                             },
-                            onClick = { menuOpen = false; onFavoriteClick() }
+                            onClick = { menuOpen = false; Haptics.favoriteTick(context); onFavoriteClick() }
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.library_delete_cd)) },

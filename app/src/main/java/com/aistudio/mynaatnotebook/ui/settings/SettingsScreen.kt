@@ -85,9 +85,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.aistudio.mynaatnotebook.util.Haptics
 
 /** Which manual export destination opened the backup-type chooser dialog. */
 private enum class ExportTarget { APP_FOLDER, CHOOSE_PLACE }
@@ -150,9 +148,6 @@ fun SettingsScreen(
     val lockPinSet by lockViewModel.pinSet.collectAsStateWithLifecycle()
     val lockBiometricEnabled by lockViewModel.biometricEnabled.collectAsStateWithLifecycle()
     val lockAutoLockMinutes by lockViewModel.autoLockMinutes.collectAsStateWithLifecycle()
-    val lockOnDeviceUnlock by lockViewModel.lockOnDeviceUnlock.collectAsStateWithLifecycle()
-    val lockLastBackupAtMs by lockViewModel.lastBackupAtMs.collectAsStateWithLifecycle()
-    val lockBackupStale by lockViewModel.isBackupStale.collectAsStateWithLifecycle()
 
     // Which font picker is open: "reader", "title", or null.
     var fontPickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
@@ -657,6 +652,7 @@ fun SettingsScreen(
             onConfirm = { pin ->
                 showPinDialog = false
                 lockViewModel.setPin(pin) {
+                    Haptics.confirm(context)
                     if (!lockEnabled) {
                         lockViewModel.tryEnableLock { result ->
                             if (result is LockViewModel.EnableResult.BlockedNoBackup) {
@@ -1150,60 +1146,6 @@ fun SettingsScreen(
                     enabled = lockEnabled,
                     testTag = "lock_autolock_row",
                     onClick = { if (lockEnabled) showAutoLockDialog = true },
-                    trailing = {}
-                )
-                // Lock again after a device-lock/unlock cycle, even inside
-                // the grace period. On by default.
-                SettingsRowDivider()
-                SettingsActionRow(
-                    icon = Icons.Default.PhonelinkLock,
-                    title = stringResource(R.string.lock_device_unlock_title),
-                    subtitle = stringResource(R.string.lock_device_unlock_subtitle),
-                    contentDescription = stringResource(R.string.lock_device_unlock_title),
-                    enabled = lockEnabled,
-                    testTag = "lock_device_unlock_row",
-                    onClick = {
-                        if (lockEnabled) {
-                            lockViewModel.setLockOnDeviceUnlock(!lockOnDeviceUnlock)
-                        }
-                    },
-                    trailing = {
-                        Switch(
-                            checked = lockOnDeviceUnlock,
-                            onCheckedChange = { lockViewModel.setLockOnDeviceUnlock(it) },
-                            enabled = lockEnabled,
-                            colors = lockSwitchColors(),
-                            modifier = Modifier.testTag("lock_device_unlock_switch")
-                        )
-                    }
-                )
-                SettingsRowDivider()
-                // Last backup is a STATUS line, not a button: tapping it
-                // used to fire a Drive sync (wrong target — sync lives
-                // on the Drive section's own Sync now button). Display
-                // only: no click, no ripple, status content description.
-                val lockBackupTitle = if (lockLastBackupAtMs > 0L) {
-                    stringResource(
-                        R.string.lock_last_backup,
-                        SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-                            .format(Date(lockLastBackupAtMs))
-                    )
-                } else {
-                    stringResource(R.string.lock_backup_never)
-                }
-                SettingsActionRow(
-                    icon = Icons.Default.Backup,
-                    title = lockBackupTitle,
-                    subtitle = if (lockBackupStale) {
-                        stringResource(R.string.lock_backup_stale)
-                    } else {
-                        null
-                    },
-                    contentDescription = lockBackupTitle,
-                    enabled = true,
-                    testTag = "lock_backup_status",
-                    clickable = false,
-                    onClick = {},
                     trailing = {}
                 )
             }

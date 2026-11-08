@@ -54,7 +54,6 @@ private val KEY_LOCK_PIN_HASH = stringPreferencesKey("lock_pin_hash")
 private val KEY_LOCK_PIN_SALT = stringPreferencesKey("lock_pin_salt")
 private val KEY_LOCK_BIOMETRIC_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("lock_biometric_enabled")
 private val KEY_LOCK_AUTO_LOCK_MINUTES = androidx.datastore.preferences.core.intPreferencesKey("lock_auto_lock_minutes")
-private val KEY_LOCK_ON_DEVICE_UNLOCK = androidx.datastore.preferences.core.booleanPreferencesKey("lock_on_device_unlock")
 private val KEY_LOCK_FAILED_ATTEMPTS = androidx.datastore.preferences.core.intPreferencesKey("lock_failed_attempts")
 private val KEY_LOCK_LOCKOUT_UNTIL_MS = androidx.datastore.preferences.core.longPreferencesKey("lock_lockout_until_ms")
 
@@ -459,19 +458,6 @@ class SettingsStore @Inject constructor(
     }
 
     /**
-     * When true (the default), a device-lock/unlock cycle re-locks the
-     * app even inside the auto-lock grace period: opening the app after
-     * unlocking the phone always asks for PIN/biometric again.
-     */
-    val lockOnDeviceUnlock: Flow<Boolean> = context.settingsDataStore.data
-        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
-        .map { it[KEY_LOCK_ON_DEVICE_UNLOCK] ?: true }
-
-    suspend fun setLockOnDeviceUnlock(enabled: Boolean) {
-        context.settingsDataStore.edit { it[KEY_LOCK_ON_DEVICE_UNLOCK] = enabled }
-    }
-
-    /**
      * Wrong-PIN lockout state. Persisted (LOCAL ONLY, like all lock state)
      * so force-stopping the app cannot reset the delay ladder: the
      * countdown survives process death, and only a correct PIN (or
@@ -507,12 +493,6 @@ class SettingsStore @Inject constructor(
             prefs[KEY_LAST_EXPORT_URI] != null
     }
 
-    /** Most recent backup moment across Drive sync and manual export (0 = never). */
-    val lastAnyBackupAt: Flow<Long> = context.settingsDataStore.data
-        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
-        .map { prefs ->
-            maxOf(prefs[KEY_LAST_BACKUP_AT] ?: 0L, prefs[KEY_DRIVE_LAST_SYNC_AT] ?: 0L)
-        }
 }
 
 /** Shared preference defaults (kept here so ViewModel and store can never drift). */

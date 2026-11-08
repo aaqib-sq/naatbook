@@ -118,6 +118,9 @@ import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.aistudio.mynaatnotebook.util.Haptics
 
 /** Keyed lazy editor: only visible sections are composed and high-frequency media state is local. */
 @Composable
@@ -136,13 +139,15 @@ fun AddNaatModal(
             .navigationBarsPadding()
             .imePadding()
     ) {
+        val listState = rememberLazyListState()
         LazyColumn(
+            state = listState,
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item(key = "header") { EditorHeader(viewModel, onClose) }
-            item(key = "metadata") { EditorMetadataSection(viewModel, settingsViewModel) }
+            item(key = "metadata") { EditorMetadataSection(viewModel, settingsViewModel, listState) }
             item(key = "audio") { EditorAudioSection(viewModel) }
             item(key = "bottom-space") { Spacer(Modifier.height(8.dp)) }
         }
@@ -183,7 +188,11 @@ private fun EditorHeader(viewModel: NaatViewModel, onClose: () -> Unit) {
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: SettingsViewModel) {
+private fun EditorMetadataSection(
+    viewModel: NaatViewModel,
+    settingsViewModel: SettingsViewModel,
+    listState: LazyListState
+) {
     val context = LocalContext.current
     val metadata by viewModel.editorMetadata.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
@@ -277,7 +286,13 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
                 if (interaction is PressInteraction.Press) {
                     lyricsScope.launch {
                         delay(300)
-                        lyricsBringIntoView.bringIntoView()
+                        // Bounce fix: a delayed bring-into-view fired
+                        // mid-fling yanks the list down by itself. Skip
+                        // it while the list is scrolling; a tap that
+                        // stays still still brings the field into view.
+                        if (!listState.isScrollInProgress) {
+                            lyricsBringIntoView.bringIntoView()
+                        }
                     }
                 }
             }
@@ -319,7 +334,9 @@ private fun EditorMetadataSection(viewModel: NaatViewModel, settingsViewModel: S
                         if (state.isFocused) {
                             lyricsScope.launch {
                                 delay(300)
-                                lyricsBringIntoView.bringIntoView()
+                                if (!listState.isScrollInProgress) {
+                                    lyricsBringIntoView.bringIntoView()
+                                }
                             }
                         }
                     }
@@ -974,7 +991,10 @@ private fun EditorSaveSection(viewModel: NaatViewModel) {
         onClick = {
             if (metadata.title.isBlank()) {
                 Toast.makeText(context, context.getString(R.string.editor_title_required), Toast.LENGTH_SHORT).show()
-            } else viewModel.saveDraft()
+            } else {
+                Haptics.confirm(context)
+                viewModel.saveDraft()
+            }
         },
         enabled = !isSaving && !isAttaching,
         modifier = Modifier.fillMaxWidth().height(48.dp).testTag("save_notebook_btn")

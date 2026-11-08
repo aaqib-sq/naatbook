@@ -138,14 +138,14 @@
     <string name="editor_duplicate_message">اسی عنوان، شاعر، فولڈر اور متن والا ایک اندراج پہلے سے موجود ہے: \"%1$s\"۔ پھر بھی ایک اور نقل محفوظ کریں؟</string>
     <string name="editor_duplicate_save_anyway">پھر بھی محفوظ کریں</string>
     <string name="editor_attach_cancelled">فائل منسلک کرنا منسوخ ہو گیا</string>
-    <string name="reader_copy_cd">اشعار نقل کریں</string>
-    <string name="reader_share_cd">اشعار بانٹیں</string>
+    <string name="reader_copy_cd">نقل کریں</string>
+    <string name="reader_share_cd">بانٹیں</string>
     <string name="reader_copied">اشعار نقل ہو گئے</string>
     <string name="reader_share_audio_cd">آڈیو بانٹیں</string>
     <string name="reader_audio_missing">آڈیو فائل نہیں ملی</string>
     <string name="reader_poet">شاعر: %1$s</string>
     <string name="reader_unknown_poet">نامعلوم شاعر</string>
-    <string name="reader_favorite_cd">پسندیدہ بنائیں یا ہٹائیں</string>
+    <string name="reader_favorite_cd">پسندیدہ</string>
     <string name="reader_immersive_enter_cd">مکمل سکرین ریڈر کھولیں</string>
     <string name="reader_immersive_exit_cd">مکمل سکرین ریڈر سے نکلیں</string>
     <string name="reader_font_size_cd">حروف کا سائز</string>
@@ -154,8 +154,6 @@
     <string name="reader_autoscroll_off">خودکار سکرول</string>
     <string name="reader_text_size_label">حروف کا سائز</string>
     <string name="reader_autoscroll_label">خودکار سکرول</string>
-    <string name="reader_previous_entry">پچھلا اندراج</string>
-    <string name="reader_next_entry">اگلا اندراج</string>
     <string name="reader_scroll_speed_label">اسکرول کی رفتار</string>
     <string name="reader_tap_label">ریڈر کے کنٹرول دکھائیں یا چھپائیں</string>
     <string name="reader_no_lyrics">کوئی تحریری اشعار فراہم نہیں کیے گئے۔\nمنسلک آڈیو کے ساتھ پڑھنے کے لیے تیار!</string>
@@ -167,7 +165,6 @@
     <string name="library_search_cd">تلاش کا نشان</string>
     <string name="library_search_hint">نعتیں، شعرا، اشعار تلاش کریں...</string>
     <string name="library_clear_search">تلاش صاف کریں</string>
-    <string name="library_favorites_filter_off_cd">تمام اندراجات دکھائیں (پسندیدہ فلٹر بند کریں)</string>
     <string name="library_voice_prompt">نعت کا لفظ بولیں...</string>
     <string name="library_stt_unsupported">آواز سے تلاش سہولت میسر نہیں یا آف لائن ہے</string>
     <string name="library_voice_search_cd">آواز سے تلاش</string>
@@ -176,6 +173,7 @@
     <string name="library_recent_title">حالیہ نوٹ بکس</string>
     <string name="library_empty_folders">ابھی فولڈرز میں کوئی اندراج نہیں۔</string>
     <string name="library_favorites_query_title">پسندیدہ · \"%1$s\"</string>
+    <string name="library_favorites_filter_off_cd">تمام اندراجات دکھائیں (پسندیدہ فلٹر بند کریں)</string>
     <string name="library_favorites_title">پسندیدہ</string>
     <string name="library_results_title">\"%1$s\" کے نتائج</string>
     <string name="library_search_in_folder">%1$s میں تلاش ہو رہی ہے</string>
@@ -196,7 +194,7 @@
     <string name="library_by_poet">از %1$s</string>
     <string name="library_recorded_cd">ریکارڈ شدہ آڈیو نوٹ موجود ہے</string>
     <string name="library_linked_cd">منسلک MP3 موجود ہے</string>
-    <string name="library_favorite_toggle_cd">پسندیدہ بنائیں یا ہٹائیں</string>
+    <string name="library_favorite_toggle_cd">پسندیدہ</string>
     <string name="library_delete_cd">اندراج حذف کریں</string>
 
     <!-- Editor -->

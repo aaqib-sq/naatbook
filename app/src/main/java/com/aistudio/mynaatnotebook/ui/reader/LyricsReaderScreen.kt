@@ -135,6 +135,7 @@ import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import java.io.File
+import com.aistudio.mynaatnotebook.util.Haptics
 
 private val ReaderBottomBreathingRoom = 24.dp
 
@@ -244,42 +245,6 @@ fun LyricsReaderScreen(
         customFamilies
     )
 
-    // UX batch 4 (Arena A1): previous / next entry within the list the
-    // user came from — the Library's live filter (folder, search,
-    // favorites) in its display order. An entry reached from outside that
-    // list (e.g. the mini player) simply has no neighbours, and the menu
-    // items stay hidden.
-    val libraryOrder by viewModel.filteredSummaries.collectAsStateWithLifecycle()
-    val currentOrderIndex = libraryOrder.indexOfFirst { it.id == naat.id }
-    val previousEntryId = if (currentOrderIndex > 0) {
-        libraryOrder[currentOrderIndex - 1].id
-    } else {
-        null
-    }
-    val nextEntryId = if (currentOrderIndex >= 0 && currentOrderIndex < libraryOrder.lastIndex) {
-        libraryOrder[currentOrderIndex + 1].id
-    } else {
-        null
-    }
-    // Switching entries while this one is playing carries the listening
-    // over: the neighbour opens and its audio starts (from its own
-    // remembered position); a paused reader just switches, silently.
-    fun openNeighborEntry(entryId: Int) {
-        val keepPlaying = viewModel.playbackController.isPlaying.value &&
-            viewModel.playbackController.nowPlaying.value?.naatId == naat.id
-        viewModel.loadNaat(entryId, onLoaded = { entry ->
-            viewModel.selectNaat(entry)
-            // Audit fix L1: a neighbour opened from the Reader counts as
-            // opened, exactly like a normal open — otherwise it never rises
-            // in "Recent Notebooks".
-            viewModel.recordEntryOpened(entry.id)
-            if (keepPlaying) {
-                entry.audioPath?.let { path ->
-                    viewModel.startEntryPlaybackResuming(entry, path)
-                }
-            }
-        })
-    }
 
     val readerChromeVisible = !immersive || immersiveChromeVisible
 
@@ -469,9 +434,6 @@ fun LyricsReaderScreen(
                     onAutoScrollToggle = { autoScrollActive = !autoScrollActive },
                     scrollSpeed = scrollSpeed,
                     onScrollSpeedChange = { scrollSpeed = it },
-                    previousEntryId = previousEntryId,
-                    nextEntryId = nextEntryId,
-                    onOpenEntry = { entryId -> openNeighborEntry(entryId) }
                 )
             }
         }
@@ -541,9 +503,6 @@ private fun ReaderTopBar(
     onAutoScrollToggle: () -> Unit,
     scrollSpeed: Float,
     onScrollSpeedChange: (Float) -> Unit,
-    previousEntryId: Int? = null,
-    nextEntryId: Int? = null,
-    onOpenEntry: (Int) -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -696,10 +655,22 @@ private fun ReaderTopBar(
             }
         }
 
-            // Overflow menu: favorite, auto-scroll, copy, share, share-audio,
-            // edit. Audit 03 M8: unlike the "Aa" panel above, this menu also
-            // renders in immersive mode, so auto-scroll stays reachable
-            // without leaving full screen first.
+            // Fullscreen sits before the overflow menu: Aa, fullscreen,
+            // three-dot, in that order.
+            IconButton(
+                onClick = if (immersive) onExitImmersive else onEnterImmersive,
+                modifier = Modifier.testTag(
+                    if (immersive) "reader_exit_fullscreen" else "reader_enter_fullscreen"
+                )
+            ) {
+                Icon(
+                    imageVector = if (immersive) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                    contentDescription = if (immersive) stringResource(R.string.reader_immersive_exit_cd) else stringResource(R.string.reader_immersive_enter_cd),
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+            // Overflow menu: favorite, copy, share, share-audio, edit.
+            // Auto-scroll lives only in the "Aa" panel above.
             var overflowOpen by remember { mutableStateOf(false) }
             Box {
                 IconButton(
@@ -716,42 +687,6 @@ private fun ReaderTopBar(
                     expanded = overflowOpen,
                     onDismissRequest = { overflowOpen = false }
                 ) {
-                    // UX batch 4 (Arena A1): walk the list this entry was
-                    // opened from without going back to the Library first.
-                    val prevId = previousEntryId
-                    if (prevId != null) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.reader_previous_entry)) },
-                            leadingIcon = {
-                                Icon(Icons.Default.SkipPrevious, contentDescription = null)
-                            },
-                            onClick = { overflowOpen = false; onOpenEntry(prevId) },
-                            modifier = Modifier.testTag("reader_previous_item")
-                        )
-                    }
-                    val nextId = nextEntryId
-                    if (nextId != null) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.reader_next_entry)) },
-                            leadingIcon = {
-                                Icon(Icons.Default.SkipNext, contentDescription = null)
-                            },
-                            onClick = { overflowOpen = false; onOpenEntry(nextId) },
-                            modifier = Modifier.testTag("reader_next_item")
-                        )
-                    }
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.reader_autoscroll_label)) },
-                        leadingIcon = {
-                            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                                if (autoScrollActive) {
-                                    Icon(Icons.Default.Check, contentDescription = null)
-                                }
-                            }
-                        },
-                        onClick = { onAutoScrollToggle() },
-                        modifier = Modifier.testTag("reader_autoscroll_item")
-                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.reader_favorite_cd)) },
                         leadingIcon = {
@@ -761,7 +696,7 @@ private fun ReaderTopBar(
                                 tint = if (naat.isFavorite) HighContrastRed else MaterialTheme.colorScheme.onBackground
                             )
                         },
-                        onClick = { overflowOpen = false; onToggleFavorite() },
+                        onClick = { overflowOpen = false; Haptics.favoriteTick(readerContext); onToggleFavorite() },
                         modifier = Modifier.testTag("reader_favorite_toggle")
                     )
                     if (hasLyrics) {
@@ -814,18 +749,6 @@ private fun ReaderTopBar(
                 }
             }
 
-        IconButton(
-            onClick = if (immersive) onExitImmersive else onEnterImmersive,
-            modifier = Modifier.testTag(
-                if (immersive) "reader_exit_fullscreen" else "reader_enter_fullscreen"
-            )
-        ) {
-            Icon(
-                imageVector = if (immersive) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                contentDescription = if (immersive) stringResource(R.string.reader_immersive_exit_cd) else stringResource(R.string.reader_immersive_enter_cd),
-                tint = MaterialTheme.colorScheme.onBackground
-            )
-        }
     }
 }
 

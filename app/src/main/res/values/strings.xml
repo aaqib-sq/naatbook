@@ -145,14 +145,14 @@
     <string name="editor_duplicate_message">An entry with the same title, poet, folder and text already exists: \"%1$s\". Save another copy anyway?</string>
     <string name="editor_duplicate_save_anyway">Save anyway</string>
     <string name="editor_attach_cancelled">File attach cancelled</string>
-    <string name="reader_copy_cd">Copy lyrics</string>
-    <string name="reader_share_cd">Share lyrics</string>
+    <string name="reader_copy_cd">Copy</string>
+    <string name="reader_share_cd">Share</string>
     <string name="reader_copied">Lyrics copied</string>
     <string name="reader_share_audio_cd">Share audio</string>
     <string name="reader_audio_missing">Audio file is missing</string>
     <string name="reader_poet">Poet: %1$s</string>
     <string name="reader_unknown_poet">Unknown Poet</string>
-    <string name="reader_favorite_cd">Toggle favorite</string>
+    <string name="reader_favorite_cd">Favourite</string>
     <string name="reader_immersive_enter_cd">Enter full screen reader</string>
     <string name="reader_immersive_exit_cd">Exit full screen reader</string>
     <string name="reader_font_size_cd">Font size</string>
@@ -161,8 +161,6 @@
     <string name="reader_autoscroll_off">AutoScroll</string>
     <string name="reader_text_size_label">Text size</string>
     <string name="reader_autoscroll_label">Auto scroll</string>
-    <string name="reader_previous_entry">Previous entry</string>
-    <string name="reader_next_entry">Next entry</string>
     <string name="reader_scroll_speed_label">Scroll speed</string>
     <string name="reader_tap_label">Show or hide reader controls</string>
     <string name="reader_no_lyrics">No written lyrics provided.\nReady to recite with attached media!</string>
@@ -174,7 +172,6 @@
     <string name="library_search_cd">Search icon</string>
     <string name="library_search_hint">Search Naats, Poets, Lyrics...</string>
     <string name="library_clear_search">Clear search</string>
-    <string name="library_favorites_filter_off_cd">Show all entries (turn off favorites filter)</string>
     <string name="library_voice_prompt">Speak Naat keyword...</string>
     <string name="library_stt_unsupported">Speech-to-Text not supported or offline</string>
     <string name="library_voice_search_cd">Voice search</string>
@@ -183,7 +180,8 @@
     <string name="library_recent_title">RECENT NOTEBOOKS</string>
     <string name="library_empty_folders">No entries in folders yet.</string>
     <string name="library_favorites_query_title">FAVORITES · \"%1$s\"</string>
-    <string name="library_favorites_title">FAVORITES</string>
+    <string name="library_favorites_filter_off_cd">Show all entries (turn off favorites filter)</string>
+    <string name="library_favorites_title">Favorites</string>
     <string name="library_results_title">RESULTS FOR \"%1$s\"</string>
     <string name="library_search_in_folder">Searching in %1$s</string>
     <string name="library_draft_banner">Saved draft: %1$s</string>
@@ -203,7 +201,7 @@
     <string name="library_by_poet">By %1$s</string>
     <string name="library_recorded_cd">Recorded Audio Note Available</string>
     <string name="library_linked_cd">Linked MP3 Available</string>
-    <string name="library_favorite_toggle_cd">Favorite toggle</string>
+    <string name="library_favorite_toggle_cd">Favourite</string>
     <string name="library_delete_cd">Delete entry</string>
 
     <!-- Editor -->
@@ -466,9 +464,6 @@
     <string name="lock_set_pin">Set PIN</string>
     <string name="lock_change_pin">Change PIN</string>
     <string name="lock_biometric_setting">Fingerprint / face unlock</string>
-    <string name="lock_last_backup">Last backup: %1$s</string>
-    <string name="lock_backup_never">No backup yet</string>
-    <string name="lock_backup_stale">Backup is stale — make a fresh backup first</string>
     <string name="lock_blocked_title">Back up first</string>
     <string name="lock_blocked_message">App lock can only be turned on after a backup exists. Make a Drive backup or save a local export file first, so you can always get your library back.</string>
     <string name="lock_pin_set_title">Set a 4-digit PIN</string>
@@ -500,7 +495,5 @@
     <string name="lock_autolock_10">After 10 minutes</string>
     <string name="lock_autolock_20">After 20 minutes</string>
     <string name="lock_autolock_30">After 30 minutes</string>
-    <string name="lock_device_unlock_title">Lock when phone is unlocked</string>
-    <string name="lock_device_unlock_subtitle">Ask for PIN or fingerprint again after unlocking the phone</string>
     <string name="status_lock_biometric_failed">Fingerprint / face unlock failed — try your PIN</string>
 </resources>
