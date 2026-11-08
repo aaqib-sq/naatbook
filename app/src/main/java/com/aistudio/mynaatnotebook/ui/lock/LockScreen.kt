@@ -53,6 +53,7 @@ import com.aistudio.mynaatnotebook.viewmodel.DriveViewModel
 import com.aistudio.mynaatnotebook.viewmodel.LockViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.aistudio.mynaatnotebook.util.Haptics
 
 /**
  * Combined PIN + biometric lock screen (owner-confirmed variant, 2026-10-30).
@@ -228,6 +229,7 @@ fun LockScreen(
                                         CircleShape
                                     )
                                     .clickable(enabled = keypadEnabled) {
+                                        Haptics.keypadTick(context)
                                         pinError = false
                                         lockViewModel.clearBiometricError()
                                         pressedKey = key
@@ -251,6 +253,9 @@ fun LockScreen(
                                                     if (!lockViewModel.checkPin(typed)) {
                                                         pin = ""
                                                         pinError = true
+                                                        Haptics.wrongPin(context)
+                                                    } else {
+                                                        Haptics.confirm(context)
                                                     }
                                                     pinSubmitting = false
                                                 }
@@ -292,7 +297,9 @@ fun LockScreen(
                 OutlinedButton(
                     onClick = {
                         (context as? FragmentActivity)?.let {
-                            lockViewModel.requestBiometric(it)
+                            lockViewModel.requestBiometric(it) {
+                                Haptics.confirm(context)
+                            }
                         }
                     },
                     modifier = Modifier.testTag("lock_biometric_btn")

@@ -156,9 +156,7 @@ fun NaatApp(
     }
 
     // App lock: the grace clock starts on background, and the foreground
-    // decision runs through AutoLockPolicy (Immediate / grace timer /
-    // device-unlock cycle). A device unlock while backgrounded is seen
-    // via ACTION_USER_PRESENT.
+    // decision runs through AutoLockPolicy (Immediate / grace timer).
     // One atomic read of the lock gate: enabled + unlocked arrive
     // together, so the overlay can never flash on a half-updated pair.
     val lockState by lockViewModel.lockState.collectAsStateWithLifecycle()
@@ -176,26 +174,8 @@ fun NaatApp(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        val unlockReceiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(
-                context: android.content.Context?,
-                intent: android.content.Intent?
-            ) {
-                lockViewModel.onDeviceUnlocked()
-            }
-        }
-        val unlockFilter = android.content.IntentFilter(
-            android.content.Intent.ACTION_USER_PRESENT
-        )
-        androidx.core.content.ContextCompat.registerReceiver(
-            context,
-            unlockReceiver,
-            unlockFilter,
-            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
-        )
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            context.unregisterReceiver(unlockReceiver)
         }
     }
 

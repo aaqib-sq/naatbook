@@ -42,9 +42,8 @@ import kotlinx.coroutines.sync.Mutex
  *   NEVER wipe data.
  * - `unlocked` is in-memory only: process death re-locks, and every
  *   foreground (ON_START) re-evaluates the lock through AutoLockPolicy:
- *   Immediate re-locks at once, a grace timer re-locks only after the
- *   app stayed backgrounded past it, and a device-lock/unlock cycle
- *   re-locks regardless of the timer when that toggle is on (default).
+ *   Immediate re-locks at once, and a grace timer re-locks only after
+ *   the app stayed backgrounded past it.
  */
 @HiltViewModel
 class LockViewModel @Inject constructor(
@@ -111,14 +110,6 @@ class LockViewModel @Inject constructor(
     /** Last system biometric error text; null = none (keypad is the fallback). */
     val biometricError: StateFlow<String?> = _biometricError.asStateFlow()
 
-    /** Last backup moment (Drive sync or manual export), 0 = never. */
-    private val _lastBackupAtMs = MutableStateFlow(0L)
-    val lastBackupAtMs: StateFlow<Long> = _lastBackupAtMs.asStateFlow()
-
-    /** True when the last backup is older than 7 days (or never happened). */
-    private val _isBackupStale = MutableStateFlow(true)
-    val isBackupStale: StateFlow<Boolean> = _isBackupStale.asStateFlow()
-
     /** True when this device can offer biometric unlock at all. */
     val biometricAvailable: Boolean
         get() = BiometricManager.from(context).canAuthenticate(
@@ -129,15 +120,8 @@ class LockViewModel @Inject constructor(
     private val _autoLockMinutes = MutableStateFlow(0)
     val autoLockMinutes: StateFlow<Int> = _autoLockMinutes.asStateFlow()
 
-    /** Re-lock after a device-lock/unlock cycle (default true). */
-    private val _lockOnDeviceUnlock = MutableStateFlow(true)
-    val lockOnDeviceUnlock: StateFlow<Boolean> = _lockOnDeviceUnlock.asStateFlow()
-
     /** When the app last went to background (0 = never backgrounded). */
     private var backgroundedAtMs: Long = 0L
-
-    /** True when the phone was unlocked after the app went to background. */
-    private var deviceUnlockedSinceBackground: Boolean = false
 
     init {
         // One-time load of the persisted gate: unlocked always starts
@@ -165,35 +149,17 @@ class LockViewModel @Inject constructor(
         viewModelScope.launch {
             settingsStore.lockAutoLockMinutes.collect { _autoLockMinutes.value = it }
         }
-        viewModelScope.launch {
-            settingsStore.lockOnDeviceUnlock.collect { _lockOnDeviceUnlock.value = it }
-        }
-        viewModelScope.launch {
-            settingsStore.lastAnyBackupAt.collect { at ->
-                _lastBackupAtMs.value = at
-                _isBackupStale.value = at <= 0L ||
-                    System.currentTimeMillis() - at > 7L * 24L * 60L * 60L * 1000L
-            }
-        }
     }
 
     /** Called when the app goes to background: start the grace clock. */
     fun onBackgrounded() {
         backgroundedAtMs = System.currentTimeMillis()
-        deviceUnlockedSinceBackground = false
-    }
-
-    /** Called when the phone is unlocked while the app is backgrounded. */
-    fun onDeviceUnlocked() {
-        deviceUnlockedSinceBackground = true
     }
 
     /** Called on foreground: re-lock only when AutoLockPolicy says so. */
     fun onForegrounded() {
         if (AutoLockPolicy.shouldRelock(
                 lockEnabled = _lockState.value.enabled,
-                lockOnDeviceUnlock = _lockOnDeviceUnlock.value,
-                deviceUnlockedSinceBackground = deviceUnlockedSinceBackground,
                 autoLockMinutes = _autoLockMinutes.value,
                 backgroundedAtMs = backgroundedAtMs,
                 nowMs = System.currentTimeMillis()
@@ -207,13 +173,6 @@ class LockViewModel @Inject constructor(
         viewModelScope.launch {
             settingsStore.setLockAutoLockMinutes(minutes)
             _autoLockMinutes.value = minutes
-        }
-    }
-
-    fun setLockOnDeviceUnlock(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsStore.setLockOnDeviceUnlock(enabled)
-            _lockOnDeviceUnlock.value = enabled
         }
     }
 
@@ -356,7 +315,7 @@ class LockViewModel @Inject constructor(
     }
 
     /** System biometric prompt (fingerprint/face, device-credential fallback). */
-    fun requestBiometric(activity: FragmentActivity) {
+    fun requestBiometric(activity: FragmentActivity, onAuthenticated: (() -> Unit)? = null) {
         val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
         val prompt = BiometricPrompt(
             activity,
@@ -369,6 +328,7 @@ class LockViewModel @Inject constructor(
                     _emergencyResult.value = null
                     persistLockout()
                     _lockState.update { it.copy(unlocked = true) }
+                    onAuthenticated?.invoke()
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
