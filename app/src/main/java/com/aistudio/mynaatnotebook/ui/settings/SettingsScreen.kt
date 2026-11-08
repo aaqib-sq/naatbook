@@ -139,6 +139,8 @@ fun SettingsScreen(
     var showPinDialog by remember { mutableStateOf(false) }
     var showLockBlockedDialog by remember { mutableStateOf(false) }
     var showAutoLockDialog by remember { mutableStateOf(false) }
+    // Verifies the current PIN (change-PIN flow) without blocking the UI.
+    val lockPinScope = rememberCoroutineScope()
 
     // App lock state: one atomic read — enabled is derived from the same
     // LockState value the gate uses, never from a second flow.
@@ -637,9 +639,20 @@ fun SettingsScreen(
     // App lock: PIN setup (set or change). On a match the PIN is stored
     // (salted hash only) and, when the lock is still off, the enable
     // attempt runs again — a backup that vanished in between still blocks.
+    // Changing a PIN proves the current one first: without that, anyone
+    // holding the unlocked phone could set a new PIN and lock the
+    // owner out.
     if (showPinDialog) {
         PinSetupDialog(
-            title = stringResource(R.string.lock_pin_set_title),
+            title = if (lockPinSet) {
+                stringResource(R.string.lock_change_pin)
+            } else {
+                stringResource(R.string.lock_pin_set_title)
+            },
+            requireCurrentPin = lockPinSet,
+            onVerifyCurrentPin = { pin, onResult ->
+                lockPinScope.launch { onResult(lockViewModel.verifyPin(pin)) }
+            },
             onDismiss = { showPinDialog = false },
             onConfirm = { pin ->
                 showPinDialog = false
@@ -1188,7 +1201,7 @@ fun SettingsScreen(
                     },
                     contentDescription = lockBackupTitle,
                     enabled = true,
-                    testTag = "lock_backup_btn",
+                    testTag = "lock_backup_status",
                     clickable = false,
                     onClick = {},
                     trailing = {}
@@ -1900,7 +1913,11 @@ private fun SettingsActionRow(
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    // A disabled row dims as a whole: the old code left
+                    // the subtitle at full strength while the title and
+                    // icon faded, which read as a half-broken row.
+                    color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+                    else secondaryTextColor()
                 )
             }
         }
@@ -1931,16 +1948,23 @@ private fun backupInitialUri(persisted: String?): Uri =
         )
 
 /** App-lock PIN setup: 4 digits + confirm. Mismatch is shown in place
- * and the confirm field is cleared — nothing is stored until both agree. */
+ * and the confirm field is cleared — nothing is stored until both agree.
+ * When a PIN already exists (change flow), the current PIN must be
+ * proven first and the new PIN is only saved after that check passes. */
 @Composable
 private fun PinSetupDialog(
     title: String,
+    requireCurrentPin: Boolean = false,
+    onVerifyCurrentPin: ((String, (Boolean) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    var pin by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf("") }
-    var mismatch by remember { mutableStateOf(false) }
+    var pin by rememberSaveable { mutableStateOf("") }
+    var confirm by rememberSaveable { mutableStateOf("") }
+    var mismatch by rememberSaveable { mutableStateOf(false) }
+    var current by rememberSaveable { mutableStateOf("") }
+    var currentError by rememberSaveable { mutableStateOf(false) }
+    var currentVerified by rememberSaveable { mutableStateOf(false) }
     val pinKeyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1948,6 +1972,26 @@ private fun PinSetupDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.lock_pin_set_message))
+                if (requireCurrentPin && !currentVerified) {
+                    OutlinedTextField(
+                        value = current,
+                        onValueChange = {
+                            current = it.filter { ch -> ch.isDigit() }.take(4)
+                            currentError = false
+                        },
+                        label = { Text(stringResource(R.string.lock_pin_current)) },
+                        singleLine = true,
+                        keyboardOptions = pinKeyboard,
+                        visualTransformation = PasswordVisualTransformation(),
+                        isError = currentError,
+                        supportingText = if (currentError) {
+                            { Text(stringResource(R.string.lock_pin_wrong_current)) }
+                        } else {
+                            null
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("lock_pin_current_field")
+                    )
+                }
                 OutlinedTextField(
                     value = pin,
                     onValueChange = {
@@ -1982,13 +2026,29 @@ private fun PinSetupDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = pin.length == 4 && confirm.length == 4,
+                enabled = pin.length == 4 && confirm.length == 4 &&
+                    (!requireCurrentPin || currentVerified || current.length == 4),
                 onClick = {
-                    if (pin == confirm) {
-                        onConfirm(pin)
+                    val trySave = {
+                        if (pin == confirm) {
+                            onConfirm(pin)
+                        } else {
+                            mismatch = true
+                            confirm = ""
+                        }
+                    }
+                    if (requireCurrentPin && !currentVerified) {
+                        onVerifyCurrentPin?.invoke(current) { ok ->
+                            if (ok) {
+                                currentVerified = true
+                                trySave()
+                            } else {
+                                currentError = true
+                                current = ""
+                            }
+                        }
                     } else {
-                        mismatch = true
-                        confirm = ""
+                        trySave()
                     }
                 },
                 modifier = Modifier.testTag("lock_pin_save")
