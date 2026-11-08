@@ -162,6 +162,10 @@ fun NaatApp(
     // One atomic read of the lock gate: enabled + unlocked arrive
     // together, so the overlay can never flash on a half-updated pair.
     val lockState by lockViewModel.lockState.collectAsStateWithLifecycle()
+    // The gate starts (enabled=false) until the store answers: the
+    // splash below stays up until it does, so a locked library can
+    // never flash for a frame on cold start.
+    val lockLoaded by lockViewModel.lockLoaded.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -601,7 +605,10 @@ fun NaatApp(
                 // First-launch intro overlay (covers everything until done
                 // or skipped). While the store has not answered, a plain
                 // splash with the app mark avoids any flash of either UI.
-                if (onboardingSeen == null) {
+                // The lock gate loads from the same store: until it has
+                // answered too, the library stays behind the splash even
+                // when the intro is already known.
+                if (onboardingSeen == null || !lockLoaded) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()

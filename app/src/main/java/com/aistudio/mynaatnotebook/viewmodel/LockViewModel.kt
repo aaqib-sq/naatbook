@@ -76,6 +76,15 @@ class LockViewModel @Inject constructor(
     /** True while an enable/disable operation is in flight. */
     val lockBusy: StateFlow<Boolean> = _lockBusy.asStateFlow()
 
+    private val _lockLoaded = MutableStateFlow(false)
+    /**
+     * True once the persisted lock gate (and the persisted lockout state)
+     * have been read. Until then the UI must not draw the library: the
+     * gate starts (enabled=false) and a locked library would flash for
+     * a frame on cold start while the store answers.
+     */
+    val lockLoaded: StateFlow<Boolean> = _lockLoaded.asStateFlow()
+
     private val _pinSet = MutableStateFlow(false)
     /** True when a PIN hash exists (set at least once). */
     val pinSet: StateFlow<Boolean> = _pinSet.asStateFlow()
@@ -134,10 +143,18 @@ class LockViewModel @Inject constructor(
         // One-time load of the persisted gate: unlocked always starts
         // false (process death re-locks). This is the ONLY read of the
         // stored flag — no collector, so DataStore can never overwrite
-        // the in-memory state mid-session.
+        // the in-memory state mid-session. The persisted lockout ladder
+        // loads with it, so a force-stop cannot reset the countdown;
+        // an already-expired lockout is dropped, never honoured stale.
         viewModelScope.launch {
             val enabled = settingsStore.lockEnabled.first()
+            val attempts = settingsStore.lockFailedAttempts.first()
+            val untilMs = settingsStore.lockLockoutUntilMs.first()
+            _failedAttempts.value = attempts
+            _lockoutUntilMs.value =
+                if (untilMs > System.currentTimeMillis()) untilMs else 0L
             _lockState.value = LockState(enabled = enabled, unlocked = false)
+            _lockLoaded.value = true
         }
         viewModelScope.launch {
             settingsStore.lockPinHash.collect { _pinSet.value = it != null }
@@ -158,11 +175,6 @@ class LockViewModel @Inject constructor(
                     System.currentTimeMillis() - at > 7L * 24L * 60L * 60L * 1000L
             }
         }
-    }
-
-    /** Re-lock on foreground. No-op when the lock is off. */
-    fun relock() {
-        _lockState.update { if (it.enabled) it.copy(unlocked = false) else it }
     }
 
     /** Called when the app goes to background: start the grace clock. */
@@ -257,12 +269,22 @@ class LockViewModel @Inject constructor(
                 _lockState.value = LockState(enabled = false, unlocked = false)
                 _failedAttempts.value = 0
                 _lockoutUntilMs.value = 0L
+                _biometricError.value = null
+                _emergencyResult.value = null
+                persistLockout()
                 launch { settingsStore.setLockEnabled(false) }
             } finally {
                 _lockBusy.value = false
                 lockOpMutex.unlock()
             }
         }
+    }
+
+    /** Persist the lockout ladder so it survives process death. */
+    private fun persistLockout() {
+        val attempts = _failedAttempts.value
+        val untilMs = _lockoutUntilMs.value
+        viewModelScope.launch { settingsStore.setLockoutState(attempts, untilMs) }
     }
 
     /** Store a new PIN (4 digits, confirmed by the caller). */
@@ -291,6 +313,11 @@ class LockViewModel @Inject constructor(
         return if (hash != null && salt != null && PinHash.matches(pin, salt, hash)) {
             _failedAttempts.value = 0
             _lockoutUntilMs.value = 0L
+            _biometricError.value = null
+            // A fresh unlock starts clean: no stale error or emergency
+            // result from the previous lock session carries over.
+            _emergencyResult.value = null
+            persistLockout()
             _lockState.update { it.copy(unlocked = true) }
             true
         } else {
@@ -298,6 +325,32 @@ class LockViewModel @Inject constructor(
             _failedAttempts.value = failures
             val delay = LockAttemptPolicy.delayAfterFailures(failures)
             if (delay > 0L) _lockoutUntilMs.value = System.currentTimeMillis() + delay
+            persistLockout()
+            false
+        }
+    }
+
+    /**
+     * Check a PIN without touching the lock gate: used when the owner
+     * changes the PIN in Settings (the current PIN must be proven first).
+     * Wrong attempts count on the same ladder as the lock screen, so
+     * guessing the current PIN in Settings is no easier than on the
+     * lock screen. Never unlocks.
+     */
+    suspend fun verifyPin(pin: String): Boolean {
+        val hash = settingsStore.lockPinHash.first()
+        val salt = settingsStore.lockPinSalt.first()
+        return if (hash != null && salt != null && PinHash.matches(pin, salt, hash)) {
+            _failedAttempts.value = 0
+            _lockoutUntilMs.value = 0L
+            persistLockout()
+            true
+        } else {
+            val failures = _failedAttempts.value + 1
+            _failedAttempts.value = failures
+            val delay = LockAttemptPolicy.delayAfterFailures(failures)
+            if (delay > 0L) _lockoutUntilMs.value = System.currentTimeMillis() + delay
+            persistLockout()
             false
         }
     }
@@ -313,12 +366,22 @@ class LockViewModel @Inject constructor(
                     _failedAttempts.value = 0
                     _lockoutUntilMs.value = 0L
                     _biometricError.value = null
+                    _emergencyResult.value = null
+                    persistLockout()
                     _lockState.update { it.copy(unlocked = true) }
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    // System lockout / cancel: the PIN keypad stays as the
-                    // fallback. No app-level biometric counter exists.
+                    // A deliberate cancel (user pressed Cancel or
+                    // dismissed the prompt) is not a failure: no toast,
+                    // no error state — the keypad simply stays as it is.
+                    if (errorCode == BiometricPrompt.ERROR_USER_CANCELED ||
+                        errorCode == BiometricPrompt.ERROR_CANCELED ||
+                        errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                    ) return
+                    // System lockout / hardware error: the PIN keypad
+                    // stays as the fallback. No app-level biometric
+                    // counter exists.
                     _biometricError.value = errString.toString()
                     statusReporter.show(R.string.status_lock_biometric_failed)
                 }
@@ -358,10 +421,6 @@ class LockViewModel @Inject constructor(
                 _emergencyWorking.value = false
             }
         }
-    }
-
-    fun clearEmergencyResult() {
-        _emergencyResult.value = null
     }
 
     fun clearBiometricError() {
