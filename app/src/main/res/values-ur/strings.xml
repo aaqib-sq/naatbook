@@ -173,6 +173,7 @@
     <string name="library_recent_title">حالیہ نوٹ بکس</string>
     <string name="library_empty_folders">ابھی فولڈرز میں کوئی اندراج نہیں۔</string>
     <string name="library_favorites_query_title">پسندیدہ · \"%1$s\"</string>
+    <string name="library_favorites_filter_off_cd">تمام اندراجات دکھائیں (پسندیدہ فلٹر بند کریں)</string>
     <string name="library_favorites_title">پسندیدہ</string>
     <string name="library_results_title">\"%1$s\" کے نتائج</string>
     <string name="library_search_in_folder">%1$s میں تلاش ہو رہی ہے</string>

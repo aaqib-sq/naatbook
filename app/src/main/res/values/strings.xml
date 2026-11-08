@@ -180,6 +180,7 @@
     <string name="library_recent_title">RECENT NOTEBOOKS</string>
     <string name="library_empty_folders">No entries in folders yet.</string>
     <string name="library_favorites_query_title">FAVORITES · \"%1$s\"</string>
+    <string name="library_favorites_filter_off_cd">Show all entries (turn off favorites filter)</string>
     <string name="library_favorites_title">Favorites</string>
     <string name="library_results_title">RESULTS FOR \"%1$s\"</string>
     <string name="library_search_in_folder">Searching in %1$s</string>
