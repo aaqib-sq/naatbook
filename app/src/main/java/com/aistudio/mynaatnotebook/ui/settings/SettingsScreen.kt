@@ -32,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
@@ -139,8 +140,11 @@ fun SettingsScreen(
     var showLockBlockedDialog by remember { mutableStateOf(false) }
     var showAutoLockDialog by remember { mutableStateOf(false) }
 
-    // App lock state (LockViewModel owns the DataStore flows).
-    val lockEnabled by lockViewModel.lockEnabled.collectAsStateWithLifecycle()
+    // App lock state: one atomic read — enabled is derived from the same
+    // LockState value the gate uses, never from a second flow.
+    val lockState by lockViewModel.lockState.collectAsStateWithLifecycle()
+    val lockEnabled = lockState.enabled
+    val lockBusy by lockViewModel.lockBusy.collectAsStateWithLifecycle()
     val lockPinSet by lockViewModel.pinSet.collectAsStateWithLifecycle()
     val lockBiometricEnabled by lockViewModel.biometricEnabled.collectAsStateWithLifecycle()
     val lockAutoLockMinutes by lockViewModel.autoLockMinutes.collectAsStateWithLifecycle()
@@ -1033,7 +1037,10 @@ fun SettingsScreen(
                     enabled = true,
                     testTag = "lock_toggle",
                     onClick = {
-                        if (lockEnabled) {
+                        if (lockBusy) {
+                            // A tap mid-flight is dropped (the ViewModel
+                            // serialises enable/disable); no second flip.
+                        } else if (lockEnabled) {
                             lockViewModel.disableLock()
                         } else {
                             lockViewModel.tryEnableLock { result ->
@@ -1050,6 +1057,8 @@ fun SettingsScreen(
                     trailing = {
                         Switch(
                             checked = lockEnabled,
+                            enabled = !lockBusy,
+                            colors = lockSwitchColors(),
                             onCheckedChange = { checked ->
                                 if (!checked) {
                                     lockViewModel.disableLock()
@@ -1103,6 +1112,7 @@ fun SettingsScreen(
                                 checked = lockBiometricEnabled,
                                 onCheckedChange = { lockViewModel.setBiometricEnabled(it) },
                                 enabled = lockEnabled,
+                                colors = lockSwitchColors(),
                                 modifier = Modifier.testTag("lock_biometric_switch")
                             )
                         }
@@ -1149,37 +1159,38 @@ fun SettingsScreen(
                             checked = lockOnDeviceUnlock,
                             onCheckedChange = { lockViewModel.setLockOnDeviceUnlock(it) },
                             enabled = lockEnabled,
+                            colors = lockSwitchColors(),
                             modifier = Modifier.testTag("lock_device_unlock_switch")
                         )
                     }
                 )
                 SettingsRowDivider()
+                // Last backup is a STATUS line, not a button: tapping it
+                // used to fire a Drive sync (wrong target — sync lives
+                // on the Drive section's own Sync now button). Display
+                // only: no click, no ripple, status content description.
+                val lockBackupTitle = if (lockLastBackupAtMs > 0L) {
+                    stringResource(
+                        R.string.lock_last_backup,
+                        SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+                            .format(Date(lockLastBackupAtMs))
+                    )
+                } else {
+                    stringResource(R.string.lock_backup_never)
+                }
                 SettingsActionRow(
                     icon = Icons.Default.Backup,
-                    title = if (lockLastBackupAtMs > 0L) {
-                        stringResource(
-                            R.string.lock_last_backup,
-                            SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-                                .format(Date(lockLastBackupAtMs))
-                        )
-                    } else {
-                        stringResource(R.string.lock_backup_never)
-                    },
+                    title = lockBackupTitle,
                     subtitle = if (lockBackupStale) {
                         stringResource(R.string.lock_backup_stale)
                     } else {
                         null
                     },
-                    contentDescription = stringResource(R.string.lock_backup_now),
-                    enabled = !backupWorking && !driveSyncing,
+                    contentDescription = lockBackupTitle,
+                    enabled = true,
                     testTag = "lock_backup_btn",
-                    onClick = {
-                        if (driveEmail != null) {
-                            driveViewModel.syncNow()
-                        } else {
-                            exportChoiceTarget = ExportTarget.APP_FOLDER
-                        }
-                    },
+                    clickable = false,
+                    onClick = {},
                     trailing = {}
                 )
             }
@@ -1818,6 +1829,25 @@ private fun FontNameDialog(
     )
 }
 
+/**
+ * Lock switches, made visible on the grey cards in both themes.
+ * Material3's defaults hide the OFF switch here: the default OFF track
+ * is surfaceVariant (near-white in light, near-black in dark) and the
+ * default OFF thumb/border is outline (the same pale grey), so the
+ * switch melts into the surfaceContainerHighest card. These explicit
+ * theme-native colours keep OFF clearly visible — mid-grey track with
+ * a surface thumb — while ON stays the theme primary. No new colour.
+ */
+@Composable
+private fun lockSwitchColors(): SwitchColors = SwitchDefaults.colors(
+    checkedTrackColor = MaterialTheme.colorScheme.primary,
+    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+    checkedBorderColor = Color.Transparent,
+    uncheckedTrackColor = secondaryTextColor(),
+    uncheckedThumbColor = MaterialTheme.colorScheme.surface,
+    uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
+)
+
 /** One tappable row inside the Settings data card: icon well, title + subtitle, chevron. */
 @Composable
 private fun SettingsActionRow(
@@ -1828,12 +1858,18 @@ private fun SettingsActionRow(
     enabled: Boolean,
     testTag: String,
     onClick: () -> Unit,
-    trailing: (@Composable () -> Unit)? = null
+    trailing: (@Composable () -> Unit)? = null,
+    // Display-only rows (e.g. a status line): no click target, no
+    // ripple, but the row keeps its normal colours (unlike enabled=false).
+    clickable: Boolean = true
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
+            .then(
+                if (clickable) Modifier.clickable(enabled = enabled, onClick = onClick)
+                else Modifier
+            )
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically

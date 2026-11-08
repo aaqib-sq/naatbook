@@ -159,8 +159,9 @@ fun NaatApp(
     // decision runs through AutoLockPolicy (Immediate / grace timer /
     // device-unlock cycle). A device unlock while backgrounded is seen
     // via ACTION_USER_PRESENT.
-    val lockEnabled by lockViewModel.lockEnabled.collectAsStateWithLifecycle()
-    val lockUnlocked by lockViewModel.unlocked.collectAsStateWithLifecycle()
+    // One atomic read of the lock gate: enabled + unlocked arrive
+    // together, so the overlay can never flash on a half-updated pair.
+    val lockState by lockViewModel.lockState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -625,7 +626,7 @@ fun NaatApp(
                 // App lock: opaque topmost overlay. Drawn last in the Box
                 // so it covers the library, reader, and settings alike.
                 // Back is swallowed inside LockScreen itself.
-                if (lockEnabled && !lockUnlocked) {
+                if (lockState.enabled && !lockState.unlocked) {
                     LockScreen(
                         lockViewModel = lockViewModel,
                         driveViewModel = driveViewModel

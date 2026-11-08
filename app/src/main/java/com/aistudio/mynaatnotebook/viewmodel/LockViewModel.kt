@@ -22,7 +22,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 
 /**
  * App-lock state machine (combined PIN + biometric, owner-confirmed 2026-10-30).
@@ -52,8 +54,27 @@ class LockViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private val _lockEnabled = MutableStateFlow(false)
-    val lockEnabled: StateFlow<Boolean> = _lockEnabled.asStateFlow()
+    /**
+     * The lock gate is ONE atomic value: [LockState] carries both halves
+     * (enabled + unlocked) in a single StateFlow, so the UI can never
+     * observe the in-between (enabled=true, unlocked=false) that used to
+     * flash the lock screen for a frame when two writers updated two
+     * separate flows. Every transition assigns or updates this one flow
+     * synchronously; the DataStore write follows fire-and-forget and is
+     * never a second writer.
+     */
+    data class LockState(val enabled: Boolean, val unlocked: Boolean)
+
+    private val _lockState = MutableStateFlow(LockState(enabled = false, unlocked = false))
+    /** Single source of truth for the lock gate. */
+    val lockState: StateFlow<LockState> = _lockState.asStateFlow()
+
+    /** Serialises enable/disable: a second tap while one runs is dropped. */
+    private val lockOpMutex = Mutex()
+
+    private val _lockBusy = MutableStateFlow(false)
+    /** True while an enable/disable operation is in flight. */
+    val lockBusy: StateFlow<Boolean> = _lockBusy.asStateFlow()
 
     private val _pinSet = MutableStateFlow(false)
     /** True when a PIN hash exists (set at least once). */
@@ -61,10 +82,6 @@ class LockViewModel @Inject constructor(
 
     private val _biometricEnabled = MutableStateFlow(false)
     val biometricEnabled: StateFlow<Boolean> = _biometricEnabled.asStateFlow()
-
-    private val _unlocked = MutableStateFlow(false)
-    /** In-memory session flag: true only between an unlock and the next foreground. */
-    val unlocked: StateFlow<Boolean> = _unlocked.asStateFlow()
 
     private val _failedAttempts = MutableStateFlow(0)
     /** Wrong PIN attempts since the last success (this lock session). */
@@ -114,7 +131,14 @@ class LockViewModel @Inject constructor(
     private var deviceUnlockedSinceBackground: Boolean = false
 
     init {
-        viewModelScope.launch { settingsStore.lockEnabled.collect { _lockEnabled.value = it } }
+        // One-time load of the persisted gate: unlocked always starts
+        // false (process death re-locks). This is the ONLY read of the
+        // stored flag — no collector, so DataStore can never overwrite
+        // the in-memory state mid-session.
+        viewModelScope.launch {
+            val enabled = settingsStore.lockEnabled.first()
+            _lockState.value = LockState(enabled = enabled, unlocked = false)
+        }
         viewModelScope.launch {
             settingsStore.lockPinHash.collect { _pinSet.value = it != null }
         }
@@ -138,7 +162,7 @@ class LockViewModel @Inject constructor(
 
     /** Re-lock on foreground. No-op when the lock is off. */
     fun relock() {
-        if (_lockEnabled.value) _unlocked.value = false
+        _lockState.update { if (it.enabled) it.copy(unlocked = false) else it }
     }
 
     /** Called when the app goes to background: start the grace clock. */
@@ -155,7 +179,7 @@ class LockViewModel @Inject constructor(
     /** Called on foreground: re-lock only when AutoLockPolicy says so. */
     fun onForegrounded() {
         if (AutoLockPolicy.shouldRelock(
-                lockEnabled = _lockEnabled.value,
+                lockEnabled = _lockState.value.enabled,
                 lockOnDeviceUnlock = _lockOnDeviceUnlock.value,
                 deviceUnlockedSinceBackground = deviceUnlockedSinceBackground,
                 autoLockMinutes = _autoLockMinutes.value,
@@ -163,7 +187,7 @@ class LockViewModel @Inject constructor(
                 nowMs = System.currentTimeMillis()
             )
         ) {
-            _unlocked.value = false
+            _lockState.update { it.copy(unlocked = false) }
         }
     }
 
@@ -199,18 +223,26 @@ class LockViewModel @Inject constructor(
      */
     fun tryEnableLock(onResult: (EnableResult) -> Unit) {
         viewModelScope.launch {
-            if (!_pinSet.value) {
-                onResult(EnableResult.NeedsPin)
-                return@launch
+            if (!lockOpMutex.tryLock()) return@launch
+            _lockBusy.value = true
+            try {
+                if (!_pinSet.value) {
+                    onResult(EnableResult.NeedsPin)
+                    return@launch
+                }
+                if (!settingsStore.hasAnyBackup()) {
+                    onResult(EnableResult.BlockedNoBackup)
+                    return@launch
+                }
+                // Atomic flip first: the UI sees enabled+unlocked together.
+                // The DataStore write follows fire-and-forget.
+                _lockState.value = LockState(enabled = true, unlocked = true)
+                launch { settingsStore.setLockEnabled(true) }
+                onResult(EnableResult.Enabled)
+            } finally {
+                _lockBusy.value = false
+                lockOpMutex.unlock()
             }
-            if (!settingsStore.hasAnyBackup()) {
-                onResult(EnableResult.BlockedNoBackup)
-                return@launch
-            }
-            settingsStore.setLockEnabled(true)
-            _lockEnabled.value = true
-            _unlocked.value = true
-            onResult(EnableResult.Enabled)
         }
     }
 
@@ -219,11 +251,17 @@ class LockViewModel @Inject constructor(
 
     fun disableLock() {
         viewModelScope.launch {
-            settingsStore.setLockEnabled(false)
-            _lockEnabled.value = false
-            _unlocked.value = false
-            _failedAttempts.value = 0
-            _lockoutUntilMs.value = 0L
+            if (!lockOpMutex.tryLock()) return@launch
+            _lockBusy.value = true
+            try {
+                _lockState.value = LockState(enabled = false, unlocked = false)
+                _failedAttempts.value = 0
+                _lockoutUntilMs.value = 0L
+                launch { settingsStore.setLockEnabled(false) }
+            } finally {
+                _lockBusy.value = false
+                lockOpMutex.unlock()
+            }
         }
     }
 
@@ -253,7 +291,7 @@ class LockViewModel @Inject constructor(
         return if (hash != null && salt != null && PinHash.matches(pin, salt, hash)) {
             _failedAttempts.value = 0
             _lockoutUntilMs.value = 0L
-            _unlocked.value = true
+            _lockState.update { it.copy(unlocked = true) }
             true
         } else {
             val failures = _failedAttempts.value + 1
@@ -275,7 +313,7 @@ class LockViewModel @Inject constructor(
                     _failedAttempts.value = 0
                     _lockoutUntilMs.value = 0L
                     _biometricError.value = null
-                    _unlocked.value = true
+                    _lockState.update { it.copy(unlocked = true) }
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
