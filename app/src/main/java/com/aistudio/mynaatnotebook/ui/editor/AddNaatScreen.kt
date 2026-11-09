@@ -115,6 +115,7 @@ import com.aistudio.mynaatnotebook.ui.components.FontPickerLeadChoice
 import com.aistudio.mynaatnotebook.ui.components.fontChoiceLabel
 import com.aistudio.mynaatnotebook.ui.theme.FontChoices
 import com.aistudio.mynaatnotebook.viewmodel.SettingsViewModel
+import com.aistudio.mynaatnotebook.viewmodel.limitTitleWords
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -184,15 +185,6 @@ private fun EditorHeader(viewModel: NaatViewModel, onClose: () -> Unit) {
             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.editor_close_cd))
         }
     }
-}
-
-/** Titles are capped at 12 words: a title is a name, not a passage.
- *  Newlines are stripped too (a paste can smuggle them into this
- *  single-line field). Extra words are dropped, never stored. */
-private fun limitTitleWords(value: String): String {
-    val clean = value.replace("\n", " ").replace("\r", " ")
-    val words = clean.split(Regex("\\s+")).filter { it.isNotEmpty() }
-    return if (words.size <= 12) clean else words.take(12).joinToString(" ")
 }
 
 @Composable
