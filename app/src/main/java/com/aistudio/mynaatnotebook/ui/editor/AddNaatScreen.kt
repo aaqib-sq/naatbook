@@ -284,13 +284,21 @@ private fun EditorMetadataSection(
         LaunchedEffect(lyricsInteraction) {
             lyricsInteraction.interactions.collect { interaction ->
                 if (interaction is PressInteraction.Press) {
+                    // Bounce fix: remember where the list was when the
+                    // finger went down. A delayed bring-into-view fired
+                    // after a fast flick that already settled still
+                    // yanks the list back by itself — so skip it if the
+                    // list moved at all since the press, or is still
+                    // scrolling. A tap that stays still still brings
+                    // the field into view (2026-10-27 top-clipping fix).
+                    val startIndex = listState.firstVisibleItemIndex
+                    val startOffset = listState.firstVisibleItemScrollOffset
                     lyricsScope.launch {
                         delay(300)
-                        // Bounce fix: a delayed bring-into-view fired
-                        // mid-fling yanks the list down by itself. Skip
-                        // it while the list is scrolling; a tap that
-                        // stays still still brings the field into view.
-                        if (!listState.isScrollInProgress) {
+                        if (!listState.isScrollInProgress &&
+                            listState.firstVisibleItemIndex == startIndex &&
+                            listState.firstVisibleItemScrollOffset == startOffset
+                        ) {
                             lyricsBringIntoView.bringIntoView()
                         }
                     }
@@ -332,9 +340,14 @@ private fun EditorMetadataSection(
                     .bringIntoViewRequester(lyricsBringIntoView)
                     .onFocusChanged { state ->
                         if (state.isFocused) {
+                            val startIndex = listState.firstVisibleItemIndex
+                            val startOffset = listState.firstVisibleItemScrollOffset
                             lyricsScope.launch {
                                 delay(300)
-                                if (!listState.isScrollInProgress) {
+                                if (!listState.isScrollInProgress &&
+                                    listState.firstVisibleItemIndex == startIndex &&
+                                    listState.firstVisibleItemScrollOffset == startOffset
+                                ) {
                                     lyricsBringIntoView.bringIntoView()
                                 }
                             }
