@@ -186,6 +186,15 @@ private fun EditorHeader(viewModel: NaatViewModel, onClose: () -> Unit) {
     }
 }
 
+/** Titles are capped at 12 words: a title is a name, not a passage.
+ *  Newlines are stripped too (a paste can smuggle them into this
+ *  single-line field). Extra words are dropped, never stored. */
+private fun limitTitleWords(value: String): String {
+    val clean = value.replace("\n", " ").replace("\r", " ")
+    val words = clean.split(Regex("\\s+")).filter { it.isNotEmpty() }
+    return if (words.size <= 12) clean else words.take(12).joinToString(" ")
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun EditorMetadataSection(
@@ -218,7 +227,7 @@ private fun EditorMetadataSection(
             EditorCardLabel(stringResource(R.string.editor_details_title))
             TextField(
                 value = metadata.title,
-                onValueChange = { value -> viewModel.updateDraft { it.copy(title = value.replace("\n", " ").replace("\r", " ")) } },
+                onValueChange = { value -> viewModel.updateDraft { it.copy(title = limitTitleWords(value)) } },
                 label = { Text(stringResource(R.string.editor_title_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("add_naat_title"),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
