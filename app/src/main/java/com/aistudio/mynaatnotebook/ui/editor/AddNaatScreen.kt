@@ -218,7 +218,7 @@ private fun EditorMetadataSection(
             EditorCardLabel(stringResource(R.string.editor_details_title))
             TextField(
                 value = metadata.title,
-                onValueChange = { value -> viewModel.updateDraft { it.copy(title = value) } },
+                onValueChange = { value -> viewModel.updateDraft { it.copy(title = value.replace("\n", " ").replace("\r", " ")) } },
                 label = { Text(stringResource(R.string.editor_title_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("add_naat_title"),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -229,7 +229,7 @@ private fun EditorMetadataSection(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             TextField(
                 value = metadata.poet,
-                onValueChange = { value -> viewModel.updateDraft { it.copy(poet = value) } },
+                onValueChange = { value -> viewModel.updateDraft { it.copy(poet = value.replace("\n", " ").replace("\r", " ")) } },
                 label = { Text(stringResource(R.string.editor_poet_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("add_naat_poet"),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),

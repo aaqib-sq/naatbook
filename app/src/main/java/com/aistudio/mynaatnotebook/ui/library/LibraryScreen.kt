@@ -771,6 +771,8 @@ fun LibraryScreen(
             onDismissRequest = { if (!isDeleting) deleteCandidate = null },
             title = { Text(stringResource(R.string.library_delete_title)) },
             text = {
+                // Long titles are capped: the title is printed as-is,
+                // so a multi-line title once filled this whole dialog.
                 Text(
                     stringResource(
                         R.string.library_delete_message,
@@ -778,7 +780,9 @@ fun LibraryScreen(
                         if (candidate.audioType != "none" || candidate.secondaryAudioType != "none")
                             stringResource(R.string.library_delete_with_audio)
                         else "."
-                    )
+                    ),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
             },
             confirmButton = {
