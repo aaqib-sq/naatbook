@@ -28,7 +28,7 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_discard">Discard</string>
     <string name="common_undo">Undo</string>
-    <string name="common_edit_entry">Edit entry</string>
+    <string name="common_edit_entry">Edit</string>
     <string name="common_database_error">database error</string>
 
     <!-- Settings -->
@@ -202,7 +202,7 @@
     <string name="library_recorded_cd">Recorded Audio Note Available</string>
     <string name="library_linked_cd">Linked MP3 Available</string>
     <string name="library_favorite_toggle_cd">Favourite</string>
-    <string name="library_delete_cd">Delete entry</string>
+    <string name="library_delete_cd">Delete</string>
 
     <!-- Editor -->
     <string name="editor_title_edit">Edit NaatBook Entry</string>

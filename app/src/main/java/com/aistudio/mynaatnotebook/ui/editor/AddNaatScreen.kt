@@ -218,7 +218,7 @@ private fun EditorMetadataSection(
             EditorCardLabel(stringResource(R.string.editor_details_title))
             TextField(
                 value = metadata.title,
-                onValueChange = { value -> viewModel.updateDraft { it.copy(title = value) } },
+                onValueChange = { value -> viewModel.updateDraft { it.copy(title = value.replace("\n", " ").replace("\r", " ")) } },
                 label = { Text(stringResource(R.string.editor_title_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("add_naat_title"),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -229,7 +229,7 @@ private fun EditorMetadataSection(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             TextField(
                 value = metadata.poet,
-                onValueChange = { value -> viewModel.updateDraft { it.copy(poet = value) } },
+                onValueChange = { value -> viewModel.updateDraft { it.copy(poet = value.replace("\n", " ").replace("\r", " ")) } },
                 label = { Text(stringResource(R.string.editor_poet_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("add_naat_poet"),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
@@ -284,13 +284,21 @@ private fun EditorMetadataSection(
         LaunchedEffect(lyricsInteraction) {
             lyricsInteraction.interactions.collect { interaction ->
                 if (interaction is PressInteraction.Press) {
+                    // Bounce fix: remember where the list was when the
+                    // finger went down. A delayed bring-into-view fired
+                    // after a fast flick that already settled still
+                    // yanks the list back by itself — so skip it if the
+                    // list moved at all since the press, or is still
+                    // scrolling. A tap that stays still still brings
+                    // the field into view (2026-10-27 top-clipping fix).
+                    val startIndex = listState.firstVisibleItemIndex
+                    val startOffset = listState.firstVisibleItemScrollOffset
                     lyricsScope.launch {
                         delay(300)
-                        // Bounce fix: a delayed bring-into-view fired
-                        // mid-fling yanks the list down by itself. Skip
-                        // it while the list is scrolling; a tap that
-                        // stays still still brings the field into view.
-                        if (!listState.isScrollInProgress) {
+                        if (!listState.isScrollInProgress &&
+                            listState.firstVisibleItemIndex == startIndex &&
+                            listState.firstVisibleItemScrollOffset == startOffset
+                        ) {
                             lyricsBringIntoView.bringIntoView()
                         }
                     }
@@ -332,9 +340,14 @@ private fun EditorMetadataSection(
                     .bringIntoViewRequester(lyricsBringIntoView)
                     .onFocusChanged { state ->
                         if (state.isFocused) {
+                            val startIndex = listState.firstVisibleItemIndex
+                            val startOffset = listState.firstVisibleItemScrollOffset
                             lyricsScope.launch {
                                 delay(300)
-                                if (!listState.isScrollInProgress) {
+                                if (!listState.isScrollInProgress &&
+                                    listState.firstVisibleItemIndex == startIndex &&
+                                    listState.firstVisibleItemScrollOffset == startOffset
+                                ) {
                                     lyricsBringIntoView.bringIntoView()
                                 }
                             }

@@ -28,7 +28,7 @@
     <string name="common_cancel">منسوخ</string>
     <string name="common_discard">رد کریں</string>
     <string name="common_undo">واپس لیں</string>
-    <string name="common_edit_entry">اندراج میں ترمیم کریں</string>
+    <string name="common_edit_entry">ترمیم کریں</string>
     <string name="common_database_error">ڈیٹا بیس کی خرابی</string>
 
     <!-- Settings -->
@@ -195,7 +195,7 @@
     <string name="library_recorded_cd">ریکارڈ شدہ آڈیو نوٹ موجود ہے</string>
     <string name="library_linked_cd">منسلک MP3 موجود ہے</string>
     <string name="library_favorite_toggle_cd">پسندیدہ</string>
-    <string name="library_delete_cd">اندراج حذف کریں</string>
+    <string name="library_delete_cd">حذف کریں</string>
 
     <!-- Editor -->
     <string name="editor_title_edit">NaatBook اندراج میں ترمیم</string>
