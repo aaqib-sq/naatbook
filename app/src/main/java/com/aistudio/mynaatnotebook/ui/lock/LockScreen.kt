@@ -128,26 +128,16 @@ fun LockScreen(
     val remainingSec = ((lockoutUntilMs - nowMs) / 1000L).coerceAtLeast(0L)
     val keypadEnabled = !lockedOut && !pinSubmitting
 
-    // Lock 12: keys show the designed shine + fill + glow, not the stock
-    // Material ripple — the ripple and the shine are two different motions
-    // firing together, which felt odd. indication = null kills the ripple;
-    // the shared source is required by clickable but draws nothing.
+    // Lock 12: keys give only the standard press feedback (fill + glow),
+    // no ripple and no shine — both were removed because the effect felt
+    // odd. indication = null kills the ripple; the shared source is
+    // required by clickable but draws nothing.
     val keyInteractionSource = remember { MutableInteractionSource() }
 
-    // Lock 12 shine sweep: one soft grey band across the tapped key
-    // (750ms). A trigger counter restarts the sweep even when the same
-    // key is tapped twice in a row — a LaunchedEffect keyed on the key
-    // alone would not restart.
-    var shineKey by remember { mutableStateOf<String?>(null) }
-    var shineTrigger by remember { mutableIntStateOf(0) }
-    val shineAnim = remember { Animatable(0f) }
-    LaunchedEffect(shineTrigger) {
-        if (shineKey != null) {
-            shineAnim.snapTo(0f)
-            shineAnim.animateTo(1f, tween(750))
-            shineKey = null
-        }
-    }
+    // Lock 12: the shine sweep is REMOVED (owner order 2026-11-11) — the
+    // ripple was already removed, but the key-press effect still felt
+    // odd, so the shine goes too. Keys now give only fill + glow +
+    // vibration + the dot. No diagonal band, no ripple.
     // Auto biometric prompt (owner order 2026-11-11): when the lock
     // appears and fingerprint is on, the system prompt opens by itself
     // first — like other apps — with the PIN keypad staying as the
@@ -294,8 +284,6 @@ fun LockScreen(
                                         interactionSource = keyInteractionSource
                                     ) {
                                         Haptics.keypadTick(context)
-                                        shineKey = key
-                                        shineTrigger++
                                         pinError = false
                                         lockViewModel.clearBiometricError()
                                         pressedKey = key
@@ -336,39 +324,6 @@ fun LockScreen(
                                     .testTag("lock_key_$key"),
                                 contentAlignment = Alignment.Center
                             ) {
-                                // Lock 12 shine sweep: one soft grey band
-                                // sweeping the tapped key, 750ms, fading
-                                // in at the start and out at the end.
-                                // Drawn behind the digit, clipped to the
-                                // key's circle by the Box above.
-                                if (shineKey == key) {
-                                    val density = LocalDensity.current
-                                    Box(
-                                        modifier = Modifier
-                                            .size(38.dp, 110.dp)
-                                            .graphicsLayer {
-                                                rotationZ = -22f
-                                                val sweep = -120.dp + 300.dp * shineAnim.value
-                                                translationX = with(density) { sweep.toPx() }
-                                                val progress = shineAnim.value
-                                                alpha = minOf(
-                                                    progress / 0.15f,
-                                                    (1f - progress) / 0.15f,
-                                                    1f
-                                                ).coerceIn(0f, 1f)
-                                            }
-                                            .background(
-                                                brush = Brush.horizontalGradient(
-                                                    listOf(
-                                                        Color.Transparent,
-                                                        Color.White.copy(alpha = 0.6f),
-                                                        Color.White.copy(alpha = 0.45f),
-                                                        Color.Transparent
-                                                    )
-                                                )
-                                            )
-                                    )
-                                }
                                 // Press glow: a soft radial halo while
                                 // the key is held, on top of the fill.
                                 if (pressedKey == key) {
