@@ -1,6 +1,9 @@
 package com.aistudio.mynaatnotebook.ui.lock
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +34,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,8 +44,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -54,6 +62,12 @@ import com.aistudio.mynaatnotebook.viewmodel.LockViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.aistudio.mynaatnotebook.util.Haptics
+
+/**
+ * Lock 12 (owner-confirmed 2026-11-11): grey key/dot rings, matching the
+ * Meta AI preview the owner liked — bright white rings looked harsh.
+ */
+private val LockRingGrey = Color(0xFF888888)
 
 /**
  * Combined PIN + biometric lock screen (owner-confirmed variant, 2026-10-30).
@@ -113,6 +127,35 @@ fun LockScreen(
     val lockedOut = nowMs < lockoutUntilMs
     val remainingSec = ((lockoutUntilMs - nowMs) / 1000L).coerceAtLeast(0L)
     val keypadEnabled = !lockedOut && !pinSubmitting
+
+    // Lock 12 shine sweep: one soft grey band across the tapped key
+    // (750ms). A trigger counter restarts the sweep even when the same
+    // key is tapped twice in a row — a LaunchedEffect keyed on the key
+    // alone would not restart.
+    var shineKey by remember { mutableStateOf<String?>(null) }
+    var shineTrigger by remember { mutableIntStateOf(0) }
+    val shineAnim = remember { Animatable(0f) }
+    LaunchedEffect(shineTrigger) {
+        if (shineKey != null) {
+            shineAnim.snapTo(0f)
+            shineAnim.animateTo(1f, tween(750))
+            shineKey = null
+        }
+    }
+    // Auto biometric prompt (owner order 2026-11-11): when the lock
+    // appears and fingerprint is on, the system prompt opens by itself
+    // first — like other apps — with the PIN keypad staying as the
+    // fallback. Fires once per lock appearance; a cancel does not
+    // re-prompt.
+    var biometricAutoPrompted by remember { mutableStateOf(false) }
+    LaunchedEffect(biometricEnabled, lockedOut) {
+        if (biometricEnabled && lockViewModel.biometricAvailable && !lockedOut && !biometricAutoPrompted) {
+            biometricAutoPrompted = true
+            (context as? FragmentActivity)?.let {
+                lockViewModel.requestBiometric(it) { Haptics.confirm(context) }
+            }
+        }
+    }
 
     // Back must never escape the lock screen into the library.
     BackHandler(enabled = true) { }
@@ -176,23 +219,34 @@ fun LockScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(16.dp))
-            // PIN dots.
+            // PIN dots (Lock 12): grey rings, 24dp; a filled dot stays
+            // the background colour and only spreads lightly (scale
+            // 1.2) — it never turns white.
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 repeat(4) { index ->
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .border(
-                                2.dp,
-                                MaterialTheme.colorScheme.onBackground,
-                                CircleShape
-                            )
-                            .background(
-                                if (index < pin.length) MaterialTheme.colorScheme.onBackground
-                                else MaterialTheme.colorScheme.background
-                            )
-                    )
+                    key(index) {
+                        val dotFilled = index < pin.length
+                        val dotScale by animateFloatAsState(
+                            targetValue = if (dotFilled) 1.2f else 1f,
+                            animationSpec = tween(180),
+                            label = "dotScale"
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .graphicsLayer {
+                                    scaleX = dotScale
+                                    scaleY = dotScale
+                                }
+                                .clip(CircleShape)
+                                .border(
+                                    2.dp,
+                                    LockRingGrey,
+                                    CircleShape
+                                )
+                                .background(MaterialTheme.colorScheme.background)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(20.dp))
@@ -203,20 +257,20 @@ fun LockScreen(
             val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "<")
             keys.chunked(3).forEach { rowKeys ->
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    modifier = Modifier.padding(vertical = 6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.padding(vertical = 9.dp)
                 ) {
                     rowKeys.forEach { key ->
                         if (key.isEmpty()) {
-                            Spacer(modifier = Modifier.size(68.dp))
+                            Spacer(modifier = Modifier.size(78.dp))
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(68.dp)
+                                    .size(78.dp)
                                     .clip(CircleShape)
                                     .border(
                                         2.dp,
-                                        MaterialTheme.colorScheme.onBackground,
+                                        LockRingGrey,
                                         CircleShape
                                     )
                                     .background(
@@ -230,6 +284,8 @@ fun LockScreen(
                                     )
                                     .clickable(enabled = keypadEnabled) {
                                         Haptics.keypadTick(context)
+                                        shineKey = key
+                                        shineTrigger++
                                         pinError = false
                                         lockViewModel.clearBiometricError()
                                         pressedKey = key
@@ -270,6 +326,54 @@ fun LockScreen(
                                     .testTag("lock_key_$key"),
                                 contentAlignment = Alignment.Center
                             ) {
+                                // Lock 12 shine sweep: one soft grey band
+                                // sweeping the tapped key, 750ms, fading
+                                // in at the start and out at the end.
+                                // Drawn behind the digit, clipped to the
+                                // key's circle by the Box above.
+                                if (shineKey == key) {
+                                    val density = LocalDensity.current
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp, 110.dp)
+                                            .graphicsLayer {
+                                                rotationZ = -22f
+                                                val sweep = -120.dp + 300.dp * shineAnim.value
+                                                translationX = with(density) { sweep.toPx() }
+                                                val progress = shineAnim.value
+                                                alpha = minOf(
+                                                    progress / 0.15f,
+                                                    (1f - progress) / 0.15f,
+                                                    1f
+                                                ).coerceIn(0f, 1f)
+                                            }
+                                            .background(
+                                                brush = Brush.horizontalGradient(
+                                                    listOf(
+                                                        Color.Transparent,
+                                                        Color.White.copy(alpha = 0.6f),
+                                                        Color.White.copy(alpha = 0.45f),
+                                                        Color.Transparent
+                                                    )
+                                                )
+                                            )
+                                    )
+                                }
+                                // Press glow: a soft radial halo while
+                                // the key is held, on top of the fill.
+                                if (pressedKey == key) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                brush = Brush.radialGradient(
+                                                    0.0f to Color.White.copy(alpha = 0.20f),
+                                                    1.0f to Color.Transparent
+                                                ),
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
                                 // Delete is a standard backspace mark,
                                 // not a "<" glyph pretending to be one.
                                 if (key == "<") {
