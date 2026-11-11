@@ -315,7 +315,7 @@ class LockViewModel @Inject constructor(
         }
     }
 
-    /** System biometric prompt (fingerprint only). The prompt must never crash the app: any failure to show it falls back to the PIN keypad. Face is NOT offered: it needs BIOMETRIC_WEAK, and WEAK failed immediately on the owner's phone (PR #123) even though the fingerprint itself is fine. */
+    /** System biometric prompt (fingerprint only). The prompt must never crash the app: any failure to show it falls back to the PIN keypad. A biometric-only prompt REQUIRES a negative button (set below) — without it, PromptInfo.build() throws and the system dialog never appears at all. Face is NOT offered for now (STRONG only); it needs WEAK, which can be re-tested later with a valid PromptInfo — the PR #123 WEAK failure was this same missing-button bug, not a WEAK defect. */
     fun requestBiometric(activity: FragmentActivity, onAuthenticated: (() -> Unit)? = null) {
         val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
         val prompt = BiometricPrompt(
@@ -352,12 +352,18 @@ class LockViewModel @Inject constructor(
             val info = BiometricPrompt.PromptInfo.Builder()
                 .setTitle(context.getString(R.string.lock_biometric_title))
                 .setSubtitle(context.getString(R.string.lock_biometric_subtitle))
+                .setNegativeButtonText(context.getString(R.string.lock_use_pin_instead))
                 .setAllowedAuthenticators(
-                    // STRONG alone = fingerprint (Class 3) only. WEAK was
-                    // tried in PR #123 to add face, but on this phone the
-                    // WEAK prompt failed immediately on open ("Fingerprint /
-                    // face unlock failed") even though the fingerprint
-                    // itself works fine — so face is off for now.
+                    // STRONG alone = fingerprint (Class 3) only.
+                    // REQUIRED: a biometric-only prompt (no DEVICE_CREDENTIAL)
+                    // MUST have a negative button — without it, build()
+                    // throws IllegalArgumentException and the system dialog
+                    // never appears. That missing button was the real cause
+                    // of every biometric failure since PR #122 (crash in
+                    // #122, instant "failed" Toast in #123/#124/#125) — the
+                    // authenticator was never the problem. Tapping the
+                    // button fires ERROR_NEGATIVE_BUTTON, which the callback
+                    // already handles silently (PIN keypad stays).
                     // DEVICE_CREDENTIAL is deliberately NOT here: the device
                     // PIN must never unlock the app — the app's own PIN is
                     // the only PIN, and it is the fallback when the prompt
