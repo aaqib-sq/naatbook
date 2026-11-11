@@ -128,6 +128,12 @@ fun LockScreen(
     val remainingSec = ((lockoutUntilMs - nowMs) / 1000L).coerceAtLeast(0L)
     val keypadEnabled = !lockedOut && !pinSubmitting
 
+    // Lock 12: keys show the designed shine + fill + glow, not the stock
+    // Material ripple — the ripple and the shine are two different motions
+    // firing together, which felt odd. indication = null kills the ripple;
+    // the shared source is required by clickable but draws nothing.
+    val keyInteractionSource = remember { MutableInteractionSource() }
+
     // Lock 12 shine sweep: one soft grey band across the tapped key
     // (750ms). A trigger counter restarts the sweep even when the same
     // key is tapped twice in a row — a LaunchedEffect keyed on the key
@@ -282,7 +288,11 @@ fun LockScreen(
                                         },
                                         CircleShape
                                     )
-                                    .clickable(enabled = keypadEnabled) {
+                                    .clickable(
+                                        enabled = keypadEnabled,
+                                        indication = null,
+                                        interactionSource = keyInteractionSource
+                                    ) {
                                         Haptics.keypadTick(context)
                                         shineKey = key
                                         shineTrigger++
