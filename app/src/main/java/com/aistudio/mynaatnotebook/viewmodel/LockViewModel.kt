@@ -113,7 +113,9 @@ class LockViewModel @Inject constructor(
     /** True when this device can offer biometric unlock at all. */
     val biometricAvailable: Boolean
         get() = BiometricManager.from(context).canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_STRONG
+            // WEAK covers both fingerprint (Class 3) and face (Class 2),
+            // matching the prompt below.
+            BiometricManager.Authenticators.BIOMETRIC_WEAK
         ) == BiometricManager.BIOMETRIC_SUCCESS
 
     /** Auto-lock grace in minutes (0 = Immediate). */
@@ -314,7 +316,7 @@ class LockViewModel @Inject constructor(
         }
     }
 
-    /** System biometric prompt (fingerprint/face, device-credential fallback). */
+    /** System biometric prompt (fingerprint/face). The prompt must never crash the app: any failure to show it falls back to the PIN keypad. */
     fun requestBiometric(activity: FragmentActivity, onAuthenticated: (() -> Unit)? = null) {
         val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
         val prompt = BiometricPrompt(
@@ -347,21 +349,28 @@ class LockViewModel @Inject constructor(
                 }
             }
         )
-        val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(context.getString(R.string.lock_biometric_title))
-            .setSubtitle(context.getString(R.string.lock_biometric_subtitle))
-            .setAllowedAuthenticators(
-                // BIOMETRIC_STRONG = fingerprint (Class 3); BIOMETRIC_WEAK
-                // also covers face on this phone (Class 2), so the dialog
-                // offers fingerprint + face, like WhatsApp. DEVICE_CREDENTIAL
-                // is deliberately NOT here: the device PIN must never unlock
-                // the app — the app's own PIN is the only PIN, and it is the
-                // fallback when the prompt is cancelled or locked out.
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        try {
+            val info = BiometricPrompt.PromptInfo.Builder()
+                .setTitle(context.getString(R.string.lock_biometric_title))
+                .setSubtitle(context.getString(R.string.lock_biometric_subtitle))
+                .setAllowedAuthenticators(
+                    // WEAK alone covers fingerprint (Class 3) and face
+                    // (Class 2) — the dialog offers both, like WhatsApp.
+                    // DEVICE_CREDENTIAL is deliberately NOT here: the device
+                    // PIN must never unlock the app — the app's own PIN is
+                    // the only PIN, and it is the fallback when the prompt
+                    // is cancelled or locked out.
                     BiometricManager.Authenticators.BIOMETRIC_WEAK
-            )
-            .build()
-        prompt.authenticate(info)
+                )
+                .build()
+            prompt.authenticate(info)
+        } catch (e: Exception) {
+            // Showing the prompt failed (bad authenticator combination,
+            // activity state, anything): never crash — the PIN keypad is
+            // the fallback, and the error line tells the user to use it.
+            _biometricError.value = e.message
+            statusReporter.show(R.string.status_lock_biometric_failed)
+        }
     }
 
     /** Emergency export: encrypted file into Download/NaatBook. */
