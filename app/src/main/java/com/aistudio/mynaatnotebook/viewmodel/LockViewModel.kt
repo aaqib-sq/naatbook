@@ -351,8 +351,14 @@ class LockViewModel @Inject constructor(
             .setTitle(context.getString(R.string.lock_biometric_title))
             .setSubtitle(context.getString(R.string.lock_biometric_subtitle))
             .setAllowedAuthenticators(
+                // BIOMETRIC_STRONG = fingerprint (Class 3); BIOMETRIC_WEAK
+                // also covers face on this phone (Class 2), so the dialog
+                // offers fingerprint + face, like WhatsApp. DEVICE_CREDENTIAL
+                // is deliberately NOT here: the device PIN must never unlock
+                // the app — the app's own PIN is the only PIN, and it is the
+                // fallback when the prompt is cancelled or locked out.
                 BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK
             )
             .build()
         prompt.authenticate(info)
