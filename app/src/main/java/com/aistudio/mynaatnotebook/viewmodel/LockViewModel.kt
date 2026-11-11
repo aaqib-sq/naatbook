@@ -113,9 +113,8 @@ class LockViewModel @Inject constructor(
     /** True when this device can offer biometric unlock at all. */
     val biometricAvailable: Boolean
         get() = BiometricManager.from(context).canAuthenticate(
-            // WEAK covers both fingerprint (Class 3) and face (Class 2),
-            // matching the prompt below.
-            BiometricManager.Authenticators.BIOMETRIC_WEAK
+            // STRONG = fingerprint (Class 3), matching the prompt below.
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
         ) == BiometricManager.BIOMETRIC_SUCCESS
 
     /** Auto-lock grace in minutes (0 = Immediate). */
@@ -316,7 +315,7 @@ class LockViewModel @Inject constructor(
         }
     }
 
-    /** System biometric prompt (fingerprint/face). The prompt must never crash the app: any failure to show it falls back to the PIN keypad. */
+    /** System biometric prompt (fingerprint only). The prompt must never crash the app: any failure to show it falls back to the PIN keypad. Face is NOT offered: it needs BIOMETRIC_WEAK, and WEAK failed immediately on the owner's phone (PR #123) even though the fingerprint itself is fine. */
     fun requestBiometric(activity: FragmentActivity, onAuthenticated: (() -> Unit)? = null) {
         val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
         val prompt = BiometricPrompt(
@@ -354,13 +353,16 @@ class LockViewModel @Inject constructor(
                 .setTitle(context.getString(R.string.lock_biometric_title))
                 .setSubtitle(context.getString(R.string.lock_biometric_subtitle))
                 .setAllowedAuthenticators(
-                    // WEAK alone covers fingerprint (Class 3) and face
-                    // (Class 2) — the dialog offers both, like WhatsApp.
+                    // STRONG alone = fingerprint (Class 3) only. WEAK was
+                    // tried in PR #123 to add face, but on this phone the
+                    // WEAK prompt failed immediately on open ("Fingerprint /
+                    // face unlock failed") even though the fingerprint
+                    // itself works fine — so face is off for now.
                     // DEVICE_CREDENTIAL is deliberately NOT here: the device
                     // PIN must never unlock the app — the app's own PIN is
                     // the only PIN, and it is the fallback when the prompt
                     // is cancelled or locked out.
-                    BiometricManager.Authenticators.BIOMETRIC_WEAK
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG
                 )
                 .build()
             prompt.authenticate(info)
