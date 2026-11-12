@@ -32,6 +32,11 @@ val DarkBorder = Color(0xFF1F1F1F)
 // Favorite tint and highlight
 val HighContrastRed = Color(0xFFFF3B30)
 
+// Search highlight (owner-chosen 2026-11-12): Brandeis Blue #0074FF.
+// The exact searched span in a title / lyrics snippet is drawn in this
+// blue, in both themes. It is the only non-monochrome colour in the app.
+val SearchHighlightBlue = Color(0xFF0074FF)
+
 // Secondary text: theme-aware. The single dark value (#8E8E93) passed on
 // black but failed AA on white, so light theme gets a darker step while
 // dark keeps the original. Use secondaryTextColor() at call sites.

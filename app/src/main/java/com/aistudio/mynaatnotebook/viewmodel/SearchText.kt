@@ -32,6 +32,59 @@ private val SEARCH_DIACRITICS: Set<Char> = setOf(
     '\u0670' // superscript alef
 )
 
+/**
+ * Maps a (normalized) search query back onto the ORIGINAL text, so the
+ * matched span can be highlighted exactly as typed. The DAO folds both
+ * sides before matching (harakat stripped, variant letters folded), so a
+ * plain indexOf on the original text would miss matches whose spelling
+ * differs - this rebuilds the folded text while remembering, for every
+ * folded character, the index it came from in the original, then maps
+ * the folded match back. Returns the inclusive IntRange in original
+ * indices, or null when the query does not occur in [original].
+ */
+fun findFoldedMatchRange(original: String, query: String): IntRange? {
+    val q = normalizeSearchText(query)
+    if (q.isEmpty()) return null
+    val folded = StringBuilder(original.length)
+    val origIndex = ArrayList<Int>(original.length)
+    for (i in original.indices) {
+        val ch = original[i]
+        if (ch in SEARCH_DIACRITICS) continue
+        folded.append((SEARCH_FOLDS[ch] ?: ch).lowercaseChar())
+        origIndex.add(i)
+    }
+    val start = folded.toString().indexOf(q)
+    if (start < 0) return null
+    val endFolded = start + q.length - 1
+    if (endFolded >= origIndex.size) return null
+    return origIndex[start]..origIndex[endFolded]
+}
+
+/**
+ * The first lyrics line containing [query], windowed around the match so
+ * the highlighted word is always visible, with the highlight range inside
+ * the returned text. Returns null when no line contains the query. The
+ * window keeps ~24 characters of context on each side; a leading/trailing
+ * ellipsis marks text cut off by the window.
+ */
+fun lyricsSnippet(lyrics: String, query: String): Pair<String, IntRange>? {
+    val context = 24
+    for (rawLine in lyrics.split('\n')) {
+        val line = rawLine.trim()
+        if (line.isEmpty()) continue
+        val range = findFoldedMatchRange(line, query) ?: continue
+        val winStart = maxOf(0, range.first - context)
+        val winEnd = minOf(line.length, range.last + 1 + context)
+        val prefix = if (winStart > 0) "\u2026 " else ""
+        val suffix = if (winEnd < line.length) " \u2026" else ""
+        val text = prefix + line.substring(winStart, winEnd) + suffix
+        val hlStart = prefix.length + (range.first - winStart)
+        val hlEnd = prefix.length + (range.last - winStart)
+        return text to (hlStart..hlEnd)
+    }
+    return null
+}
+
 /** Variant letters folded to the form Urdu text is usually stored in. */
 private val SEARCH_FOLDS: Map<Char, Char> = mapOf(
     '\u0622' to '\u0627', // alef madda -> alef

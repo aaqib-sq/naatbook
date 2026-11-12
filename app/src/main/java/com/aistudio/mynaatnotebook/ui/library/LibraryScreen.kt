@@ -48,6 +48,10 @@ import androidx.compose.ui.res.painterResource
 import com.aistudio.mynaatnotebook.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,9 +66,12 @@ import com.aistudio.mynaatnotebook.data.NaatSummary
 import com.aistudio.mynaatnotebook.ui.theme.MyApplicationTheme
 import com.aistudio.mynaatnotebook.ui.theme.NastaliqFamily
 import com.aistudio.mynaatnotebook.ui.theme.HighContrastRed
+import com.aistudio.mynaatnotebook.ui.theme.SearchHighlightBlue
 import com.aistudio.mynaatnotebook.ui.theme.secondaryTextColor
 import com.aistudio.mynaatnotebook.viewmodel.NaatViewModel
 import com.aistudio.mynaatnotebook.viewmodel.normalizeSearchText
+import com.aistudio.mynaatnotebook.viewmodel.findFoldedMatchRange
+import com.aistudio.mynaatnotebook.viewmodel.lyricsSnippet
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -573,7 +580,8 @@ fun LibraryScreen(
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
                             onEditClick = { onEdit(naat.id) },
                             titleFontChoice = titleFontChoice,
-                            customFamilies = customFamilies
+                            customFamilies = customFamilies,
+                            searchQuery = debouncedSearchQuery
                         )
                         }
                     }
@@ -757,7 +765,8 @@ fun LibraryScreen(
                             onFavoriteClick = { viewModel.toggleFavorite(naat.id) },
                             onEditClick = { onEdit(naat.id) },
                             titleFontChoice = titleFontChoice,
-                            customFamilies = customFamilies
+                            customFamilies = customFamilies,
+                            searchQuery = debouncedSearchQuery
                         )
                     }
                 }
@@ -1223,6 +1232,28 @@ private fun EmptyStateGuide(
     }
 }
 
+/**
+ * Builds the text with only [range] drawn in [highlightColor]; a null
+ * range returns the plain text. Used for the search highlight: only the
+ * exact searched span is coloured, never the whole title or line.
+ */
+private fun highlightedText(
+    text: String,
+    range: IntRange?,
+    highlightColor: Color
+): AnnotatedString {
+    if (range == null) return AnnotatedString(text)
+    return buildAnnotatedString {
+        append(text.substring(0, range.first))
+        withStyle(SpanStyle(color = highlightColor)) {
+            append(text.substring(range.first, range.last + 1))
+        }
+        if (range.last + 1 < text.length) {
+            append(text.substring(range.last + 1))
+        }
+    }
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 fun NaatRowItem(
@@ -1237,7 +1268,12 @@ fun NaatRowItem(
     // family, resolved with urduScript = false, fell back to SansSerif
     // for Urdu titles whenever the choice was AUTO.
     titleFontChoice: String,
-    customFamilies: Map<String, FontFamily>
+    customFamilies: Map<String, FontFamily>,
+    // Active search query (debounced). Blank outside search: the row
+    // renders exactly as before. While searching, the exact searched
+    // span is highlighted in SearchHighlightBlue, and a lyrics-only
+    // match shows its matching lyrics line as the second line.
+    searchQuery: String = ""
 ) {
     val context = LocalContext.current
     val rowTitleFamily = FontChoices.resolveTitle(
@@ -1250,6 +1286,23 @@ fun NaatRowItem(
     // identity — no accent colors, per the approved preview.
     val cardBorder = if (isPlaying) MaterialTheme.colorScheme.onBackground
                      else MaterialTheme.colorScheme.outline
+    // Search highlight + lyrics snippet (owner order 2026-11-12).
+    // Title match: only the exact searched span is coloured
+    // SearchHighlightBlue (#0074FF). Lyrics-only match: the second line
+    // shows the matching lyrics line (same small size as the poet)
+    // instead of the poet, with the searched word highlighted. The
+    // card stays two lines either way.
+    val titleRange = remember(searchQuery, naat.title) {
+        if (searchQuery.isNotBlank()) findFoldedMatchRange(naat.title, searchQuery) else null
+    }
+    val titleText = remember(searchQuery, naat.title, titleRange) {
+        highlightedText(naat.title, titleRange, SearchHighlightBlue)
+    }
+    val lyricsSnippetText = remember(searchQuery, naat.lyrics, titleRange) {
+        if (searchQuery.isNotBlank() && titleRange == null) {
+            naat.lyrics?.let { lyricsSnippet(it, searchQuery) }
+        } else null
+    }
     // Entry actions live behind one very small overflow menu (owner order
     // 2026-10-27): the pencil/heart/trash buttons are gone from the card.
     // Long-press on the card opens the same menu.
@@ -1278,7 +1331,7 @@ fun NaatRowItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = naat.title,
+                        text = titleText,
                         style = MaterialTheme.typography.titleMedium,
                         // Audit fix M7: synthetic SemiBold muddies
                         // Nastaliq joins; Bold-family weights apply only
@@ -1323,7 +1376,20 @@ fun NaatRowItem(
                         )
                     }
                 }
-                if (!naat.poet.isNullOrBlank()) {
+                if (lyricsSnippetText != null) {
+                    Text(
+                        text = highlightedText(
+                            lyricsSnippetText.first,
+                            lyricsSnippetText.second,
+                            SearchHighlightBlue
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = secondaryTextColor(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                } else if (!naat.poet.isNullOrBlank()) {
                     Text(
                         text = stringResource(R.string.library_by_poet, naat.poet),
                         style = MaterialTheme.typography.bodySmall,
