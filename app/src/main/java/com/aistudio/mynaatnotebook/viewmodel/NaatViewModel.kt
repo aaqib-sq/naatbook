@@ -1029,8 +1029,8 @@ class NaatViewModel @Inject constructor(
             persistDraft(EditorDraft(
                 active = true,
                 editingId = naat.id,
-                title = naat.title,
-                poet = naat.poet.orEmpty(),
+                title = limitTitleWords(naat.title),
+                poet = cleanSingleLine(naat.poet.orEmpty()),
                 category = NaatCategories.normalize(naat.category),
                 lyrics = naat.lyrics.orEmpty(),
                 existingAudioType = naat.audioType,
@@ -1359,8 +1359,8 @@ class NaatViewModel @Inject constructor(
 
                     val saved = if (draft.editingId == null) {
                         val entity = NaatEntity(
-                            title = draft.title,
-                            poet = draft.poet.takeIf { it.isNotBlank() },
+                            title = limitTitleWords(draft.title),
+                            poet = cleanSingleLine(draft.poet).takeIf { it.isNotBlank() },
                             category = draft.category,
                             lyrics = draft.lyrics.takeIf { it.isNotBlank() },
                             audioType = audioType,
@@ -1381,8 +1381,8 @@ class NaatViewModel @Inject constructor(
                     } else {
                         val entity = NaatEntity(
                             id = draft.editingId,
-                            title = draft.title,
-                            poet = draft.poet.takeIf { it.isNotBlank() },
+                            title = limitTitleWords(draft.title),
+                            poet = cleanSingleLine(draft.poet).takeIf { it.isNotBlank() },
                             category = draft.category,
                             lyrics = draft.lyrics.takeIf { it.isNotBlank() },
                             audioType = audioType,
@@ -1780,3 +1780,16 @@ class NaatViewModel @Inject constructor(
         super.onCleared()
     }
 }
+
+/** Titles are capped at 12 words: a title is a name, not a passage.
+ *  Newlines are stripped too (a paste can smuggle them into a
+ *  single-line field). Extra words are dropped, never stored. */
+fun limitTitleWords(value: String): String {
+    val clean = value.replace("\n", " ").replace("\r", " ")
+    val words = clean.split(Regex("\\s+")).filter { it.isNotEmpty() }
+    return if (words.size <= 12) clean else words.take(12).joinToString(" ")
+}
+
+/** A single-line field must never hold a line break: strip them. */
+fun cleanSingleLine(value: String): String =
+    value.replace("\n", " ").replace("\r", " ")
