@@ -5,9 +5,10 @@ import com.aistudio.mynaatnotebook.data.NaatSummary
 /**
  * Stage-2 UX audit: relevance ranking for Library search.
  *
- * The DAO still does the matching (title/poet/lyrics, newest-first) — this
- * only re-orders the matches so title hits surface first, then poet hits,
- * then lyrics-only hits. Kotlin's sortedWith is stable, so the DAO's
+ * The DAO still does the matching (title/lyrics, newest-first) — this
+ * only re-orders the matches so title hits surface first, then
+ * lyrics-only hits. Poet left search (owner order 2026-11-12), so there
+ * is no poet tier. Kotlin's sortedWith is stable, so the DAO's
  * newest-first order is preserved inside each tier.
  */
 fun rankSearchResults(results: List<NaatSummary>, query: String): List<NaatSummary> {
@@ -18,8 +19,7 @@ fun rankSearchResults(results: List<NaatSummary>, query: String): List<NaatSumma
     return results.sortedWith(compareBy { summary ->
         when {
             normalizeSearchText(summary.title).contains(q) -> 0
-            summary.poet?.let { normalizeSearchText(it).contains(q) } == true -> 1
-            else -> 2
+            else -> 1
         }
     })
 }

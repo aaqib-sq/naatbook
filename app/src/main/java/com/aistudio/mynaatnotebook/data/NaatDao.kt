@@ -34,13 +34,12 @@ interface NaatDao {
     // variant letters folded, ASCII lowered) — a query typed with
     // diacritics or Arabic yeh/kaf used to match nothing at all.
     @Query("""
-        SELECT id, title, poet, category, audioType, audioPath, isFavorite, createdAt,
+        SELECT id, title, poet, category, lyrics, audioType, audioPath, isFavorite, createdAt,
                secondaryAudioType, secondaryAudioPath, titleFontOverride
         FROM naats
         WHERE (:folder IS NULL OR category = :folder COLLATE NOCASE)
           AND (:favoritesOnly = 0 OR isFavorite = 1)
           AND (:query = '' OR lower(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(title, 'ـ', ''), 'ً', ''), 'ٌ', ''), 'ٍ', ''), 'َ', ''), 'ُ', ''), 'ِ', ''), 'ّ', ''), 'ْ', ''), 'ٰ', ''), 'آ', 'ا'), 'أ', 'ا'), 'إ', 'ا'), 'ٱ', 'ا'), 'ؤ', 'و'), 'ئ', 'ی'), 'ي', 'ی'), 'ى', 'ی'), 'ك', 'ک'), 'ة', 'ہ'), 'ھ', 'ہ')) LIKE '%' || :query || '%' ESCAPE '\'
-               OR lower(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(poet, 'ـ', ''), 'ً', ''), 'ٌ', ''), 'ٍ', ''), 'َ', ''), 'ُ', ''), 'ِ', ''), 'ّ', ''), 'ْ', ''), 'ٰ', ''), 'آ', 'ا'), 'أ', 'ا'), 'إ', 'ا'), 'ٱ', 'ا'), 'ؤ', 'و'), 'ئ', 'ی'), 'ي', 'ی'), 'ى', 'ی'), 'ك', 'ک'), 'ة', 'ہ'), 'ھ', 'ہ')) LIKE '%' || :query || '%' ESCAPE '\'
                OR lower(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(lyrics, 'ـ', ''), 'ً', ''), 'ٌ', ''), 'ٍ', ''), 'َ', ''), 'ُ', ''), 'ِ', ''), 'ّ', ''), 'ْ', ''), 'ٰ', ''), 'آ', 'ا'), 'أ', 'ا'), 'إ', 'ا'), 'ٱ', 'ا'), 'ؤ', 'و'), 'ئ', 'ی'), 'ي', 'ی'), 'ى', 'ی'), 'ك', 'ک'), 'ة', 'ہ'), 'ھ', 'ہ')) LIKE '%' || :query || '%' ESCAPE '\')
         ORDER BY createdAt DESC
     """)

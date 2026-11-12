@@ -22,8 +22,8 @@ class SearchRankingTest {
     @Test
     fun `title match ranks above lyrics-only match`() {
         // DAO order is newest-first: the lyrics-only entry is newer.
-        // (A DAO row that matched only inside lyrics has a title+poet that
-        // do not contain the query — lyrics aren't carried by the projection.)
+        // (A DAO row that matched only inside lyrics has a title that does
+        // not contain the query.)
         val lyricsOnly = summary(2, "Some kalaam", poet = "Someone")
         val titleMatch = summary(1, "Madina sharif")
         val ranked = rankSearchResults(listOf(lyricsOnly, titleMatch), "madina")
@@ -31,12 +31,14 @@ class SearchRankingTest {
     }
 
     @Test
-    fun `poet match sits between title and lyrics-only matches`() {
+    fun `poet is not a ranking tier`() {
+        // Poet left search (owner order 2026-11-12): a row matching only
+        // in the poet ranks with lyrics-only rows, in DAO order — never
+        // above them.
         val lyricsOnly = summary(3, "Evening kalaam")
-        val poetMatch = summary(2, "Morning kalaam", poet = "Qari Madina")
-        val titleMatch = summary(1, "Madina sharif")
-        val ranked = rankSearchResults(listOf(lyricsOnly, poetMatch, titleMatch), "madina")
-        assertEquals(listOf(titleMatch, poetMatch, lyricsOnly), ranked)
+        val poetOnly = summary(2, "Morning kalaam", poet = "Qari Madina")
+        val ranked = rankSearchResults(listOf(lyricsOnly, poetOnly), "madina")
+        assertEquals(listOf(lyricsOnly, poetOnly), ranked)
     }
 
     @Test
