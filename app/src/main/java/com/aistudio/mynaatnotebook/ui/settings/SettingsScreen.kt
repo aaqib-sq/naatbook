@@ -126,7 +126,7 @@ fun SettingsScreen(
     val driveOperation by driveViewModel.operation.collectAsStateWithLifecycle()
     val drivePendingRestoreUri by driveViewModel.pendingRestoreUri.collectAsStateWithLifecycle()
     val driveConsentIntent by driveViewModel.consentIntent.collectAsStateWithLifecycle()
-    val driveEmptySyncConfirm by driveViewModel.emptySyncConfirm.collectAsStateWithLifecycle()
+    val driveStaleReminder by driveViewModel.staleReminder.collectAsStateWithLifecycle()
     val driveRestoreChoices by driveViewModel.restoreChoices.collectAsStateWithLifecycle()
     var driveDisconnectConfirm by rememberSaveable { mutableStateOf(false) }
     var showClearDataConfirm by rememberSaveable { mutableStateOf(false) }
@@ -1285,29 +1285,15 @@ fun SettingsScreen(
             }
         }
 
-        // Audit round 2 (S1/S2): a manual sync skipped by the empty-library
-        // guard asks before an empty backup is allowed over Drive's real ones.
-        if (driveEmptySyncConfirm) {
-            AlertDialog(
-                onDismissRequest = { driveViewModel.dismissEmptySync() },
-                title = { Text(stringResource(R.string.drive_empty_confirm_title)) },
-                text = { Text(stringResource(R.string.drive_empty_confirm_message)) },
-                confirmButton = {
-                    TextButton(onClick = { driveViewModel.confirmEmptySync() }) {
-                        Text(stringResource(R.string.drive_empty_confirm_action))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { driveViewModel.dismissEmptySync() }) {
-                        Text(stringResource(R.string.common_cancel))
-                    }
-                }
-            )
-        }
+        // Nine-fixes (flaw 2): the empty-sync confirm dialog is gone — an
+        // empty library never syncs, and the user is simply told nothing
+        // was backed up. No forced path remains.
 
         // UX batch 1 (audit B1): with several backups in Drive, restore
         // asks which one — date and entry count per backup, newest first —
-        // instead of blindly downloading the newest.
+        // instead of blindly downloading the newest. Nine-fixes (flaw 9):
+        // each backup also previews its first few entry titles, so the
+        // chooser names what's inside.
         driveRestoreChoices?.let { choices ->
             AlertDialog(
                 onDismissRequest = { driveViewModel.dismissRestoreChoices() },
@@ -1335,6 +1321,17 @@ fun SettingsScreen(
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                // Nine-fixes (flaw 9): first few titles inside
+                                // this backup, so the chooser names its contents.
+                                if (info.previewTitles.isNotEmpty()) {
+                                    Text(
+                                        info.previewTitles.joinToString(" · "),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -1400,6 +1397,16 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.testTag("drive_last_sync_text")
                         )
+                        // Nine-fixes (flaw 6): gentle nudge when Drive is
+                        // connected but nothing has synced for a week or more.
+                        if (driveStaleReminder) {
+                            Text(
+                                text = stringResource(R.string.settings_drive_stale_reminder),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.testTag("drive_stale_reminder_text")
+                            )
+                        }
                     }
                     SettingsRowDivider(14.dp)
                     SettingsActionRow(

@@ -72,7 +72,7 @@ class EntriesOnlyExportTest {
         insertEntryWithAudio("EntriesOnly", payload)
         val target = temporary.newFile("entries-only.zip")
 
-        assertEquals(1, manager.exportBackupToFile(target, entriesOnly = true).getOrThrow())
+        assertEquals(1, manager.exportBackupToFile(target, entriesOnly = true).getOrThrow().count)
 
         val names = zipNames(target)
         assertTrue(names.none { it.startsWith("audio/") })
@@ -91,7 +91,7 @@ class EntriesOnlyExportTest {
         insertEntryWithAudio("Full", payload)
         val target = temporary.newFile("full.zip")
 
-        assertEquals(1, manager.exportBackupToFile(target).getOrThrow())
+        assertEquals(1, manager.exportBackupToFile(target).getOrThrow().count)
 
         val names = zipNames(target)
         assertTrue(names.contains("audio/${digestOf(payload)}.m4a"))
@@ -190,7 +190,7 @@ class EntriesOnlyExportTest {
         )
         val target = temporary.newFile("fonts.zip")
 
-        assertEquals(2, manager.exportBackupToFile(target, entriesOnly = true).getOrThrow())
+        assertEquals(2, manager.exportBackupToFile(target, entriesOnly = true).getOrThrow().count)
         // The field travels in the format-v2 export JSON.
         val manifest = zipJson(target).getJSONArray("entries")
         val exported = (0 until manifest.length())

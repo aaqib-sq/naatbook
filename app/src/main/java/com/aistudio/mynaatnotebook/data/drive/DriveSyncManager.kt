@@ -2,6 +2,7 @@ package com.aistudio.mynaatnotebook.data.drive
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.annotation.StringRes
 import com.aistudio.mynaatnotebook.R
 import com.aistudio.mynaatnotebook.data.BackupManager
@@ -58,7 +59,13 @@ class DriveException(
 ) : IOException(message)
 
 /** One backup file stored in the Drive folder. */
-data class DriveBackupInfo(val fileId: String, val name: String, val createdAtMs: Long?)
+data class DriveBackupInfo(
+    val fileId: String,
+    val name: String,
+    val createdAtMs: Long?,
+    /** Nine-fixes (flaw 9): first few entry titles, for the restore chooser preview. */
+    val previewTitles: List<String> = emptyList()
+)
 
 /**
  * Entry count encoded in a Drive backup file name ("...-n42.zip", written
@@ -67,14 +74,33 @@ data class DriveBackupInfo(val fileId: String, val name: String, val createdAtMs
 fun driveBackupEntryCount(fileName: String): Int? =
     Regex("""-n(\d+)\.zip$""").find(fileName)?.groupValues?.get(1)?.toIntOrNull()
 
+/**
+ * Nine-fixes (flaw 5): the fileId rotation must never delete — the
+ * OLDEST backup that actually holds entries. An empty backup is never a
+ * safe copy; a backup whose name carries no count (pre-count names) is
+ * treated as holding entries. Null when no backup qualifies. Pure, so
+ * the pinning rule is unit-testable without Drive.
+ */
+fun selectPinnedBackupId(backupsNewestFirst: List<DriveBackupInfo>): String? =
+    backupsNewestFirst.asReversed()
+        .firstOrNull { info ->
+            val n = driveBackupEntryCount(info.name)
+            n == null || n > 0
+        }?.fileId
+
 /** Outcome of a sync attempt (audit round 2, S1/S2). */
 sealed interface SyncOutcome {
-    /** A backup was uploaded; [count] entries went up. */
-    data class Uploaded(val count: Int) : SyncOutcome
+    /**
+     * A backup was uploaded; [count] entries went up. [skippedAudio] is
+     * how many of those entries lost their audio to missing files
+     * (nine-fixes flaw 3) — the backup is saved, but the user is told.
+     */
+    data class Uploaded(val count: Int, val skippedAudio: Int = 0) : SyncOutcome
 
     /**
-     * Nothing was uploaded: the local library is empty and Drive already
-     * holds backups, so an empty upload would have endangered them.
+     * Nothing was uploaded: the local library is empty. An empty library
+     * never syncs (nine-fixes flaw 2) — there is nothing to back up, and
+     * an empty upload could evict real backups through rotation.
      */
     data object SkippedEmpty : SyncOutcome
 }
@@ -139,16 +165,13 @@ class DriveSyncManager @Inject constructor(
      * Build the backup ZIP and upload it to Drive, then prune old backups
      * and record the sync bookkeeping.
      *
-     * Empty-library guard (audit round 2, S1/S2): when the local library
-     * has 0 entries and the Drive folder already holds backups, the upload
-     * is skipped ([SyncOutcome.SkippedEmpty]) unless [forced] — an empty
-     * upload must never become the newest backup over real ones, because
-     * rotation keeps only the newest [KEEP_BACKUPS] and a restore against
-     * the empty file reads as "0 entries" (REPLACE would wipe the phone).
+     * Empty-library guard (audit round 2, S1/S2; hardened by the
+     * nine-fixes round, flaw 2): an empty library NEVER uploads — there
+     * is nothing to back up, and an empty upload could evict real backups
+     * through rotation. The old "forced" escape is closed.
      */
     suspend fun syncNow(
-        onProgress: (Float) -> Unit,
-        forced: Boolean = false
+        onProgress: (Float) -> Unit
     ): Result<SyncOutcome> = withContext(Dispatchers.IO) {
         runCatching {
             withApi { token ->
@@ -156,16 +179,16 @@ class DriveSyncManager @Inject constructor(
                 val hash = backupManager.contentHash()
                 val staged = File(context.cacheDir, "drive-sync-upload.zip")
                 try {
-                    val count = backupManager.exportBackupToFile(staged) { p ->
+                    val exportResult = backupManager.exportBackupToFile(staged) { p ->
                         onProgress(p * 0.3f)
                     }.getOrThrow()
+                    val count = exportResult.count
                     // The entry count rides in the file name so an empty
                     // backup is recognizable at a glance in the Drive app.
                     val name = BACKUP_FILE_PREFIX +
                         SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) +
                         "-n$count.zip"
-                    val existing = listBackups(token, folderId)
-                    if (DriveSyncPolicy.decideUpload(count, existing.size, forced) ==
+                    if (DriveSyncPolicy.decideUpload(count) ==
                         UploadDecision.SKIP_EMPTY_OVER_EXISTING
                     ) {
                         SyncOutcome.SkippedEmpty
@@ -193,17 +216,24 @@ class DriveSyncManager @Inject constructor(
                                     )
                                 }
                             }
-                            // Rotation: keep only the newest backups. An empty
-                            // upload (only possible when forced, or as the very
-                            // first backup) never evicts existing backups.
+                            // Rotation: keep only the newest backups, plus
+                            // one pinned safe copy (nine-fixes flaw 5) —
+                            // the oldest backup that holds entries is never
+                            // evicted, so a run of bad syncs cannot wipe
+                            // every good copy. The folder then holds at
+                            // most KEEP_BACKUPS newest + the pinned one.
                             if (count > 0) {
-                                listBackups(token, folderId).drop(KEEP_BACKUPS).forEach { old ->
-                                    currentCoroutineContext().ensureActive()
-                                    runCatching { deleteFile(token, old.fileId) }
-                                }
+                                val all = listBackups(token, folderId)
+                                val pinnedId = selectPinnedBackupId(all)
+                                all.drop(KEEP_BACKUPS)
+                                    .filter { it.fileId != pinnedId }
+                                    .forEach { old ->
+                                        currentCoroutineContext().ensureActive()
+                                        runCatching { deleteFile(token, old.fileId) }
+                                    }
                             }
                             settingsStore.recordDriveSync(System.currentTimeMillis(), hash)
-                            SyncOutcome.Uploaded(count)
+                            SyncOutcome.Uploaded(count, exportResult.skippedAudio)
                         } catch (e: CancellationException) {
                         // The cancel raced a completed upload: remove the orphan so
                         // Drive keeps only acknowledged syncs, and don't record a
@@ -262,6 +292,28 @@ class DriveSyncManager @Inject constructor(
                     val target = File(context.cacheDir, RESTORE_ZIP_NAME)
                     downloadFile(token, fileId, target, onProgress)
                     target
+                }
+            }
+        }
+
+    /**
+     * Nine-fixes (flaw 9): the first [maxTitles] entry titles of one Drive
+     * backup, for the restore chooser preview. The file is downloaded to
+     * a throwaway cache file, peeked via the manifest, and deleted — the
+     * real restore download (to drive-restore.zip) still happens only
+     * when the user picks that backup.
+     */
+    suspend fun peekBackupTitles(fileId: String, maxTitles: Int = 3): Result<List<String>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                withApi { token ->
+                    val temp = File(context.cacheDir, "drive-peek-$fileId.zip")
+                    try {
+                        downloadFile(token, fileId, temp) {}
+                        backupManager.peekEntryTitles(Uri.fromFile(temp), maxTitles).getOrThrow()
+                    } finally {
+                        runCatching { temp.delete() }
+                    }
                 }
             }
         }
@@ -563,6 +615,19 @@ class DriveSyncManager @Inject constructor(
             // propagates, so cancellation semantics are unchanged.
             runCatching { target.delete() }
             throw t
+        }
+        // Nine-fixes (flaw 7): verify the downloaded bytes match Drive's
+        // MD5, like the upload path does. A mismatch deletes the bad copy
+        // and fails with a clear error, so a corrupt download never
+        // reaches the import as a generic failure. When Drive reports no
+        // MD5 the check is skipped (fail-open, as on upload).
+        val remoteMd5 = runCatching { remoteMd5(token, fileId) }.getOrNull()
+        if (remoteMd5 != null && !remoteMd5.equals(md5Hex(target), ignoreCase = true)) {
+            runCatching { target.delete() }
+            throw DriveException(
+                "Download verification failed — please try again",
+                resId = R.string.status_drive_error_download_verify
+            )
         }
         onProgress(1f)
     }

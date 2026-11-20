@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -56,6 +57,27 @@ class DriveViewModel @Inject constructor(
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    /**
+     * Nine-fixes (flaw 6): Drive is connected but the last sync is over a
+     * week old (or never happened) — the Settings Drive card shows a gentle
+     * "sync now" nudge. The auto-sync default stays off; this only reminds.
+     */
+    private val _staleReminder = MutableStateFlow(false)
+    val staleReminder: StateFlow<Boolean> = _staleReminder.asStateFlow()
+
+    companion object {
+        /** A Drive backup older than this counts as stale (flaw 6). */
+        const val STALE_SYNC_THRESHOLD_MS = 7L * 24L * 60L * 60L * 1000L
+
+        /**
+         * Nine-fixes (flaw 6): true when Drive has never synced, or the
+         * last sync is older than [STALE_SYNC_THRESHOLD_MS]. Pure, so the
+         * rule is unit-testable.
+         */
+        fun isSyncStale(lastSyncAtMs: Long, nowMs: Long): Boolean =
+            lastSyncAtMs <= 0L || nowMs - lastSyncAtMs >= STALE_SYNC_THRESHOLD_MS
+    }
 
     private val _progress = MutableStateFlow<Float?>(null)
     val progress: StateFlow<Float?> = _progress.asStateFlow()
@@ -105,6 +127,13 @@ class DriveViewModel @Inject constructor(
                     SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault()).format(Date(at))
                 } else null
             }
+        }
+        // Nine-fixes (flaw 6): the stale-sync nudge follows the connection
+        // and the last-sync time together.
+        viewModelScope.launch {
+            combine(settingsStore.driveEmail, settingsStore.driveLastSyncAt) { email, at ->
+                email != null && isSyncStale(at, System.currentTimeMillis())
+            }.collect { _staleReminder.value = it }
         }
         // The Google sign-in cache is the source of truth; mirror it into
         // the store so the UI survives process death either way.
@@ -159,20 +188,7 @@ class DriveViewModel @Inject constructor(
 
     fun syncNow() = runSync(manual = true)
 
-    private val _emptySyncConfirm = MutableStateFlow(false)
-    /** Manual sync was skipped by the empty-library guard; ask first. */
-    val emptySyncConfirm: StateFlow<Boolean> = _emptySyncConfirm.asStateFlow()
-
-    fun confirmEmptySync() {
-        _emptySyncConfirm.value = false
-        runSync(manual = true, forced = true)
-    }
-
-    fun dismissEmptySync() {
-        _emptySyncConfirm.value = false
-    }
-
-    private fun runSync(manual: Boolean, forced: Boolean = false) {
+    private fun runSync(manual: Boolean) {
         if (_isSyncing.value) return
         _isSyncing.value = true
         _operation.value = DriveOp.SYNC
@@ -181,19 +197,29 @@ class DriveViewModel @Inject constructor(
             try {
                 if (manual) statusReporter.show(R.string.status_drive_syncing)
                 driveManager.syncNow(
-                    onProgress = { p -> _progress.value = p.coerceIn(0f, 1f) },
-                    forced = forced
+                    onProgress = { p -> _progress.value = p.coerceIn(0f, 1f) }
                 )
                     .onSuccess { outcome ->
                         when (outcome) {
-                            is SyncOutcome.Uploaded -> statusReporter.showPlural(
-                                R.plurals.status_drive_sync_success, outcome.count, outcome.count
-                            )
-                            SyncOutcome.SkippedEmpty -> if (manual) {
-                                _emptySyncConfirm.value = true
-                            } else {
-                                statusReporter.show(R.string.status_drive_empty_skipped)
+                            is SyncOutcome.Uploaded -> {
+                                statusReporter.showPlural(
+                                    R.plurals.status_drive_sync_success, outcome.count, outcome.count
+                                )
+                                // Nine-fixes (flaw 3): the backup is saved,
+                                // but say plainly that some audio went missing.
+                                if (outcome.skippedAudio > 0) {
+                                    statusReporter.showPlural(
+                                        R.plurals.status_export_audio_skipped,
+                                        outcome.skippedAudio, outcome.skippedAudio
+                                    )
+                                }
                             }
+                            // Nine-fixes (flaw 2): an empty library never
+                            // syncs — no confirm dialog anymore, just say
+                            // nothing was backed up. The old forced path
+                            // (confirmEmptySync) is closed entirely.
+                            SyncOutcome.SkippedEmpty ->
+                                statusReporter.show(R.string.status_drive_empty_skipped)
                         }
                     }
                     .onFailure { error ->
@@ -229,7 +255,18 @@ class DriveViewModel @Inject constructor(
                             backups.isEmpty() ->
                                 statusReporter.show(R.string.status_drive_no_backup)
                             backups.size == 1 -> downloadById(backups.first().fileId)
-                            else -> _restoreChoices.value = backups
+                            else -> {
+                                // Nine-fixes (flaw 9): preview the first few
+                                // titles of each backup so the chooser names
+                                // what's inside. A failed peek just leaves
+                                // that backup without a preview.
+                                val enriched = backups.map { info ->
+                                    val titles = driveManager.peekBackupTitles(info.fileId)
+                                        .getOrNull() ?: emptyList()
+                                    info.copy(previewTitles = titles)
+                                }
+                                _restoreChoices.value = enriched
+                            }
                         }
                     }
                     .onFailure { error ->

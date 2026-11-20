@@ -68,7 +68,8 @@ class NaatViewModel @Inject constructor(
     private val audioRecorder: AudioRecorder,
     val playbackController: PlaybackController,
     private val statusReporter: StatusReporter,
-    private val settingsStore: SettingsStore
+    private val settingsStore: SettingsStore,
+    private val backupManager: BackupManager
 ) : ViewModel() {
 
     private val draftStore = EditorDraftStore(savedStateHandle)
@@ -1574,9 +1575,14 @@ class NaatViewModel @Inject constructor(
      * Settings "Delete all data": permanently removes every entry and its
      * app-owned audio files, plus the per-entry reader state of the deleted
      * ids (so a later entry reusing an id never inherits stale offsets).
-     * No undo window — unlike single-entry delete, the Settings confirmation
-     * dialog is the safety. Drive/file backups are untouched, and parked
-     * editor drafts are left alone (unsaved work, not library data).
+     *
+     * Nine-fixes (flaw 1): the delete is gated — it only runs when a backup
+     * exists (same gate the lock uses), and a safety copy of the current
+     * library is always made first, so there is an undo. The gate check and
+     * the copy happen OUTSIDE audioFiles.exclusive — the export takes the
+     * same lock, so doing it inside would deadlock (the Mutex is not
+     * re-entrant). Drive/file backups are untouched, and parked editor
+     * drafts are left alone (unsaved work, not library data).
      */
     fun clearAllData(onDone: () -> Unit = {}) {
         if (!deleteGate.tryStart()) {
@@ -1586,6 +1592,21 @@ class NaatViewModel @Inject constructor(
         _isDeleting.value = true
         viewModelScope.launch {
             try {
+                // Nine-fixes (flaw 1): no backup, no delete — tell the user
+                // to back up first.
+                if (!settingsStore.hasAnyBackup()) {
+                    statusReporter.show(R.string.settings_clear_data_blocked)
+                    return@launch
+                }
+                // Nine-fixes (flaw 1): safety copy before deleting. If the
+                // copy fails, the delete is aborted — a failed copy must
+                // never be followed by a wipe.
+                val safetyCopy = backupManager.exportSafetyCopy()
+                if (safetyCopy.isFailure) {
+                    Log.e("NaatViewModel", "Safety copy failed; delete aborted", safetyCopy.exceptionOrNull())
+                    statusReporter.show(R.string.status_safety_copy_failed_delete)
+                    return@launch
+                }
                 audioFiles.exclusive {
                     finalizePendingDelete()
                     val all = repository.allNaats.first()

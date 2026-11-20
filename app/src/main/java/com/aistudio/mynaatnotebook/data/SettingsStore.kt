@@ -1,6 +1,8 @@
 package com.aistudio.mynaatnotebook.data
 
 import android.content.Context
+import android.net.Uri
+import android.provider.MediaStore
 import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
@@ -11,10 +13,12 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -483,14 +487,61 @@ class SettingsStore @Inject constructor(
      * manual export, or a picked export document. A Drive connection alone
      * (no sync yet) does NOT count: the lock may only be enabled when
      * something restorable actually exists.
+     *
+     * Nine-fixes (flaw 4): a timestamp alone is not proof — a deleted ZIP
+     * used to leave the app claiming a backup exists. The local evidence
+     * is now verified: a picked export document must still open, and an
+     * app-folder export must still have a file in Download/NaatBook. The
+     * Drive timestamp is kept as evidence — that file was MD5-verified at
+     * upload and lives on Google's servers, and verifying it would need a
+     * network round-trip (SettingsStore owns no Drive client). When a
+     * local check itself errors, the old timestamp-based answer is kept
+     * rather than blocking the user on a failed check.
      */
     suspend fun hasAnyBackup(): Boolean {
         val prefs = context.settingsDataStore.data
             .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
             .first()
-        return (prefs[KEY_LAST_BACKUP_AT] ?: 0L) > 0L ||
-            (prefs[KEY_DRIVE_LAST_SYNC_AT] ?: 0L) > 0L ||
-            prefs[KEY_LAST_EXPORT_URI] != null
+        // Drive: a recorded sync means a backup was uploaded (MD5-verified).
+        if ((prefs[KEY_DRIVE_LAST_SYNC_AT] ?: 0L) > 0L) return true
+        val exportUri = prefs[KEY_LAST_EXPORT_URI]
+        val lastBackupAt = prefs[KEY_LAST_BACKUP_AT] ?: 0L
+        // Local checks touch the filesystem — keep them off the main thread.
+        return withContext(Dispatchers.IO) {
+            if (exportUri != null && documentExists(exportUri)) return@withContext true
+            if (lastBackupAt > 0L && appFolderBackupExists()) return@withContext true
+            false
+        }
+    }
+
+    /** True when the SAF document at [uriString] still exists and opens. */
+    private fun documentExists(uriString: String): Boolean {
+        return try {
+            val uri = Uri.parse(uriString)
+            context.contentResolver.openFileDescriptor(uri, "r")?.close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** True when any backup file still sits in the Download/NaatBook folder. */
+    private fun appFolderBackupExists(): Boolean {
+        return try {
+            val uri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            val projection = arrayOf(MediaStore.Downloads._ID)
+            // MediaStore stores the path with a trailing slash; match both
+            // spellings so a device quirk never reports "no backup" when a
+            // file is really there.
+            val selection = "${MediaStore.Downloads.RELATIVE_PATH} IN (?, ?)"
+            val selectionArgs = arrayOf("Download/NaatBook", "Download/NaatBook/")
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor -> cursor.moveToFirst() } == true
+        } catch (e: Exception) {
+            // A failed check must not block the user — fall back to the
+            // timestamp (the old behaviour) by reporting a backup exists.
+            true
+        }
     }
 
 }
