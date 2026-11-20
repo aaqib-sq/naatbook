@@ -279,6 +279,10 @@
         <item quantity="one">لائبریری کا بیک اپ کامیابی سے برآمد ہو گیا! %1$d اندراج۔</item>
         <item quantity="other">لائبریری کا بیک اپ کامیابی سے برآمد ہو گیا! %1$d اندراجات۔</item>
     </plurals>
+    <plurals name="status_export_audio_skipped">
+        <item quantity="one">انتباہ: %1$d اندراج کی آڈیو غائب تھی اور بیک اپ میں شامل نہیں ہوئی۔</item>
+        <item quantity="other">انتباہ: %1$d اندراجات کی آڈیو غائب تھی اور بیک اپ میں شامل نہیں ہوئی۔</item>
+    </plurals>
     <string name="status_export_failed">برآمد ناکام: %1$s</string>
     <string name="status_importing">بیک اپ درآمد ہو رہا ہے، براہ کرم انتظار کریں...</string>
     <string name="settings_progress_exporting">بیک اپ بن رہا ہے</string>
@@ -326,10 +330,10 @@
     <string name="settings_import_confirm_title">بیک اپ درآمد کریں؟</string>
     <string name="settings_import_confirm_message">اس سے بیک اپ کے اندراجات آپ کی لائبریری میں شامل ہو جائیں گے۔ جاری رکھیں؟</string>
     <string name="settings_import_confirm_import">درآمد کریں</string>
-    <string name="settings_import_mode_merge">لائبریری میں شامل کریں</string>
-    <string name="settings_import_mode_merge_desc">نئے اندراجات شامل ہوتے ہیں؛ جو پہلے سے موجود ہوں وہ چھوڑ دیے جاتے ہیں۔</string>
-    <string name="settings_import_mode_replace">لائبریری تبدیل کریں</string>
-    <string name="settings_import_mode_replace_desc">لائبریری کی موجودہ ہر چیز حذف ہو کر اس بیک اپ سے بدل جاتی ہے۔</string>
+    <string name="settings_import_mode_merge">میری نعتیں رکھیں اور بیک اپ والی شامل کریں</string>
+    <string name="settings_import_mode_merge_desc">آپ کی موجودہ نعتیں رہیں گی۔ بیک اپ سے صرف نئی نعتیں شامل ہوں گی؛ جو پہلے سے موجود ہوں وہ چھوڑ دی جائیں گی۔</string>
+    <string name="settings_import_mode_replace">میری لائبریری بیک اپ سے بدل دیں</string>
+    <string name="settings_import_mode_replace_desc">لائبریری کی موجودہ ہر چیز حذف ہو کر اس بیک اپ سے بدل جائے گی۔ پہلے حفاظتی نقل محفوظ کی جائے گی، تاکہ آپ اسے واپس لا سکیں۔</string>
     <string name="settings_import_replace_title">پوری لائبریری تبدیل کریں؟</string>
     <string name="settings_import_replace_message">اس سے تمام موجودہ اندراجات اور ان کی آڈیو مستقل طور پر حذف ہو جائے گی اور بیک اپ شامل ہو جائے گا۔ کچھ بھی حذف ہونے سے پہلے موجودہ لائبریری کی حفاظتی نقل محفوظ کر لی جائے گی، تاکہ آپ اسے واپس لا سکیں۔ جاری رکھیں؟</string>
     <string name="settings_import_backup_count">اس بیک اپ میں %1$d اندراجات ہیں۔</string>
@@ -347,6 +351,7 @@
     <string name="settings_drive_connect_subtitle">بیک اپ آپ کے ڈرائیو میں نظر آنے والے “NaatBook Backup” فولڈر میں جائے گا</string>
     <string name="settings_drive_last_sync">آخری بار بھیجا گیا: %1$s</string>
     <string name="settings_drive_never_synced">ابھی تک ڈرائیو پر نہیں بھیجا گیا</string>
+    <string name="settings_drive_stale_reminder">آخری ڈرائیو بیک اپ کو کافی وقت ہو گیا ہے — تازہ بیک اپ کے لیے ابھی بھیجیں دبائیں۔</string>
     <string name="settings_drive_sync_now">ابھی بھیجیں</string>
     <string name="settings_drive_restore">ڈرائیو سے واپس لائیں</string>
     <string name="settings_drive_auto">خودکار بھیجنا</string>
@@ -376,6 +381,7 @@
          DriveException message must never reach a toast. -->
     <string name="status_drive_error_network">نیٹ ورک کی خرابی — اپنا کنکشن چیک کر کے دوبارہ کوشش کریں</string>
     <string name="status_drive_error_verify">اپ لوڈ کی جانچ ناکام رہی — دوبارہ بھیجیں</string>
+    <string name="status_drive_error_download_verify">ڈاؤن لوڈ کی جانچ ناکام رہی — دوبارہ کوشش کریں</string>
     <string name="status_drive_error_upload">ڈرائیو پر اپ لوڈ ناکام رہا — دوبارہ کوشش کریں</string>
     <string name="status_drive_error_generic">ڈرائیو کی درخواست ناکام رہی — دوبارہ کوشش کریں</string>
     <string name="status_drive_no_backup">ڈرائیو میں ابھی کوئی بیک اپ نہیں — پہلے بھیجیں</string>
@@ -383,9 +389,6 @@
     <string name="status_drive_consent_needed">جاری رکھنے کے لیے گوگل کو آپ کی اجازت چاہیے</string>
     <string name="status_drive_restore_available">اکاؤنٹ جڑ گیا۔ ڈرائیو میں پہلے سے ایک بیک اپ موجود ہے، مگر اس فون کی لائبریری ابھی بیک اپ نہیں ہوئی — ڈرائیو والا بیک اپ یہاں لانے کے لیے «ڈرائیو سے واپس لائیں»، اور اس فون کی لائبریری محفوظ کرنے کے لیے «ابھی بھیجیں» استعمال کریں</string>
     <string name="status_drive_empty_skipped">لائبریری خالی ہے — کوئی بیک اپ نہیں بھیجا گیا</string>
-    <string name="drive_empty_confirm_title">خالی لائبریری کا بیک اپ بھیجیں؟</string>
-    <string name="drive_empty_confirm_message">یہ لائبریری خالی ہے، مگر ڈرائیو میں پہلے سے اندراجات والا بیک اپ موجود ہے۔ ابھی بھیجنے سے خالی لائبریری سب سے نیا بیک اپ بن جائے گی، اور صرف تازہ ترین 3 بیک اپ ہی رکھے جاتے ہیں۔</string>
-    <string name="drive_empty_confirm_action">پھر بھی بھیجیں</string>
     <!-- UX batch 1 (2026-10-20): restore choice, safety copy, human errors -->
     <string name="drive_restore_choose_title">بحالی کے لیے بیک اپ منتخب کریں</string>
     <string name="drive_restore_date_unknown">تاریخ معلوم نہیں</string>
@@ -396,6 +399,8 @@
     <string name="status_safety_copy_making">پہلے موجودہ لائبریری کی حفاظتی نقل محفوظ کی جا رہی ہے...</string>
     <string name="status_safety_copy_saved">آپ کی پچھلی لائبریری کی حفاظتی نقل %1$s میں محفوظ ہو گئی — آپ اسے کسی بھی وقت واپس درآمد کر سکتے ہیں</string>
     <string name="status_safety_copy_failed">حفاظتی نقل محفوظ نہیں ہو سکی، اس لیے کچھ بھی تبدیل نہیں ہوا۔ کچھ جگہ خالی کر کے دوبارہ کوشش کریں</string>
+    <string name="status_safety_copy_failed_delete">حفاظتی نقل محفوظ نہیں ہو سکی، اس لیے کچھ بھی حذف نہیں ہوا۔ کچھ جگہ خالی کر کے دوبارہ کوشش کریں</string>
+    <string name="settings_clear_data_blocked">تمام ڈیٹا حذف کرنے سے پہلے بیک اپ ضروری ہے۔ ڈرائیو بیک اپ بنائیں یا مقامی ایکسپورٹ فائل محفوظ کریں، تاکہ آپ اپنی لائبریری ہمیشہ واپس لا سکیں۔</string>
     <string name="safety_place_downloads">Download/NaatBook</string>
     <string name="safety_place_app">ایپ کے حفاظتی فولڈر</string>
     <string name="status_error_bad_backup">یہ فائل NaatBook کا درست بیک اپ نہیں ہے</string>

@@ -13,6 +13,7 @@ import com.aistudio.mynaatnotebook.audio.PlaybackController
 import com.aistudio.mynaatnotebook.data.BackupManager
 import com.aistudio.mynaatnotebook.data.EncryptedBackup
 import com.aistudio.mynaatnotebook.data.ImportMode
+import com.aistudio.mynaatnotebook.data.SafetyCopyPlace
 import com.aistudio.mynaatnotebook.data.SettingsStore
 import com.aistudio.mynaatnotebook.data.drive.DriveSyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,11 +22,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import android.os.Build
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -101,8 +98,19 @@ class BackupViewModel @Inject constructor(
                 val result = backupManager.exportBackup(uri, entriesOnly) { p ->
                     _progress.value = p.coerceIn(0f, 1f)
                 }
-                result.onSuccess { count ->
-                    statusReporter.showPlural(R.plurals.status_export_success, count, count)
+                result.onSuccess { exportResult ->
+                    statusReporter.showPlural(R.plurals.status_export_success, exportResult.count, exportResult.count)
+                    // Nine-fixes (flaw 3): the backup is saved, but say
+                    // plainly that some audio went missing instead of
+                    // reporting plain success. Same delayed follow-up
+                    // rhythm as the safety-copy / fonts notes.
+                    if (exportResult.skippedAudio > 0) {
+                        delay(2_800)
+                        statusReporter.showPlural(
+                            R.plurals.status_export_audio_skipped,
+                            exportResult.skippedAudio, exportResult.skippedAudio
+                        )
+                    }
                     settingsStore.recordBackup(
                         System.currentTimeMillis(),
                         uri.lastPathSegment?.substringAfterLast('/') ?: "Chosen place"
@@ -138,8 +146,17 @@ class BackupViewModel @Inject constructor(
                 val result = backupManager.exportBackupToAppFolder(fileName, entriesOnly) { p ->
                     _progress.value = p.coerceIn(0f, 1f)
                 }
-                result.onSuccess { (count, label) ->
-                    statusReporter.showPlural(R.plurals.status_export_success, count, count)
+                result.onSuccess { (exportResult, label) ->
+                    statusReporter.showPlural(R.plurals.status_export_success, exportResult.count, exportResult.count)
+                    // Nine-fixes (flaw 3): same skipped-audio warning as
+                    // the picker export above.
+                    if (exportResult.skippedAudio > 0) {
+                        delay(2_800)
+                        statusReporter.showPlural(
+                            R.plurals.status_export_audio_skipped,
+                            exportResult.skippedAudio, exportResult.skippedAudio
+                        )
+                    }
                     settingsStore.recordBackup(System.currentTimeMillis(), label)
                 }.onFailure {
                     if (isCancelled(it)) {
@@ -181,26 +198,13 @@ class BackupViewModel @Inject constructor(
                 // UX batch 1 (Arena S4): a REPLACE wipes the current library
                 // with no undo, so a safety copy of it is saved FIRST. If the
                 // copy cannot be made, the replace does not run at all.
+                // Nine-fixes (flaw 1): Delete-all-data uses the same copy
+                // via BackupManager.exportSafetyCopy — the logic lives there.
                 var safetyPlace: StatusMessage.Res? = null
                 if (mode == ImportMode.REPLACE) {
                     statusReporter.show(R.string.status_safety_copy_making)
-                    val stamp = SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.US).format(Date())
-                    val safetyName = "NaatBook_safety-copy_$stamp.zip"
-                    val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                    val safety: Result<Int> = if (modern) {
-                        backupManager.exportBackupToAppFolder(safetyName)
-                            .map { (count, _) -> count }
-                    } else {
-                        // The Downloads folder needs Android 10+; older
-                        // phones keep the copy in the app's private folder.
-                        val dir = File(context.filesDir, "safety-copies").apply { mkdirs() }
-                        dir.listFiles()
-                            ?.sortedByDescending { it.lastModified() }
-                            ?.drop(1)
-                            ?.forEach { old -> runCatching { old.delete() } }
-                        backupManager.exportBackupToFile(File(dir, safetyName))
-                    }
-                    val safetyCount = safety.getOrElse { error ->
+                    val safety = backupManager.exportSafetyCopy()
+                    val safetyResult = safety.getOrElse { error ->
                         if (isCancelled(error)) {
                             statusReporter.show(R.string.status_cancelled)
                         } else {
@@ -208,9 +212,9 @@ class BackupViewModel @Inject constructor(
                         }
                         return@launch
                     }
-                    if (safetyCount > 0) {
+                    if (safetyResult.count > 0) {
                         safetyPlace = StatusMessage.Res(
-                            if (modern) R.string.safety_place_downloads
+                            if (safetyResult.place == SafetyCopyPlace.DOWNLOADS) R.string.safety_place_downloads
                             else R.string.safety_place_app
                         )
                     }

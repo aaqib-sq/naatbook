@@ -2,6 +2,7 @@ package com.aistudio.mynaatnotebook.data
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,9 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -51,6 +55,20 @@ data class ImportResult(
     // drop their per-entry DataStore keys immediately.
     val removedIds: List<Int> = emptyList()
 )
+
+/**
+ * Result of an export: entries written, and entries whose audio was
+ * missing from disk (nine-fixes flaw 3) — those entries still export,
+ * but without their audio, and the caller must say so instead of
+ * reporting plain success.
+ */
+data class ExportResult(val count: Int, val skippedAudio: Int)
+
+/** Where a pre-wipe / pre-replace safety copy was saved, for the receipt. */
+enum class SafetyCopyPlace { DOWNLOADS, APP_FOLDER }
+
+/** A safety copy of the current library, before a destructive operation. */
+data class SafetyCopyResult(val count: Int, val place: SafetyCopyPlace)
 
 /** How an import treats the current library. */
 enum class ImportMode { MERGE, REPLACE }
@@ -86,7 +104,13 @@ class BackupManager @Inject constructor(
     private data class ExportAudioIndex(
         val primaryPathByNaatId: Map<Int, String>,
         val secondaryPathByNaatId: Map<Int, String>,
-        val uniqueFiles: Collection<PackedAudio>
+        val uniqueFiles: Collection<PackedAudio>,
+        /**
+         * Nine-fixes (flaw 3): entries that reference an audio file which
+         * is no longer on disk. Their audio is silently dropped from the
+         * ZIP unless the caller surfaces this count.
+         */
+        val skippedAudioEntries: Int = 0
     )
     private data class StagedArchive(
         val formatVersion: Int,
@@ -124,19 +148,21 @@ class BackupManager @Inject constructor(
 
     /**
      * Builds the complete, fsynced backup zip into [stagedZip] and returns
-     * the entry count. Shared by the SAF export and the app-folder export
-     * so both produce byte-identical archives.
+     * the entry count plus how many entries lost their audio to missing
+     * files (nine-fixes flaw 3). Shared by the SAF export and the app-folder
+     * export so both produce byte-identical archives.
      *
      * When [entriesOnly] is true, the manifest keeps the audio references
      * (so the JSON stays self-consistent) but the audio payloads are left
      * out, producing a small file; import then drops those dangling
      * references instead of failing (see [StagedArchive.entriesOnly]).
+     * Audio is left out by design there, so nothing is "skipped".
      */
     private suspend fun writeBackupZip(
         stagedZip: File,
         onProgress: (Float) -> Unit,
         entriesOnly: Boolean = false
-    ): Int {
+    ): ExportResult {
         onProgress(0.05f)
         val naats = repository.allNaats.first()
         onProgress(0.15f)
@@ -229,25 +255,29 @@ class BackupManager @Inject constructor(
             }
         }
         onProgress(0.85f)
-        return naats.size
+        // Nine-fixes (flaw 3): an entries-only export leaves audio out by
+        // design, so only a FULL export reports audio that went missing.
+        return ExportResult(naats.size, if (entriesOnly) 0 else audioIndex.skippedAudioEntries)
     }
 
     /**
      * Build and fsync the complete archive before opening the user destination.
      * A hashing/ZIP failure therefore cannot truncate a previously valid backup.
+     * Returns the entry count and how many entries lost their audio to
+     * missing files (nine-fixes flaw 3).
      */
     suspend fun exportBackup(
         outputUri: Uri,
         entriesOnly: Boolean = false,
         onProgress: (Float) -> Unit = {}
-    ): Result<Int> = withContext(Dispatchers.IO) {
+    ): Result<ExportResult> = withContext(Dispatchers.IO) {
         audioFiles.exclusive {
             val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
             // Set the moment the destination document is opened (truncated);
             // only from then on can a failure leave a partial file behind.
             var destinationTouched = false
         runCatching {
-            val entryCount = writeBackupZip(stagedZip, onProgress, entriesOnly)
+            val exportResult = writeBackupZip(stagedZip, onProgress, entriesOnly)
 
             val descriptor = context.contentResolver.openFileDescriptor(outputUri, "w")
                 ?: throw IOException("Could not open output stream")
@@ -261,7 +291,7 @@ class BackupManager @Inject constructor(
                 }
             }
             onProgress(1f)
-            entryCount
+            exportResult
             }.onFailure {
                 Log.e("BackupManager", "Export failed", it)
                 // Audit fix: a failure DURING the final copy can leave a
@@ -286,13 +316,13 @@ class BackupManager @Inject constructor(
      * (approved design): MediaStore creates the folder automatically and no
      * permission or picker is needed on Android 10+. The file stays
      * IS_PENDING until the copy completes, and a failure deletes the pending
-     * row so no partial backup is left behind. Returns (entry count, label).
+     * row so no partial backup is left behind. Returns (export result, label).
      */
     suspend fun exportBackupToAppFolder(
         fileName: String,
         entriesOnly: Boolean = false,
         onProgress: (Float) -> Unit = {}
-    ): Result<Pair<Int, String>> = withContext(Dispatchers.IO) {
+    ): Result<Pair<ExportResult, String>> = withContext(Dispatchers.IO) {
         audioFiles.exclusive {
             val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
             var pendingUri: Uri? = null
@@ -304,7 +334,7 @@ class BackupManager @Inject constructor(
                 check(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     "The NaatBook folder needs Android 10 or newer — please use Choose another place"
                 }
-                val entryCount = writeBackupZip(stagedZip, onProgress, entriesOnly)
+                val exportResult = writeBackupZip(stagedZip, onProgress, entriesOnly)
                 val resolver = context.contentResolver
                 val values = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
@@ -326,7 +356,7 @@ class BackupManager @Inject constructor(
                 resolver.update(uri, publish, null, null)
                 pendingUri = null
                 onProgress(1f)
-                entryCount to "Download/NaatBook"
+                exportResult to "Download/NaatBook"
             }.onFailure {
                 Log.e("BackupManager", "App-folder export failed", it)
                 pendingUri?.let { uri ->
@@ -341,17 +371,18 @@ class BackupManager @Inject constructor(
      * file. Google Drive sync stages the backup here, then uploads the file
      * itself (and deletes it afterwards). Drive sync always uses a FULL
      * backup — the entries-only choice is manual-export only, so this keeps
-     * the default (entriesOnly = false).
+     * the default (entriesOnly = false). Returns the entry count and how
+     * many entries lost their audio to missing files (nine-fixes flaw 3).
      */
     suspend fun exportBackupToFile(
         target: File,
         entriesOnly: Boolean = false,
         onProgress: (Float) -> Unit = {}
-    ): Result<Int> = withContext(Dispatchers.IO) {
+    ): Result<ExportResult> = withContext(Dispatchers.IO) {
         audioFiles.exclusive {
             val stagedZip = File(context.cacheDir, "backup-export-${UUID.randomUUID()}.zip")
             runCatching {
-                val entryCount = writeBackupZip(stagedZip, onProgress, entriesOnly)
+                val exportResult = writeBackupZip(stagedZip, onProgress, entriesOnly)
                 target.parentFile?.mkdirs()
                 FileInputStream(stagedZip).use { input ->
                     FileOutputStream(target).use { output ->
@@ -359,10 +390,37 @@ class BackupManager @Inject constructor(
                         output.fd.sync()
                     }
                 }
-                entryCount
+                exportResult
             }.onFailure {
                 Log.e("BackupManager", "File export failed", it)
             }.also { stagedZip.delete() }
+        }
+    }
+
+    /**
+     * Nine-fixes (flaw 1): save a safety copy of the current library (a
+     * full ZIP) before a destructive operation — Delete-all-data and
+     * REPLACE both go through here now, so the copy logic lives in one
+     * place. On Android 10+ it goes to Download/NaatBook; older phones
+     * keep it in the app-private safety-copies folder (newest 1 only).
+     * The caller aborts the destructive step when this fails.
+     */
+    suspend fun exportSafetyCopy(): Result<SafetyCopyResult> {
+        val stamp = SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.US).format(Date())
+        val safetyName = "NaatBook_safety-copy_$stamp.zip"
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            exportBackupToAppFolder(safetyName)
+                .map { (result, _) -> SafetyCopyResult(result.count, SafetyCopyPlace.DOWNLOADS) }
+        } else {
+            // The Downloads folder needs Android 10+; older phones keep
+            // the copy in the app's private folder.
+            val dir = File(context.filesDir, "safety-copies").apply { mkdirs() }
+            dir.listFiles()
+                ?.sortedByDescending { it.lastModified() }
+                ?.drop(1)
+                ?.forEach { old -> runCatching { old.delete() } }
+            exportBackupToFile(File(dir, safetyName))
+                .map { result -> SafetyCopyResult(result.count, SafetyCopyPlace.APP_FOLDER) }
         }
     }
 
@@ -429,6 +487,39 @@ class BackupManager @Inject constructor(
         }
     }
 
+    /**
+     * Nine-fixes (flaw 9): the first [maxTitles] entry titles of a backup
+     * file, for restore previews — the Drive chooser names what's inside
+     * each backup instead of showing only a date and a count. Reads only
+     * the manifest entry; nothing is extracted.
+     */
+    suspend fun peekEntryTitles(inputUri: Uri, maxTitles: Int = 3): Result<List<String>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val input = context.contentResolver.openInputStream(inputUri)
+                    ?: throw IOException("Could not open input stream")
+                val budget = ExtractionBudget()
+                var titles: List<String>? = null
+                ZipInputStream(BufferedInputStream(input)).use { zip ->
+                    while (true) {
+                        val entry = zip.nextEntry ?: break
+                        if (entry.name == DATA_ENTRY) {
+                            val entries = parseBackupDocument(readJsonEntry(zip, budget)).second
+                            titles = buildList {
+                                for (i in 0 until minOf(entries.length(), maxTitles)) {
+                                    entries.getJSONObject(i).optString("title")
+                                        .takeIf { it.isNotBlank() }?.let { add(it) }
+                                }
+                            }
+                            break
+                        }
+                        zip.closeEntry()
+                    }
+                }
+                titles ?: throw IOException("Invalid backup file: $DATA_ENTRY not found")
+            }
+        }
+
     private suspend fun buildAudioIndex(
         naats: List<NaatEntity>,
         onProgress: (Float) -> Unit = {}
@@ -437,6 +528,7 @@ class BackupManager @Inject constructor(
         val secondary = mutableMapOf<Int, String>()
         val relativeByCanonicalSource = mutableMapOf<String, String>()
         val packedByDigest = linkedMapOf<String, PackedAudio>()
+        val skippedAudioIds = mutableSetOf<Int>()
 
         fun pack(path: String?): String? {
             val source = path?.let(::safeAudioSource) ?: return null
@@ -454,11 +546,18 @@ class BackupManager @Inject constructor(
 
         naats.forEachIndexed { index, naat ->
             currentCoroutineContext().ensureActive()
-            pack(naat.audioPath)?.let { primary[naat.id] = it }
-            pack(naat.secondaryAudioPath)?.let { secondary[naat.id] = it }
+            // Nine-fixes (flaw 3): a referenced audio file that is gone
+            // from disk used to vanish from the ZIP with no word — count
+            // the entry so the export result can warn about it.
+            val primaryPacked = naat.audioPath?.let { pack(it) }
+            if (naat.audioPath != null && primaryPacked == null) skippedAudioIds += naat.id
+            primaryPacked?.let { primary[naat.id] = it }
+            val secondaryPacked = naat.secondaryAudioPath?.let { pack(it) }
+            if (naat.secondaryAudioPath != null && secondaryPacked == null) skippedAudioIds += naat.id
+            secondaryPacked?.let { secondary[naat.id] = it }
             onProgress((index + 1f) / naats.size.coerceAtLeast(1))
         }
-        return ExportAudioIndex(primary, secondary, packedByDigest.values)
+        return ExportAudioIndex(primary, secondary, packedByDigest.values, skippedAudioIds.size)
     }
 
     private fun safeAudioSource(path: String): File? {

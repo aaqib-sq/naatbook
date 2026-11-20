@@ -94,6 +94,9 @@
     <string name="settings_clear_data_dialog_title">Delete all data?</string>
     <string name="settings_clear_data_dialog_message">Every entry and its attached audio will be permanently deleted from this device. Backups already saved in Drive or as files are not deleted. Make a backup first if you want to keep anything. Continue?</string>
     <string name="settings_clear_data_confirm">Delete all</string>
+    <!-- Nine-fixes (flaw 1): deleting the whole library needs a backup
+         first — the same gate the app lock uses. -->
+    <string name="settings_clear_data_blocked">Delete all data needs a backup first. Make a Drive backup or save a local export file, so you can always get your library back.</string>
     <string name="settings_export_cd">Export</string>
     <string name="settings_export_zip">Export ZIP</string>
     <string name="settings_export_subtitle">Into Download/NaatBook</string>
@@ -294,6 +297,13 @@
         <item quantity="one">Library Backup Exported Successfully! %1$d entry.</item>
         <item quantity="other">Library Backup Exported Successfully! %1$d entries.</item>
     </plurals>
+    <!-- Nine-fixes (flaw 3): an export whose audio was dropped must not
+         report plain success — the count of entries whose audio was
+         missing is surfaced with this warning instead. -->
+    <plurals name="status_export_audio_skipped">
+        <item quantity="one">Warning: audio for %1$d entry was missing and was not included in the backup.</item>
+        <item quantity="other">Warning: audio for %1$d entries was missing and was not included in the backup.</item>
+    </plurals>
     <string name="status_export_failed">Export Failed: %1$s</string>
     <string name="status_importing">Importing backup, please wait...</string>
     <string name="settings_progress_exporting">Exporting backup</string>
@@ -341,10 +351,12 @@
     <string name="settings_import_confirm_title">Import backup?</string>
     <string name="settings_import_confirm_message">This will add entries from the backup to your library. Continue?</string>
     <string name="settings_import_confirm_import">Import</string>
-    <string name="settings_import_mode_merge">Add to library</string>
-    <string name="settings_import_mode_merge_desc">New entries are added; entries that already exist are skipped.</string>
-    <string name="settings_import_mode_replace">Replace library</string>
-    <string name="settings_import_mode_replace_desc">Everything currently in the library is deleted and replaced by this backup.</string>
+    <!-- Nine-fixes (flaw 8): MERGE / REPLACE were jargon — the options now
+         say in plain words what happens to the current library. -->
+    <string name="settings_import_mode_merge">Keep my current naats and add the backup\'s</string>
+    <string name="settings_import_mode_merge_desc">Your current naats stay. Only new naats from the backup are added; ones you already have are skipped.</string>
+    <string name="settings_import_mode_replace">Replace my library with the backup</string>
+    <string name="settings_import_mode_replace_desc">Everything in your library now is deleted and replaced by the backup. A safety copy is saved first, so you can bring it back.</string>
     <string name="settings_import_replace_title">Replace the whole library?</string>
     <string name="settings_import_replace_message">This will permanently delete all current entries and their audio, then load the backup. First, a safety copy of your current library will be saved, so you can bring it back if you change your mind. Continue?</string>
     <string name="settings_import_backup_count">This backup contains %1$d entries.</string>
@@ -362,6 +374,10 @@
     <string name="settings_drive_connect_subtitle">Backups go to a visible “NaatBook Backup” folder in your Drive</string>
     <string name="settings_drive_last_sync">Last synced: %1$s</string>
     <string name="settings_drive_never_synced">Not synced to Drive yet</string>
+    <!-- Nine-fixes (flaw 6): gentle nudge when Drive is connected but the
+         last sync is over a week old (or never happened). Shown as a status
+         line in the Drive card, never a popup; the default stays off. -->
+    <string name="settings_drive_stale_reminder">It\'s been a while since your last Drive backup — tap Sync now to back up.</string>
     <string name="settings_drive_sync_now">Sync now</string>
     <string name="settings_drive_restore">Restore from Drive</string>
     <string name="settings_drive_auto">Automatic sync</string>
@@ -391,6 +407,8 @@
          DriveException message must never reach a toast. -->
     <string name="status_drive_error_network">Network error — please check your connection and try again</string>
     <string name="status_drive_error_verify">Upload verification failed — please sync again</string>
+    <!-- Nine-fixes (flaw 7): the download side now verifies MD5 too. -->
+    <string name="status_drive_error_download_verify">Download verification failed — please try again</string>
     <string name="status_drive_error_upload">Drive upload failed — please try again</string>
     <string name="status_drive_error_generic">Drive request failed — please try again</string>
     <string name="status_drive_no_backup">No backup in Drive yet — sync first</string>
@@ -398,9 +416,6 @@
     <string name="status_drive_consent_needed">Google needs your permission to continue</string>
     <string name="status_drive_restore_available">Connected. Drive already holds a backup, but this phone\'s library is not backed up yet — Restore brings the Drive backup here; Sync now saves this phone\'s library</string>
     <string name="status_drive_empty_skipped">Library is empty — nothing was backed up</string>
-    <string name="drive_empty_confirm_title">Back up an empty library?</string>
-    <string name="drive_empty_confirm_message">This library is empty, but Drive already holds a backup with entries. Syncing now makes the empty library the newest backup, and only the newest 3 backups are kept.</string>
-    <string name="drive_empty_confirm_action">Back up anyway</string>
     <!-- UX batch 1 (2026-10-20): restore choice, safety copy, human errors -->
     <string name="drive_restore_choose_title">Choose a backup to restore</string>
     <string name="drive_restore_date_unknown">Date unknown</string>
@@ -411,6 +426,8 @@
     <string name="status_safety_copy_making">Saving a safety copy of your current library first...</string>
     <string name="status_safety_copy_saved">Safety copy of your previous library saved in %1$s — you can import it back anytime</string>
     <string name="status_safety_copy_failed">A safety copy could not be saved, so nothing was replaced. Free up some space and try again</string>
+    <!-- Nine-fixes (flaw 1): same failure, but the wipe was the operation. -->
+    <string name="status_safety_copy_failed_delete">A safety copy could not be saved, so nothing was deleted. Free up some space and try again</string>
     <string name="safety_place_downloads">Download/NaatBook</string>
     <string name="safety_place_app">the app\'s safety folder</string>
     <string name="status_error_bad_backup">this file is not a valid NaatBook backup</string>
